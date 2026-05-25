@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<!--
+  AlexOS - A Windows XP-inspired personal portfolio landing page.
+  Plain HTML / CSS / JS. No frameworks, no backend.
+
+  HOW TO EDIT:
+  - Each window lives in its own <section class="window"> block below.
+  - Change the text inside a window's .window-body to update its content.
+  - To rename a window, update both the data-title and the .window-title text.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AlexOS</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ===================== DESKTOP ===================== -->
+  <main id="desktop">
+
+    <!-- Desktop icons. data-window points to the window id (without "win-"). -->
+    <div class="desktop-icons">
+      <button class="desktop-icon" data-window="welcome">
+        <span class="icon-glyph">&#128187;</span>
+        <span class="icon-label">Welcome</span>
+      </button>
+      <button class="desktop-icon" data-window="projects">
+        <span class="icon-glyph">&#128193;</span>
+        <span class="icon-label">Projects</span>
+      </button>
+      <button class="desktop-icon" data-window="resume">
+        <span class="icon-glyph">&#128196;</span>
+        <span class="icon-label">Resume</span>
+      </button>
+      <button class="desktop-icon" data-window="games">
+        <span class="icon-glyph">&#127918;</span>
+        <span class="icon-label">Games</span>
+      </button>
+      <button class="desktop-icon" data-window="hobbies">
+        <span class="icon-glyph">&#127912;</span>
+        <span class="icon-label">Hobbies</span>
+      </button>
+      <button class="desktop-icon" data-window="videos">
+        <span class="icon-glyph">&#127916;</span>
+        <span class="icon-label">Videos</span>
+      </button>
+      <button class="desktop-icon" data-window="terminal">
+        <span class="icon-glyph">&#128421;</span>
+        <span class="icon-label">Terminal</span>
+      </button>
+      <button class="desktop-icon" data-window="contact">
+        <span class="icon-glyph">&#9993;</span>
+        <span class="icon-label">Contact</span>
+      </button>
+    </div>
+
+    <!-- ===================== WINDOWS ===================== -->
+    <!-- All windows start hidden. JavaScript shows/positions them. -->
+
+    <!-- Welcome (auto-opens, centered, on page load) -->
+    <section class="window hidden" id="win-welcome" data-title="Welcome">
+      <header class="window-title-bar">
+        <span class="window-title">Welcome</span>
+        <div class="window-controls">
+          <button class="win-btn win-min" title="Minimize">_</button>
+          <button class="win-btn win-close" title="Close">&#10005;</button>
+        </div>
+      </header>
+      <div class="window-body welcome-body">
+        <div class="welcome-logo">&#9733;</div>
+        <h2>Welcome to AlexOS</h2>
+        <p class="welcome-version">Version 1.0</p>
+        <p>Hi, I'm Alex &mdash; welcome to my personal portfolio, built to look
+           and feel like an early-2000s desktop operating system.</p>
+        <p>Click the icons on the desktop, or use the <strong>Start</strong>
+           menu, to explore my Projects, Resume, Games, Hobbies, Terminal,
+           and Contact info.</p>
+        <p class="welcome-note">More coming soon &mdash; thanks for stopping by!</p>
+      </div>
+    </section>
+
+    <!-- Projects -->
+    <section class="window hidden" id="win-projects" data-title="Projects">
+      <header class="window-title-bar">
+        <span class="window-title">Projects</span>
+        <div class="window-controls">
+          <button class="win-btn win-min" title="Minimize">_</button>
+          <button class="win-btn win-close" title="Close">&#10005;</button>
+        </div>
+      </header>
+      <div class="window-body">
+        <h2>My Projects</h2>
+        <p>Click a project to open its details.</p>
+        <!-- Project items are generated from the PROJECTS config in script.js. -->
+        <div id="projects-list" class="projects-list"></div>
+      </div>
+    </section>
+
+    <!-- Resume -->
+    <section class="window hidden" id="win-resume" data-title="Resume">
+      <header class="window-title-bar">
+        <span class="window-title">Resume</span>
+        <div class="window-controls">
+          <button class="win-btn win-min" title="Minimize">_</button>
+          <button class="win-btn win-close" title="Close">&#10005;</button>
+        </div>
+      </header>
+      <div class="window-body">
+        <h2>Resume</h2>
+        <div class="resume-section">
+          <h3>Education</h3>
+          <p>Placeholder &mdash; add your school, degree, and graduation year.</p>
+        </div>
+        <div class="resume-section">
+          <h3>Skills</h3>
+          <p>Placeholder &mdash; list languages, frameworks, and tools you know.</p>
+        </div>
+        <div class="resume-section">
+          <h3>Projects</h3>
+          <p>Placeholder &mdash; highlight a few standout projects (see the Projects window).</p>
+        </div>
+        <div class="resume-section">
+          <h3>Experience</h3>
+          <p>Placeholder &mdash; add internships, jobs, or volunteer work.</p>
+        </div>
+        <button class="action-btn" id="download-resume">Download Resume</button>
+      </div>
+    </section>
+
+    <!-- Games -->
+    <section class="window hidden" id="win-games" data-title="Games">
+      <header class="window-title-bar">
+        <span class="window-title">Games</span>
+        <div class="window-controls">
+          <button class="win-btn win-min" title="Minimize">_</button>
+          <button class="win-btn win-close" title="Close">&#10005;</button>
+        </div>
+      </header>
+      <div class="window-body">
+        <h2>Games</h2>
+        <ul class="plain-list">
+          <li><strong>Snake</strong> &mdash; <span class="coming-soon">Coming soon</span></li>
+          <li><strong>Tic Tac Toe</strong> &mdash; <span class="coming-soon">Coming soon</span></li>
+          <li><strong>Text Adventure</strong> &mdash; <span class="coming-soon">Coming soon</span></li>
+        </ul>
+        <p>These mini-games are placeholders. They will be playable in a future version of AlexOS.</p>
+      </div>
+    </section>
+
+    <!-- Hobbies -->
+    <section class="window hidden" id="win-hobbies" data-title="Hobbies">
+      <header class="window-title-bar">
+        <span class="window-title">Hobbies</span>
+        <div class="window-controls">
+          <button class="win-btn win-min" title="Minimize">_</button>
+          <button class="win-btn win-close" title="Close">&#10005;</button>
+        </div>
+      </header>
+      <div class="window-body">
+        <h2>Hobbies</h2>
+        <ul class="plain-list">
+          <li><strong>Programming</strong> &mdash; building tools and side projects.</li>
+          <li><strong>Warhammer / 40K lore</strong> &mdash; reading and tracking the lore.</li>
+          <li><strong>Gaming</strong> &mdash; video and tabletop games.</li>
+          <li><strong>Reading sci-fi</strong> &mdash; classic and modern science fiction.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Videos -->
+    <section class="window hidden" id="win-videos" data-title="Videos">
+      <header class="window-title-bar">
+        <span class="window-title">Videos</span>
+        <div class="window-controls">
+          <button class="win-btn win-min" title="Minimize">_</button>
+          <button class="win-btn win-close" title="Close">&#10005;</button>
+        </div>
+      </header>
+      <div class="window-body">
+        <h2>Videos</h2>
+        <p>Click a video to play it.</p>
+        <!-- Video items are generated from the VIDEOS config in script.js. -->
+        <div id="videos-list" class="videos-list"></div>
+      </div>
+    </section>
+
+    <!-- Terminal -->
+    <section class="window hidden" id="win-terminal" data-title="Terminal">
+      <header class="window-title-bar">
+        <span class="window-title">Terminal</span>
+        <div class="window-controls">
+          <button class="win-btn win-min" title="Minimize">_</button>
+          <button class="win-btn win-close" title="Close">&#10005;</button>
+        </div>
+      </header>
+      <div class="window-body terminal-body">
+        <div id="terminal-output" class="terminal-output">
+Welcome to AlexOS Terminal v1.0
+Type "help" to see available commands.
+        </div>
+        <div class="terminal-input-line">
+          <span class="terminal-prompt">alex@alexos:~$</span>
+          <input type="text" id="terminal-input" class="terminal-input"
+                 autocomplete="off" spellcheck="false" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Contact -->
+    <section class="window hidden" id="win-contact" data-title="Contact">
+      <header class="window-title-bar">
+        <span class="window-title">Contact</span>
+        <div class="window-controls">
+          <button class="win-btn win-min" title="Minimize">_</button>
+          <button class="win-btn win-close" title="Close">&#10005;</button>
+        </div>
+      </header>
+      <div class="window-body">
+        <h2>Contact</h2>
+        <p>Get in touch &mdash; replace the placeholders below with your real info.</p>
+        <ul class="plain-list">
+          <li><strong>Email:</strong> your-email-here</li>
+          <li><strong>GitHub:</strong> your-github-here</li>
+          <li><strong>LinkedIn:</strong> your-linkedin-here</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Project Detail (opens when a project is clicked; filled by JS) -->
+    <section class="window hidden" id="win-project-detail" data-title="Project">
+      <header class="window-title-bar">
+        <span class="window-title">Project</span>
+        <div class="window-controls">
+          <button class="win-btn win-min" title="Minimize">_</button>
+          <button class="win-btn win-close" title="Close">&#10005;</button>
+        </div>
+      </header>
+      <div class="window-body" id="project-detail-body">
+        <!-- Content is generated by JavaScript from the PROJECTS config. -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ===================== START MENU ===================== -->
+  <nav id="start-menu" class="hidden">
+    <div class="start-menu-header">AlexOS</div>
+    <ul class="start-menu-list">
+      <li class="start-menu-item" data-window="welcome">
+        <span class="start-icon">&#128187;</span> Welcome
+      </li>
+      <li class="start-menu-item" data-window="projects">
+        <span class="start-icon">&#128193;</span> Projects
+      </li>
+      <li class="start-menu-item" data-window="resume">
+        <span class="start-icon">&#128196;</span> Resume
+      </li>
+      <li class="start-menu-item" data-window="games">
+        <span class="start-icon">&#127918;</span> Games
+      </li>
+      <li class="start-menu-item" data-window="hobbies">
+        <span class="start-icon">&#127912;</span> Hobbies
+      </li>
+      <li class="start-menu-item" data-window="videos">
+        <span class="start-icon">&#127916;</span> Videos
+      </li>
+      <li class="start-menu-item" data-window="terminal">
+        <span class="start-icon">&#128421;</span> Terminal
+      </li>
+      <li class="start-menu-item" data-window="contact">
+        <span class="start-icon">&#9993;</span> Contact
+      </li>
+    </ul>
+  </nav>
+
+  <!-- ===================== TASKBAR ===================== -->
+  <footer id="taskbar">
+    <button id="start-button">
+      <span class="start-logo">&#9733;</span> Start
+    </button>
+    <!-- Open-window buttons get inserted here by JavaScript. -->
+    <div id="taskbar-windows"></div>
+    <div id="clock">--:--</div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
