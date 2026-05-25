@@ -1149,7 +1149,7 @@
       note.textContent =
         "Runs the freely distributed shareware episode, embedded from " +
         "the Internet Archive. Click into the game to start, then use " +
-        "the arrow keys to move and Ctrl to fire.";
+        "the arrow keys to move and Mouse to fire.";
       body.appendChild(note);
     } else {
       // Placeholder: a game that is not built yet.
