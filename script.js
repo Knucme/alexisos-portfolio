@@ -36,7 +36,7 @@
   const VIDEOS = [
     {
       title: "Blessing",
-      description: "A short Test video I put together",
+      description: "Test Video!",
       file: "videos/Blessing.mp4"
     },
     {
@@ -716,7 +716,7 @@
     help:
       "Available commands:\n" +
       "  help             - show this list\n" +
-      "  about            - about AlexOS\n" +
+      "  about            - about AlexisOS\n" +
       "  ls / dir [path]  - list files in a folder\n" +
       "  cd <folder>      - change folder (use 'cd ..' to go up)\n" +
       "  pwd              - show the current folder\n" +
