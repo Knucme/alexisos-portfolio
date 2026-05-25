@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  AlexOS - A Windows XP-inspired personal portfolio landing page.
+  AlexisOS - A Windows XP inspired personal portfolio landing page.
   Built with plain HTML, CSS, and JavaScript. No frameworks, no backend.
 
   STRUCTURE
@@ -12,19 +12,19 @@
 
   HOW TO EDIT THE CONTENT
   - Each window lives in its own <section class="window"> block below.
-    Change the text inside a window's .window-body to update it.
-  - To rename a window, update both its data-title attribute and the
-    .window-title text.
-  - Projects and Videos are data-driven: edit the PROJECTS and VIDEOS
+    Change the text inside a window's .window body to update it.
+  - To rename a window, update both its data title attribute and the
+    .window title text.
+  - Projects and Videos are data driven: edit the PROJECTS and VIDEOS
     config objects near the top of script.js.
 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AlexOS</title>
-  <!-- Browser tab icon. Swap images/favicon.svg to change it. -->
-  <link rel="icon" href="images/favicon.svg" type="image/svg+xml" />
+  <title>AlexisOS</title>
+  <!-- Browser tab icon. Swap images/favicon.png to change it. -->
+  <link rel="icon" href="images/favicon.png" type="image/png" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -84,40 +84,14 @@
         <div class="welcome-logo">&#9733;</div>
         <h2>Welcome to AlexOS</h2>
         <p class="welcome-version">Version 1.0</p>
-        <p>Hi, I'm Alex. Welcome to my personal portfolio &mdash; I built it
-           to look and feel like an early-2000s desktop operating system.</p>
+        <p>Hi, I'm Alexis. Welcome to my personal portfolio; I built it
+           to look and feel like an early 2000s desktop operating system.</p>
         <p>Click the icons on the desktop, or use the <strong>Start</strong>
            menu, to explore my Projects, Resume, Videos, Hobbies, and more.
-           I'll keep adding to AlexOS over time, so feel free to check back
+           I'll keep adding to AlexisOS over time, so feel free to check back
            as it grows.</p>
-        <!-- Profile links, shown as pressable icons.
-             Update the href values if your profile URLs ever change. -->
-        <div class="welcome-links">
-          <a class="social-icon" href="https://github.com/Knucme"
-             target="_blank" rel="noopener" title="Visit my GitHub">
-            <svg viewBox="0 0 48 48" aria-hidden="true">
-              <rect width="48" height="48" rx="9" fill="#1f2328" />
-              <path d="M13 10 L21 19 L12 21 Z" fill="#ffffff" />
-              <path d="M35 10 L27 19 L36 21 Z" fill="#ffffff" />
-              <circle cx="24" cy="25" r="12" fill="#ffffff" />
-              <circle cx="19.5" cy="24" r="2.3" fill="#1f2328" />
-              <circle cx="28.5" cy="24" r="2.3" fill="#1f2328" />
-              <path d="M22 29 L26 29 L24 31.5 Z" fill="#1f2328" />
-            </svg>
-            <span>GitHub</span>
-          </a>
-          <a class="social-icon" href="https://www.linkedin.com/in/a-gonzo/"
-             target="_blank" rel="noopener" title="Visit my LinkedIn">
-            <svg viewBox="0 0 48 48" aria-hidden="true">
-              <rect width="48" height="48" rx="9" fill="#0a66c2" />
-              <text x="24" y="34" font-family="Arial, Helvetica, sans-serif"
-                    font-size="25" font-weight="bold" fill="#ffffff"
-                    text-anchor="middle">in</text>
-            </svg>
-            <span>LinkedIn</span>
-          </a>
-        </div>
-        <p class="welcome-note">Thanks for stopping by!</p>
+        <p class="welcome-note">Thanks for stopping by! You can find my
+           GitHub and LinkedIn in the Contact window.</p>
       </div>
     </section>
 
@@ -149,24 +123,74 @@
       </header>
       <div class="window-body">
         <h2>Resume</h2>
+        <p class="resume-intro"><strong>Alexis Gonzalez</strong><br />
+           Junior Software Engineer &mdash; Backend Focus<br />
+           Menifee, California &middot; Navy Veteran</p>
+        <p>Navy veteran turning a long standing interest in problem solving
+           into a software engineering career, with a focus on backend
+           development. Looking for a junior backend or fullstack role.</p>
+
         <div class="resume-section">
           <h3>Education</h3>
-          <p>I'll list my school, degree, and graduation year here.</p>
+          <div class="resume-entry">
+            <p class="resume-entry-title">California State University San Marcos</p>
+            <p class="resume-entry-meta">B.S. Computer Science &middot; Jan 2026 &ndash; Dec 2027</p>
+            <p>Pursuing a B.S. in Computer Science with a focus on backend
+               systems and software engineering. Coursework includes data
+               structures, algorithms, software engineering, and database
+               systems.</p>
+          </div>
+          <div class="resume-entry">
+            <p class="resume-entry-title">Fullstack Academy</p>
+            <p class="resume-entry-meta">Software Engineering Immersive &middot; Oct 2023 &ndash; Apr 2024</p>
+            <p>28-week full stack JavaScript program. Built backend services
+               with Node.js, Express, and PostgreSQL, and worked with React
+               on the frontend.</p>
+          </div>
+          <div class="resume-entry">
+            <p class="resume-entry-title">NPower &mdash; IT Fundamentals</p>
+            <p class="resume-entry-meta">Feb 2023 &ndash; Jun 2023</p>
+            <p>Tuition free IT Fundamentals program for veterans. Earned the
+               Google IT Support and CompTIA ITF+ certifications.</p>
+          </div>
         </div>
+
         <div class="resume-section">
           <h3>Skills</h3>
-          <p>I'll fill this in with the programming languages, frameworks,
-             and tools I work with.</p>
+          <p><strong>Languages:</strong> Java, JavaScript, Python, SQL, C, C++</p>
+          <p><strong>Frameworks &amp; libraries:</strong> Spring Boot,
+             Node.js, Express, React</p>
+          <p><strong>Tools &amp; concepts:</strong> PostgreSQL, REST APIs,
+             WebSockets, JWT authentication, Git</p>
+          <p><strong>Currently learning:</strong> automated testing, Docker,
+             and cloud deployment</p>
+          <p><strong>Certifications:</strong> Google IT Support, CompTIA ITF+</p>
         </div>
+
         <div class="resume-section">
           <h3>Projects</h3>
-          <p>I'll highlight a few of my favorite projects here &mdash; you
-             can also browse them all in the Projects window.</p>
+          <p>Highlight: <strong>SOS (Support of Sale)</strong> &mdash; team
+             lead on a real time restaurant point of sale platform, where I
+             led a backend rewrite from Node/Express to Java and Spring Boot.
+             See the Projects window for this and more.</p>
         </div>
+
         <div class="resume-section">
           <h3>Experience</h3>
-          <p>I'll add my internships, jobs, and volunteer work here as I
-             build up my experience.</p>
+          <div class="resume-entry">
+            <p class="resume-entry-title">Security Supervisor &mdash; Allied Universal</p>
+            <p class="resume-entry-meta">Mar 2016 &ndash; Sep 2020 &middot; Oceanside, California</p>
+            <p>Supervised security operations for a commercial site, leading
+               a team of officers across multiple shifts and rolling out a
+               new access-control protocol.</p>
+          </div>
+          <div class="resume-entry">
+            <p class="resume-entry-title">Master-at-Arms &mdash; US Navy</p>
+            <p class="resume-entry-meta">Jan 2011 &ndash; Sep 2019 &middot; San Diego, California</p>
+            <p>Eight years of active duty in Navy law enforcement and
+               security. Led teams under high pressure conditions, ran
+               training programs, and managed regulatory compliance.</p>
+          </div>
         </div>
         <button class="action-btn" id="download-resume">Download Resume</button>
       </div>
@@ -183,13 +207,9 @@
       </header>
       <div class="window-body">
         <h2>Games</h2>
-        <ul class="plain-list">
-          <li><strong>Snake</strong> &mdash; <span class="coming-soon">Coming soon</span></li>
-          <li><strong>Tic Tac Toe</strong> &mdash; <span class="coming-soon">Coming soon</span></li>
-          <li><strong>Text Adventure</strong> &mdash; <span class="coming-soon">Coming soon</span></li>
-        </ul>
-        <p>These are placeholders for now &mdash; I'm planning to build each
-           one as a playable mini-game in a future version of AlexOS.</p>
+        <p>Click a game to open it.</p>
+        <!-- Game icons are generated from the GAMES config in script.js. -->
+        <div id="games-grid" class="games-grid"></div>
       </div>
     </section>
 
@@ -241,11 +261,11 @@
       </header>
       <div class="window-body terminal-body">
         <div id="terminal-output" class="terminal-output">
-Welcome to AlexOS Terminal v1.0
+Welcome to AlexisOS Terminal v1.0
 Type "help" to see available commands.
         </div>
         <div class="terminal-input-line">
-          <span class="terminal-prompt">alex@alexos:~$</span>
+          <span class="terminal-prompt">alexis@alexos:~$</span>
           <input type="text" id="terminal-input" class="terminal-input"
                  autocomplete="off" spellcheck="false" />
         </div>
@@ -264,14 +284,25 @@ Type "help" to see available commands.
       <div class="window-body">
         <h2>Contact</h2>
         <p>Want to get in touch or see more of my work? Here's where to
-           find me. (I'll add my email address here soon.)</p>
+           find me.</p>
         <ul class="plain-list">
-          <li><strong>Email:</strong> your-email-here</li>
-          <li><strong>GitHub:</strong>
-            <a href="https://github.com/Knucme" target="_blank" rel="noopener">github.com/Knucme</a></li>
-          <li><strong>LinkedIn:</strong>
-            <a href="https://www.linkedin.com/in/a-gonzo/" target="_blank" rel="noopener">linkedin.com/in/a-gonzo</a></li>
+          <li><strong>Email:</strong> me@argonzalez.com</li>
         </ul>
+        <!-- Pressable profile icons (same style as the Welcome window). -->
+        <div class="social-links">
+          <a class="social-icon" href="https://github.com/Knucme"
+             target="_blank" rel="noopener" title="Visit my GitHub">
+            <img class="social-img" src="images/github.png" alt=""
+                 onerror="this.style.display='none'" />
+            <span>GitHub</span>
+          </a>
+          <a class="social-icon" href="https://www.linkedin.com/in/a-gonzo/"
+             target="_blank" rel="noopener" title="Visit my LinkedIn">
+            <img class="social-img" src="images/linkedin.png" alt=""
+                 onerror="this.style.display='none'" />
+            <span>LinkedIn</span>
+          </a>
+        </div>
       </div>
     </section>
 
@@ -286,6 +317,20 @@ Type "help" to see available commands.
       </header>
       <div class="window-body" id="project-detail-body">
         <!-- Content is generated by JavaScript from the PROJECTS config. -->
+      </div>
+    </section>
+
+    <!-- Game (opens when a game icon is clicked; filled by JS) -->
+    <section class="window hidden" id="win-game" data-title="Game">
+      <header class="window-title-bar">
+        <span class="window-title">Game</span>
+        <div class="window-controls">
+          <button class="win-btn win-min" title="Minimize">_</button>
+          <button class="win-btn win-close" title="Close">&#10005;</button>
+        </div>
+      </header>
+      <div class="window-body" id="game-body">
+        <!-- Content is generated by JavaScript from the GAMES config. -->
       </div>
     </section>
 

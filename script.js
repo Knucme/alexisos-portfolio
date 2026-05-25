@@ -1,5 +1,5 @@
 /* ===================================================================
-   AlexOS - script.js
+   AlexisOS - script.js
    Handles windows, the Start menu, the taskbar, the clock, and the
    fake terminal. Plain JavaScript, no frameworks.
 
@@ -16,31 +16,16 @@
      STATE
      ---------------------------------------------------------------- */
   let zIndexCounter = 100;        // Increments so the newest window is on top.
-  let cascadeOffset = 0;          // Fallback stagger for any unlisted window.
+  let cascadeOffset = 0;          // Diagonal offset, used only if every spot is full.
 
-  /* ----------------------------------------------------------------
-     WINDOW START POSITIONS
-     Each window opens at its own spot so they spread across the
-     desktop instead of piling up in one corner.
-     x / y are fractions of the desktop (0 = left/top, 1 = right/bottom).
-     Edit these to rearrange where windows first appear.
-     ---------------------------------------------------------------- */
-  const WINDOW_POSITIONS = {
-    welcome:  { center: true },          // Always opens in the middle.
-    projects: { x: 0.04, y: 0.06 },
-    resume:   { x: 0.40, y: 0.10 },
-    games:    { x: 0.74, y: 0.06 },
-    hobbies:  { x: 0.06, y: 0.50 },
-    terminal: { x: 0.42, y: 0.52 },
-    contact:  { x: 0.74, y: 0.48 },
-    videos:   { x: 0.22, y: 0.20 },
-    "project-detail": { x: 0.30, y: 0.16 }
-  };
+  /* Window placement is dynamic — see findWindowSpot() below. A window
+     opens centered; if the center is taken it moves to the nearest free
+     space (left, right, above, or below) so windows never overlap. */
 
   /* ----------------------------------------------------------------
      VIDEOS CONFIG
      Each video plays from a local file in the "videos" folder.
-     Drop your .mp4 files into that folder, then edit the list below.
+     
 
      For each video set:
        title       - shown above the player
@@ -49,6 +34,11 @@
                      (for example "videos/demo-reel.mp4")
      ---------------------------------------------------------------- */
   const VIDEOS = [
+    {
+      title: "Blessing",
+      description: "A short Test video I put together",
+      file: "videos/Blessing.mp4"
+    },
     {
       title: "Demo Reel",
       description: "A short showcase of my work. I'll swap in my own demo " +
@@ -65,7 +55,7 @@
       title: "Coding Timelapse",
       description: "I'll add a timelapse from one of my build sessions here.",
       file: "videos/coding-timelapse.mp4"
-    }
+    },
   ];
 
   /* ----------------------------------------------------------------
@@ -87,7 +77,7 @@
     pos: {
       name: "SE370 Point of Sale System",
       tech: "Java",
-      description: "I built this point-of-sale system for my SE370 " +
+      description: "I built this point of sale system for my SE370 " +
         "software engineering course. I'll write up the architecture, " +
         "the features I worked on, and what I learned here.",
       github: ""
@@ -105,7 +95,7 @@
       tech: "JavaScript",
       description: "A tool I'm building to track characters across the " +
         "Horus Heresy series without spoilers. I'll explain how the " +
-        "spoiler-free filtering works here.",
+        "spoiler free filtering works here.",
       github: ""
     },
     poker: {
@@ -117,6 +107,59 @@
       github: ""
     }
   };
+
+  /* ----------------------------------------------------------------
+     GAMES CONFIG
+     Each game shows up as an icon in the Games window. Clicking an
+     icon opens that game in its own window.
+
+     For each game set:
+       name        - the game's title
+       glyph       - an emoji used as a fallback icon if no image is
+                     found at the "image" path below
+       image       - path to the game's icon image
+                     (save it as images/games/<name>.png)
+       type        - "doom" for the playable Doom embed, or
+                     "placeholder" for a game that isn't built yet
+       description - shown for "placeholder" games
+
+     DOOM_ARCHIVE_ID is the Internet Archive item used for Doom. Swap
+     it for another identifier to use a different version.
+     ---------------------------------------------------------------- */
+  const DOOM_ARCHIVE_ID = "msdos_DOOM_1993";
+
+  const GAMES = [
+    {
+      name: "Doom",
+      glyph: "👹",
+      image: "images/games/doom.png",
+      type: "doom"
+    },
+    {
+      name: "Snake",
+      glyph: "🐍",
+      image: "images/games/snake.png",
+      type: "placeholder",
+      description: "I haven't built Snake yet. I'm planning to make it a " +
+        "playable mini-game — check back soon!"
+    },
+    {
+      name: "Tic Tac Toe",
+      glyph: "⭕",
+      image: "images/games/tictactoe.png",
+      type: "placeholder",
+      description: "Tic Tac Toe isn't built yet. I'm planning to add it " +
+        "as a playable mini-game — check back soon!"
+    },
+    {
+      name: "Text Adventure",
+      glyph: "📜",
+      image: "images/games/textadventure.png",
+      type: "placeholder",
+      description: "My Text Adventure game is still in the works. I'm " +
+        "planning to make it playable — check back soon!"
+    }
+  ];
 
   /* ----------------------------------------------------------------
      ELEMENT REFERENCES
@@ -142,6 +185,95 @@
     });
   }
 
+  /* ----------------------------------------------------------------
+     WINDOW PLACEMENT
+     A new window opens centered. If the center is already taken, it
+     is placed in the nearest free space (left, right, above, below,
+     then the corners) so that open windows never overlap.
+     ---------------------------------------------------------------- */
+
+  /* True if rectangles a and b overlap at all. */
+  function rectsOverlap(a, b) {
+    return a.left < b.left + b.width &&
+           b.left < a.left + a.width &&
+           a.top  < b.top  + b.height &&
+           b.top  < a.top  + a.height;
+  }
+
+  /* Rectangles of every window that is currently open (visible),
+     skipping the one passed in. */
+  function openWindowRects(exclude) {
+    const rects = [];
+    document.querySelectorAll(".window").forEach(function (w) {
+      if (w === exclude || w.classList.contains("hidden")) {
+        return;
+      }
+      rects.push({
+        left:   w.offsetLeft,
+        top:    w.offsetTop,
+        width:  w.offsetWidth,
+        height: w.offsetHeight
+      });
+    });
+    return rects;
+  }
+
+  /* Find a non-overlapping spot for a window. Tries the center first,
+     then left / right / above / below, then the four corners. Falls
+     back to a small diagonal cascade if every spot is taken. */
+  function findWindowSpot(win) {
+    const gap   = 20;
+    const areaW = window.innerWidth;
+    const areaH = window.innerHeight - 36;   // Desktop minus the taskbar.
+    const winW  = win.offsetWidth  || 460;
+    const winH  = win.offsetHeight || 320;
+
+    const cx = (areaW - winW) / 2;           // Centered left.
+    const cy = (areaH - winH) / 2;           // Centered top.
+
+    // Candidate positions, tried in this order.
+    const candidates = [
+      { left: cx,              top: cy              }, // center
+      { left: cx - winW - gap, top: cy              }, // left
+      { left: cx + winW + gap, top: cy              }, // right
+      { left: cx,              top: cy - winH - gap }, // above
+      { left: cx,              top: cy + winH + gap }, // below
+      { left: cx - winW - gap, top: cy - winH - gap }, // top-left
+      { left: cx + winW + gap, top: cy - winH - gap }, // top-right
+      { left: cx - winW - gap, top: cy + winH + gap }, // bottom-left
+      { left: cx + winW + gap, top: cy + winH + gap }  // bottom-right
+    ];
+
+    const others = openWindowRects(win);
+
+    for (let i = 0; i < candidates.length; i++) {
+      // Clamp the candidate so the window stays fully on screen.
+      const left = Math.min(Math.max(candidates[i].left, 8),
+                            Math.max(8, areaW - winW - 8));
+      const top  = Math.min(Math.max(candidates[i].top, 8),
+                            Math.max(8, areaH - winH - 8));
+      const rect = { left: left, top: top, width: winW, height: winH };
+
+      // Accept the first spot that overlaps no open window.
+      let free = true;
+      for (let j = 0; j < others.length; j++) {
+        if (rectsOverlap(rect, others[j])) {
+          free = false;
+          break;
+        }
+      }
+      if (free) {
+        return { left: left, top: top };
+      }
+    }
+
+    // Every spot is taken: fall back to a small diagonal cascade.
+    const left = Math.min(40 + cascadeOffset, Math.max(8, areaW - winW - 8));
+    const top  = Math.min(40 + cascadeOffset, Math.max(8, areaH - winH - 8));
+    cascadeOffset = (cascadeOffset + 28) % 170;
+    return { left: left, top: top };
+  }
+
   /* Open (or restore) a window by its short name, e.g. "projects". */
   function openWindow(name) {
     const win = document.getElementById("win-" + name);
@@ -149,49 +281,22 @@
       return;
     }
 
-    // Remember whether this is the very first time the window opens.
-    const firstOpen = !win.dataset.opened;
+    win.dataset.name = name;
 
-    // Show the window first so we can measure its real size below.
+    // Was the window closed (hidden) before this click?
+    const wasHidden = win.classList.contains("hidden");
+
+    // Show the window so its real size can be measured for placement.
     win.classList.remove("hidden");
 
-    // First time opening: place it at its assigned spot on the desktop.
-    if (firstOpen) {
-      win.dataset.opened = "true";
-      win.dataset.name = name;
-
-      // Usable desktop area (the taskbar is 36px tall).
-      const areaW = window.innerWidth;
-      const areaH = window.innerHeight - 36;
-      // Window is now visible, so offsetWidth/Height are accurate.
-      const winW  = win.offsetWidth  || 460;
-      const winH  = win.offsetHeight || 320;
-
-      const pos = WINDOW_POSITIONS[name];
-      let left;
-      let top;
-
-      if (pos && pos.center) {
-        // Center the window on the desktop.
-        left = (areaW - winW) / 2;
-        top  = (areaH - winH) / 2;
-      } else if (pos) {
-        // Convert the fractional position into pixels.
-        left = pos.x * areaW;
-        top  = pos.y * areaH;
-      } else {
-        // Fallback for any window not listed above: gentle cascade.
-        left = 90 + cascadeOffset;
-        top  = 40 + cascadeOffset;
-        cascadeOffset = (cascadeOffset + 28) % 170;
-      }
-
-      // Clamp so the whole window stays on screen.
-      left = Math.min(Math.max(left, 8), Math.max(8, areaW - winW - 8));
-      top  = Math.min(Math.max(top, 8), Math.max(8, areaH - winH - 8));
-
-      win.style.left = left + "px";
-      win.style.top  = top + "px";
+    // Place the window every time it opens from a closed state, so it
+    // lands centered or in the nearest free space. (Restoring a
+    // minimized window from the taskbar does not call openWindow, so
+    // minimized windows still come back exactly where they were.)
+    if (wasHidden) {
+      const spot = findWindowSpot(win);
+      win.style.left = spot.left + "px";
+      win.style.top  = spot.top  + "px";
     }
 
     focusWindow(win);
@@ -421,8 +526,8 @@
      --------------------------------------------------------------- */
   const FILE_SYSTEM = {
     "about.txt":
-      "AlexOS v1.0\n\n" +
-      "A Windows XP-inspired personal portfolio, built with plain\n" +
+      "AlexisOS v1.0\n\n" +
+      "A Windows XP inspired personal portfolio, built with plain\n" +
       "HTML, CSS, and JavaScript.\n\n" +
       "Use 'ls' (or 'dir') to list files, 'cd <folder>' to move\n" +
       "around, and 'cat <file>' to read a file.",
@@ -434,7 +539,7 @@
       "- Reading sci-fi",
     "contact.txt":
       "CONTACT\n\n" +
-      "Email:    your-email-here\n" +
+      "Email:    me@argonzalez.com\n" +
       "GitHub:   github.com/Knucme\n" +
       "LinkedIn: linkedin.com/in/a-gonzo",
     "projects": {
@@ -443,14 +548,27 @@
     "resume": {
       "education.txt":
         "EDUCATION\n\n" +
-        "I'll list my school, degree, and graduation year here.",
+        "California State University San Marcos\n" +
+        "  B.S. Computer Science | Jan 2026 - Dec 2027\n\n" +
+        "Fullstack Academy\n" +
+        "  Software Engineering Immersive | Oct 2023 - Apr 2024\n\n" +
+        "NPower - IT Fundamentals | Feb 2023 - Jun 2023\n" +
+        "  Earned Google IT Support and CompTIA ITF+ certifications.",
       "skills.txt":
         "SKILLS\n\n" +
-        "I'll list the programming languages, frameworks, and tools\n" +
-        "I work with here.",
+        "Languages:   Java, JavaScript, Python, SQL\n" +
+        "Frameworks:  Spring Boot, Node.js, Express, React\n" +
+        "Tools:       PostgreSQL, REST APIs, WebSockets, JWT, Git\n" +
+        "Learning:    automated testing, Docker, cloud deployment",
       "experience.txt":
         "EXPERIENCE\n\n" +
-        "I'll add my internships, jobs, and volunteer work here."
+        "Security Supervisor - Allied Universal\n" +
+        "  Mar 2016 - Sep 2020 | Oceanside, California\n" +
+        "  Led a team of security officers across multiple shifts.\n\n" +
+        "Master at Arms - US Navy\n" +
+        "  Jan 2011 - Sep 2019 | San Diego, California\n" +
+        "  Navy law enforcement and security; led teams and ran\n" +
+        "  training programs."
     }
   };
 
@@ -611,8 +729,8 @@
       "  clear            - clear the screen\n\n" +
       "Tip: try 'ls', then 'cd projects', then 'cat poker.txt'.",
     about:
-      "AlexOS v1.0\n" +
-      "A Windows XP-inspired personal portfolio, built with plain HTML, CSS, and JS.",
+      "AlexisOS v1.0\n" +
+      "A Windows XP inspired personal portfolio, built with plain HTML, CSS, and JS.",
     projects:
       "Projects:\n" +
       "  1. SE370 Point of Sale System\n" +
@@ -624,10 +742,11 @@
       "Resume sections: Education, Skills, Projects, Experience.\n" +
       "(Open the Resume window, or 'cd resume' to explore.)",
     games:
-      "Games (coming soon):\n" +
-      "  - Snake\n" +
-      "  - Tic Tac Toe\n" +
-      "  - Text Adventure",
+      "Games:\n" +
+      "  - Doom (playable - open the Games window)\n" +
+      "  - Snake (coming soon)\n" +
+      "  - Tic Tac Toe (coming soon)\n" +
+      "  - Text Adventure (coming soon)",
     hobbies:
       "Hobbies:\n" +
       "  - Programming\n" +
@@ -636,7 +755,7 @@
       "  - Reading sci-fi",
     contact:
       "Contact:\n" +
-      "  Email:    your-email-here\n" +
+      "  Email:    me@argonzalez.com\n" +
       "  GitHub:   github.com/Knucme\n" +
       "  LinkedIn: linkedin.com/in/a-gonzo"
   };
@@ -709,7 +828,7 @@
   const downloadResumeBtn = document.getElementById("download-resume");
   if (downloadResumeBtn) {
     downloadResumeBtn.addEventListener("click", function () {
-      alert("Resume download is a placeholder. Add your resume file later!");
+      alert("Resume download button is currently a placeholder. ill add my resume file later!");
     });
   }
 
@@ -939,13 +1058,133 @@
   }
 
   /* ================================================================
+     GAMES WINDOW
+     The Games window is a folder of game icons. Clicking an icon
+     opens that game in its own window: the playable Doom embed, or
+     a placeholder for a game that is not built yet.
+     ================================================================ */
+
+  /* Build the grid of game icons inside the Games window. */
+  function renderGamesGrid() {
+    const grid = document.getElementById("games-grid");
+    if (!grid) {
+      return;
+    }
+    grid.innerHTML = "";
+
+    GAMES.forEach(function (game, index) {
+      const icon = document.createElement("button");
+      icon.className = "game-icon";
+      icon.dataset.gameIndex = index;
+
+      // Show the game's image; if the file is missing, fall back to
+      // the emoji glyph so the icon still looks complete.
+      const img = document.createElement("img");
+      img.className = "game-icon-img";
+      img.src = game.image;
+      img.alt = "";
+      img.addEventListener("error", function () {
+        const glyph = document.createElement("span");
+        glyph.className = "game-icon-glyph";
+        glyph.textContent = game.glyph;
+        if (img.parentNode) {
+          img.parentNode.replaceChild(glyph, img);
+        }
+      });
+      icon.appendChild(img);
+
+      const name = document.createElement("span");
+      name.className = "game-icon-name";
+      name.textContent = game.name;
+      icon.appendChild(name);
+
+      // Games that are not built yet get a small "Coming soon" tag.
+      if (game.type === "placeholder") {
+        const tag = document.createElement("span");
+        tag.className = "game-icon-tag";
+        tag.textContent = "Coming soon";
+        icon.appendChild(tag);
+      }
+
+      icon.addEventListener("click", function () {
+        openGame(index);
+      });
+
+      grid.appendChild(icon);
+    });
+  }
+
+  /* Open a game in the shared game window. */
+  function openGame(index) {
+    const game = GAMES[index];
+    if (!game) {
+      return;
+    }
+
+    const win  = document.getElementById("win-game");
+    const body = document.getElementById("game-body");
+
+    // Show the game's name in the title bar.
+    win.querySelector(".window-title").textContent = game.name;
+    win.dataset.title = game.name;
+
+    // Rebuild the window body from scratch.
+    body.innerHTML = "";
+
+    const h2 = document.createElement("h2");
+    h2.textContent = game.name;
+    body.appendChild(h2);
+
+    if (game.type === "doom") {
+      // Playable Doom: embed it from the Internet Archive.
+      const frame = document.createElement("iframe");
+      frame.className = "doom-frame";
+      frame.src = "https://archive.org/embed/" + DOOM_ARCHIVE_ID;
+      frame.title = "Doom";
+      frame.setAttribute("allowfullscreen", "");
+      body.appendChild(frame);
+
+      const note = document.createElement("p");
+      note.className = "doom-note";
+      note.textContent =
+        "Runs the freely distributed shareware episode, embedded from " +
+        "the Internet Archive. Click into the game to start, then use " +
+        "the arrow keys to move and Ctrl to fire.";
+      body.appendChild(note);
+    } else {
+      // Placeholder: a game that is not built yet.
+      const desc = document.createElement("p");
+      desc.textContent = game.description;
+      body.appendChild(desc);
+
+      const tagWrap = document.createElement("p");
+      const badge = document.createElement("span");
+      badge.className = "coming-soon";
+      badge.textContent = "Coming soon";
+      tagWrap.appendChild(badge);
+      body.appendChild(tagWrap);
+    }
+
+    openWindow("game");
+
+    // Keep the taskbar button label in sync with the current game.
+    const tbBtn = document.querySelector(
+      '.taskbar-window-btn[data-window="game"]'
+    );
+    if (tbBtn) {
+      tbBtn.textContent = game.name;
+    }
+  }
+
+  /* ================================================================
      STARTUP
-     Build the project and video lists, then open the Welcome window
-     (centered). Every other window stays closed until its desktop
-     icon or Start menu item is clicked.
+     Build the project, video, and game lists, then open the Welcome
+     window (centered). Every other window stays closed until its
+     desktop icon or Start menu item is clicked.
      ================================================================ */
   renderProjectsList();
   renderVideos();
+  renderGamesGrid();
   openWindow("welcome");
 
 })();
