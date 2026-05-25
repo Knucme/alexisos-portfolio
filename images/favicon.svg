@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  AlexOS favicon.
+  An original mark: a glossy blue rounded tile with a gold star,
+  echoing the Start button and Welcome window logo. Not copied from
+  any operating system.
+
+  To use your own icon instead, either replace this file with your
+  own favicon.svg, or drop an image into the images/ folder and
+  update the <link rel="icon"> tag in index.html to point to it.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3f8cf3"/>
+      <stop offset="1" stop-color="#0a5cd6"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded background tile -->
+  <rect x="2" y="2" width="60" height="60" rx="13" fill="url(#tile)"/>
+  <!-- Glossy highlight across the top -->
+  <rect x="2" y="2" width="60" height="26" rx="13" fill="#ffffff" opacity="0.18"/>
+  <!-- Five-point gold star -->
+  <path d="M32 10 L37.2 24.9 L52.9 25.2 L40.4 34.7 L44.9 49.8
+           L32 40.8 L19.1 49.8 L23.6 34.7 L11.1 25.2 L26.8 24.9 Z"
+        fill="#ffd23f" stroke="#e0a800" stroke-width="1.5"
+        stroke-linejoin="round"/>
+</svg>

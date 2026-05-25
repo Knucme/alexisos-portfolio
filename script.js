@@ -51,18 +51,19 @@
   const VIDEOS = [
     {
       title: "Demo Reel",
-      description: "A short showcase of recent work. Placeholder — " +
-        "replace videos/demo-reel.mp4 with your own clip.",
+      description: "A short showcase of my work. I'll swap in my own demo " +
+        "reel here — I just need to drop the clip into the videos folder.",
       file: "videos/demo-reel.mp4"
     },
     {
       title: "Project Walkthrough",
-      description: "A walkthrough of one of my projects. Placeholder.",
+      description: "I'm planning to record a walkthrough of one of my " +
+        "projects and add it here.",
       file: "videos/project-walkthrough.mp4"
     },
     {
       title: "Coding Timelapse",
-      description: "A timelapse from a build session. Placeholder.",
+      description: "I'll add a timelapse from one of my build sessions here.",
       file: "videos/coding-timelapse.mp4"
     }
   ];
@@ -78,7 +79,7 @@
        tech        - short tech stack line
        description - a longer paragraph about the project
        github      - "owner/repo" on GitHub, or "" if there is none yet.
-                     Example: github: "alexsmith/poker-shuffler"
+                     Example: github: "Knucme/poker-shuffler"
                      When set, the detail window shows a "View on GitHub"
                      link and a button that pulls live repo info.
      ---------------------------------------------------------------- */
@@ -86,33 +87,33 @@
     pos: {
       name: "SE370 Point of Sale System",
       tech: "Java",
-      description: "A point-of-sale application built for a software " +
-        "engineering course. Placeholder description — replace with " +
-        "details about the architecture, features, and your role.",
+      description: "I built this point-of-sale system for my SE370 " +
+        "software engineering course. I'll write up the architecture, " +
+        "the features I worked on, and what I learned here.",
       github: ""
     },
     survey: {
       name: "Statistics Survey Website",
       tech: "HTML, CSS, JavaScript",
-      description: "A web app for collecting and analyzing survey " +
-        "responses. Placeholder description — add the stack used and " +
-        "what insights it produced.",
+      description: "A web app I made for collecting and analyzing survey " +
+        "responses. I'll add details on the stack I used and the " +
+        "insights it produced.",
       github: ""
     },
     horus: {
       name: "Horus Heresy Spoiler-Free Character Tracker",
       tech: "JavaScript",
-      description: "A tool that tracks characters across the Horus Heresy " +
-        "series without revealing spoilers. Placeholder description — " +
-        "describe how the spoiler filtering works.",
+      description: "A tool I'm building to track characters across the " +
+        "Horus Heresy series without spoilers. I'll explain how the " +
+        "spoiler-free filtering works here.",
       github: ""
     },
     poker: {
       name: "Java Poker Card Shuffler",
       tech: "Java",
-      description: "A Java program that models a deck of cards and " +
-        "shuffling algorithms. Placeholder description — mention the " +
-        "algorithms and any testing you did.",
+      description: "A Java program I wrote that models a deck of cards " +
+        "and different shuffling algorithms. I'll add notes on the " +
+        "algorithms and how I tested them.",
       github: ""
     }
   };
@@ -434,21 +435,22 @@
     "contact.txt":
       "CONTACT\n\n" +
       "Email:    your-email-here\n" +
-      "GitHub:   your-github-here\n" +
-      "LinkedIn: your-linkedin-here",
+      "GitHub:   github.com/Knucme\n" +
+      "LinkedIn: linkedin.com/in/a-gonzo",
     "projects": {
       // Filled in by the loop below.
     },
     "resume": {
       "education.txt":
         "EDUCATION\n\n" +
-        "Placeholder - add your school, degree, and graduation year.",
+        "I'll list my school, degree, and graduation year here.",
       "skills.txt":
         "SKILLS\n\n" +
-        "Placeholder - list languages, frameworks, and tools you know.",
+        "I'll list the programming languages, frameworks, and tools\n" +
+        "I work with here.",
       "experience.txt":
         "EXPERIENCE\n\n" +
-        "Placeholder - add internships, jobs, or volunteer work."
+        "I'll add my internships, jobs, and volunteer work here."
     }
   };
 
@@ -635,8 +637,8 @@
     contact:
       "Contact:\n" +
       "  Email:    your-email-here\n" +
-      "  GitHub:   your-github-here\n" +
-      "  LinkedIn: your-linkedin-here"
+      "  GitHub:   github.com/Knucme\n" +
+      "  LinkedIn: linkedin.com/in/a-gonzo"
   };
 
   /* Append a line of text to the terminal output area. */
