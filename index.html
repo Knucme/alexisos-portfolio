@@ -50,9 +50,9 @@
         <span class="icon-glyph">&#127918;</span>
         <span class="icon-label">Games</span>
       </button>
-      <button class="desktop-icon" data-window="hobbies">
-        <span class="icon-glyph">&#127912;</span>
-        <span class="icon-label">Hobbies</span>
+      <button class="desktop-icon" data-window="blogs">
+        <span class="icon-glyph">&#128221;</span>
+        <span class="icon-label">Blogs</span>
       </button>
       <button class="desktop-icon" data-window="videos">
         <span class="icon-glyph">&#127916;</span>
@@ -87,7 +87,7 @@
         <p>Hi, I'm Alexis. Welcome to my personal portfolio; I built it
            to look and feel like an early 2000s desktop operating system.</p>
         <p>Click the icons on the desktop, or use the <strong>Start</strong>
-           menu, to explore my Projects, Resume, Videos, Hobbies, and more.
+           menu, to explore my Projects, Resume, Blogs, Videos, and more.
            I'll keep adding to AlexisOS over time, so feel free to check back
            as it grows.</p>
         <p class="welcome-note">Thanks for stopping by! You can find my
@@ -112,89 +112,8 @@
       </div>
     </section>
 
-    <!-- Resume -->
-    <section class="window hidden" id="win-resume" data-title="Resume">
-      <header class="window-title-bar">
-        <span class="window-title">Resume</span>
-        <div class="window-controls">
-          <button class="win-btn win-min" title="Minimize">_</button>
-          <button class="win-btn win-close" title="Close">&#10005;</button>
-        </div>
-      </header>
-      <div class="window-body">
-        <h2>Resume</h2>
-        <p class="resume-intro"><strong>Alexis Gonzalez</strong><br />
-           Junior Software Engineer &mdash; Backend Focus<br />
-           Menifee, California &middot; Navy Veteran</p>
-        <p>Navy veteran turning a long standing interest in problem solving
-           into a software engineering career, with a focus on backend
-           development. Looking for a junior backend or fullstack role.</p>
-
-        <div class="resume-section">
-          <h3>Education</h3>
-          <div class="resume-entry">
-            <p class="resume-entry-title">California State University San Marcos</p>
-            <p class="resume-entry-meta">B.S. Computer Science &middot; Jan 2026 &ndash; Dec 2027</p>
-            <p>Pursuing a B.S. in Computer Science with a focus on backend
-               systems and software engineering. Coursework includes data
-               structures, algorithms, software engineering, and database
-               systems.</p>
-          </div>
-          <div class="resume-entry">
-            <p class="resume-entry-title">Fullstack Academy</p>
-            <p class="resume-entry-meta">Software Engineering Immersive &middot; Oct 2023 &ndash; Apr 2024</p>
-            <p>28-week full stack JavaScript program. Built backend services
-               with Node.js, Express, and PostgreSQL, and worked with React
-               on the frontend.</p>
-          </div>
-          <div class="resume-entry">
-            <p class="resume-entry-title">NPower &mdash; IT Fundamentals</p>
-            <p class="resume-entry-meta">Feb 2023 &ndash; Jun 2023</p>
-            <p>Tuition free IT Fundamentals program for veterans. Earned the
-               Google IT Support and CompTIA ITF+ certifications.</p>
-          </div>
-        </div>
-
-        <div class="resume-section">
-          <h3>Skills</h3>
-          <p><strong>Languages:</strong> Java, JavaScript, Python, SQL, C, C++</p>
-          <p><strong>Frameworks &amp; libraries:</strong> Spring Boot,
-             Node.js, Express, React</p>
-          <p><strong>Tools &amp; concepts:</strong> PostgreSQL, REST APIs,
-             WebSockets, JWT authentication, Git</p>
-          <p><strong>Currently learning:</strong> automated testing, Docker,
-             and cloud deployment</p>
-          <p><strong>Certifications:</strong> Google IT Support, CompTIA ITF+</p>
-        </div>
-
-        <div class="resume-section">
-          <h3>Projects</h3>
-          <p>Highlight: <strong>SOS (Support of Sale)</strong> &mdash; team
-             lead on a real time restaurant point of sale platform, where I
-             led a backend rewrite from Node/Express to Java and Spring Boot.
-             See the Projects window for this and more.</p>
-        </div>
-
-        <div class="resume-section">
-          <h3>Experience</h3>
-          <div class="resume-entry">
-            <p class="resume-entry-title">Security Supervisor &mdash; Allied Universal</p>
-            <p class="resume-entry-meta">Mar 2016 &ndash; Sep 2020 &middot; Oceanside, California</p>
-            <p>Supervised security operations for a commercial site, leading
-               a team of officers across multiple shifts and rolling out a
-               new access-control protocol.</p>
-          </div>
-          <div class="resume-entry">
-            <p class="resume-entry-title">Master-at-Arms &mdash; US Navy</p>
-            <p class="resume-entry-meta">Jan 2011 &ndash; Sep 2019 &middot; San Diego, California</p>
-            <p>Eight years of active duty in Navy law enforcement and
-               security. Led teams under high pressure conditions, ran
-               training programs, and managed regulatory compliance.</p>
-          </div>
-        </div>
-        <button class="action-btn" id="download-resume">Download Resume</button>
-      </div>
-    </section>
+    <!-- Resume: no in-app window. The Resume desktop icon opens
+         resume.html in a new tab (see openWindow() in script.js). -->
 
     <!-- Games -->
     <section class="window hidden" id="win-games" data-title="Games">
@@ -213,23 +132,19 @@
       </div>
     </section>
 
-    <!-- Hobbies -->
-    <section class="window hidden" id="win-hobbies" data-title="Hobbies">
+    <!-- Blogs (a folder of writeups; filled from BLOGS in script.js) -->
+    <section class="window hidden" id="win-blogs" data-title="Blogs">
       <header class="window-title-bar">
-        <span class="window-title">Hobbies</span>
+        <span class="window-title">Blogs</span>
         <div class="window-controls">
           <button class="win-btn win-min" title="Minimize">_</button>
           <button class="win-btn win-close" title="Close">&#10005;</button>
         </div>
       </header>
-      <div class="window-body">
-        <h2>Hobbies</h2>
-        <ul class="plain-list">
-          <li><strong>Programming</strong> &mdash; I love building tools and side projects in my spare time.</li>
-          <li><strong>Warhammer / 40K lore</strong> &mdash; I'm always reading and keeping track of the lore.</li>
-          <li><strong>Gaming</strong> &mdash; I enjoy both video games and tabletop games.</li>
-          <li><strong>Reading sci-fi</strong> &mdash; I'm a big fan of classic and modern science fiction.</li>
-        </ul>
+      <div class="window-body" id="blogs-body">
+        <!-- Rendered by renderBlogWindow() in script.js. The Blogs window
+             shows two folders (Tech Blog, LeetCode); clicking a folder
+             shows its posts; clicking a post opens the detail window. -->
       </div>
     </section>
 
@@ -242,11 +157,10 @@
           <button class="win-btn win-close" title="Close">&#10005;</button>
         </div>
       </header>
-      <div class="window-body">
-        <h2>Videos</h2>
-        <p>Click a video to play it.</p>
-        <!-- Video items are generated from the VIDEOS config in script.js. -->
-        <div id="videos-list" class="videos-list"></div>
+      <div class="window-body" id="videos-body">
+        <!-- Rendered by renderVideosWindow() in script.js. Shows two
+             folders (Tech Tutorials, Computer Science Tutorials);
+             clicking a folder shows an inline Vimeo playlist. -->
       </div>
     </section>
 
@@ -320,6 +234,20 @@ Type "help" to see available commands.
       </div>
     </section>
 
+    <!-- Blog post (opens when a blog list item is clicked; filled by JS) -->
+    <section class="window hidden" id="win-blog-post" data-title="Post">
+      <header class="window-title-bar">
+        <span class="window-title">Post</span>
+        <div class="window-controls">
+          <button class="win-btn win-min" title="Minimize">_</button>
+          <button class="win-btn win-close" title="Close">&#10005;</button>
+        </div>
+      </header>
+      <div class="window-body" id="blog-post-body">
+        <!-- Content is generated by JavaScript from the BLOGS config. -->
+      </div>
+    </section>
+
     <!-- Game (opens when a game icon is clicked; filled by JS) -->
     <section class="window hidden" id="win-game" data-title="Game">
       <header class="window-title-bar">
@@ -352,8 +280,8 @@ Type "help" to see available commands.
       <li class="start-menu-item" data-window="games">
         <span class="start-icon">&#127918;</span> Games
       </li>
-      <li class="start-menu-item" data-window="hobbies">
-        <span class="start-icon">&#127912;</span> Hobbies
+      <li class="start-menu-item" data-window="blogs">
+        <span class="start-icon">&#128221;</span> Blogs
       </li>
       <li class="start-menu-item" data-window="videos">
         <span class="start-icon">&#127916;</span> Videos

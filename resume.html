@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<!--
+  Resume page for AlexisOS.
+  This is a standalone page that embeds the resume PDF, so clicking
+  the Resume icon on the desktop opens it in a new tab.
+
+  HOW TO USE:
+  Save the resume PDF at:  resume/Alexis-Gonzalez-Resume.pdf
+  and it will display below. To use a different filename, update the
+  <object data="..."> value in the body.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resume — Alexis Gonzalez</title>
+  <link rel="icon" href="images/favicon.png" type="image/png" />
+  <style>
+    /* Full-height layout with an XP-style header bar. */
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      height: 100%;
+    }
+    body {
+      font-family: Tahoma, Geneva, Verdana, "Segoe UI", sans-serif;
+      background: #ece9d8;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header bar — matches the AlexisOS window title-bar style. */
+    header.page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 18px;
+      background: linear-gradient(
+        to bottom,
+        #3f8cf3 0%,
+        #1d6ae8 8%,
+        #0a5cd6 45%,
+        #0a5cd6 90%,
+        #2f7ef0 100%
+      );
+      color: #ffffff;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    }
+    header.page-header h1 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: bold;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+    }
+    header.page-header a.back {
+      color: #ffffff;
+      text-decoration: none;
+      font-size: 13px;
+      padding: 6px 12px;
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      border-radius: 4px;
+    }
+    header.page-header a.back:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    /* PDF viewer fills the rest of the page. */
+    .pdf-viewer {
+      flex: 1;
+      width: 100%;
+      display: block;
+      background: #555;
+      border: 0;
+    }
+
+    /* Fallback shown if the PDF file isn't present yet. */
+    .missing {
+      max-width: 640px;
+      margin: 48px auto;
+      padding: 22px 26px;
+      background: #ffe08a;
+      border: 1px solid #c9a23a;
+      border-radius: 6px;
+      color: #6b5410;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+    .missing h2 {
+      margin-top: 0;
+      font-size: 16px;
+      color: #6b5410;
+    }
+    .missing code {
+      background: #ffffff;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: "Courier New", Courier, monospace;
+    }
+  </style>
+</head>
+<body>
+  <header class="page-header">
+    <h1>Resume — Alexis Gonzalez</h1>
+    <a class="back" href="index.html">← Back to AlexisOS</a>
+  </header>
+
+  <!--
+    The PDF embed. If the file is missing (or the browser can't
+    render PDFs inline), the .missing fallback block shows instead.
+  -->
+  <object class="pdf-viewer"
+          data="resume/Alexis-Gonzalez-Resume.pdf"
+          type="application/pdf">
+    <div class="missing">
+      <h2>Resume PDF not added yet</h2>
+      <p>Save the resume file in the project as:</p>
+      <p><code>resume/Alexis-Gonzalez-Resume.pdf</code></p>
+      <p>and this page will display it. Most browsers include a
+         built-in download button in their PDF viewer, so visitors
+         can grab a copy from here too.</p>
+      <p>To use a different filename, edit the <code>data="…"</code>
+         attribute inside <code>resume.html</code>.</p>
+    </div>
+  </object>
+</body>
+</html>
