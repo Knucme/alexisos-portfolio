@@ -262,6 +262,97 @@
             ] },
             { p: "One thing still to sort out: Windows licenses are tied to the motherboard they were activated on, so the HP will eventually flag Windows as not activated. That's a separate task. The rest of it, three different 'no OS here' screens for a healthy bootable drive, came down to a boot-mode mismatch and a recovery feature that kept intercepting the fallback." }
           ]
+        },
+        {
+          id: "x570-bios-tpm",
+          title: "Updating My X570 BIOS to Pass the Windows 11 TPM Check",
+          subtitle: "",
+          date: "2026",
+          tags: ["Hardware", "BIOS", "Windows"],
+          excerpt: "My MSI X570 Tomahawk was on launch-day firmware from 2020 and Windows 11 refused to install because it couldn't see a TPM. Turning on fTPM took three BIOS settings. Getting the BIOS updated in the first place took a smaller USB stick.",
+          vimeo: "",
+          content: [
+            { p: "I'm rebuilding my gaming desktop around a new 2 TB SSD as the boot drive, with a clean install of Windows 11 Pro on it. Before touching the drive, I wanted to make sure the board would actually accept Windows 11. An earlier attempt had been blocked by the system-requirements check and I never chased it down." },
+            { h3: "The setup" },
+            { p: "The machine:" },
+            { ul: [
+              "Motherboard: MSI MAG X570 Tomahawk WiFi (MS-7C84)",
+              "CPU: AMD Ryzen 9 3900X",
+              "RAM: 64 GB DDR4",
+              "GPU: RTX 2070 (RTX 5070 Ti on the way)",
+              "Storage: 500 GB WD Black SN750 NVMe (old boot drive), two 2 TB Seagate HDDs, new 2 TB SSD"
+            ] },
+            { h3: "The error" },
+            { p: "Running Windows 11 Setup from the desktop gave one line under 'Here's why':" },
+            { p: "Setup: The PC must support TPM 2.0." },
+            { p: "That was the only requirement it failed. The 3900X is on Microsoft's supported CPU list, and the board has plenty of RAM and storage, so the issue was something the firmware wasn't exposing, not a hardware limitation." },
+            { h3: "Why fTPM was off" },
+            { p: "AMD CPUs have a firmware TPM built into the processor (fTPM). MSI ships it disabled. So the TPM was there, just switched off. When I got into the BIOS to turn it on, the version at the top of the screen was the real story:" },
+            { p: "BIOS Ver: E7C84AMS.100, build date 04/11/2020." },
+            { p: "Version 1.00. Launch firmware. Twenty-some releases behind. That mattered for more than just Windows 11:" },
+            { ul: [
+              "Early AGESA versions have a known bug where fTPM causes periodic system-wide stutters in Windows 11 (fixed in AGESA 1.2.0.7, BIOS v1B for this board).",
+              "Resizable BAR support was added in v15, relevant with a new GPU coming.",
+              "Several CPU security patches (Inception, Sinkclose, CVE-2024-36877) landed in later versions.",
+              "A 2020 BIOS predates the entire RTX 40/50 series; I'd rather not find out how it handles a PCIe 5 card."
+            ] },
+            { p: "Also, the board was running with CSM (legacy BIOS compatibility) enabled, which blocks Secure Boot. The BIOS actually throws a warning if you try to enable Secure Boot with CSM loaded. So the plan became: flash the newest BIOS first, then set fTPM, disable CSM, enable Secure Boot." },
+            { h3: "Getting the BIOS file onto a stick (from a Mac)" },
+            { p: "My only machine with a browser at the time was a Mac, which is fine. The flash itself happens inside the board's firmware. The Mac only has to get the file onto a USB stick." },
+            { ul: [
+              "Downloaded 7C84v1K4 (2026-08-21, the newest non-beta) from the MSI support page for the board.",
+              "Unzipped it. The firmware is the single file named E7C84AMS.1K4.",
+              "Formatted the stick in Disk Utility as MS-DOS (FAT) with the Master Boot Record scheme.",
+              "Copied the file to the top level of the stick and ejected it."
+            ] },
+            { h3: "M-Flash couldn't see the stick" },
+            { p: "MSI's built-in flasher is called M-Flash. You click it in the BIOS, the board reboots into a stripped-down flash environment, and you pick the file. Except it gave me this:" },
+            { p: "M-Flash: Media Not Found. Please plug in USB media and press 'Retry' to try again." },
+            { p: "The Drive column was empty. It wasn't reading the file wrong. It wasn't seeing the stick at all. I checked the obvious things in order:" },
+            { ul: [
+              "Format. Get Info on the Mac confirmed MS-DOS (FAT32). Not the problem.",
+              "Port. Moved to a rear USB 2.0 port. No change.",
+              "Detection at POST. The POST screen listed 'USB MASS #0: USB,' so the board saw the stick during boot but M-Flash still didn't. That pointed at M-Flash being picky, not a dead port.",
+              "Partition scheme. GUID vs. MBR is a common M-Flash gotcha. Already on MBR.",
+              "Size. The stick was 64 GB."
+            ] },
+            { p: "That last one was it. Older M-Flash builds (and the Flash BIOS button on this board) don't enumerate sticks larger than 32 GB. I swapped to a 2 GB stick, formatted it the same way, copied the file over, and M-Flash listed it immediately." },
+            { p: "Lesson: when a BIOS flasher can't see a stick that the POST screen can, suspect the stick's size before the format. Use the smallest FAT32 stick you own." },
+            { p: "One more thing I noticed along the way. The first Get Info screenshot on the Mac showed only 2 MB used on the 64 GB stick. The BIOS file is 18 MB. The 2 MB was macOS's hidden index files. The firmware hadn't actually been copied yet. Worth double-checking 'Used' before you walk the stick over to the PC." },
+            { h3: "The flash" },
+            { ul: [
+              "BIOS, then M-FLASH, then Yes to reboot into flash mode.",
+              "Selected the stick, then E7C84AMS.1K4. The screen showed Current V1.00 / Selected V1.K4.",
+              "Yes. Hands off for about five minutes. No keyboard, no power button, don't touch the stick.",
+              "The board rebooted on its own. The BIOS header now read E7C84AMS.1K4."
+            ] },
+            { p: "After a flash, all settings reset to factory defaults, which was fine since the whole point was to change them." },
+            { h3: "The three settings" },
+            { p: "Order matters. CSM has to be disabled and the board rebooted before the BIOS will let you touch Secure Boot." },
+            { ul: [
+              "Settings, Security, Trusted Computing: Security Device Support = Enabled, AMD fTPM switch = AMD CPU fTPM.",
+              "Settings, Advanced, Windows OS Configuration: BIOS UEFI/CSM Mode = UEFI. F10 to save and reboot.",
+              "Back into BIOS, Windows OS Configuration, Secure Boot: Enabled, mode Standard. F10 again."
+            ] },
+            { p: "That was the whole TPM 2.0 issue: a feature the CPU always had, hidden behind a default that was never turned on." },
+            { h3: "What's next" },
+            { p: "With the firmware current and the checks passing, the actual install is straightforward:" },
+            { ul: [
+              "Build the Windows 11 installer USB (Media Creation Tool, or Rufus with the ISO).",
+              "Install the 2 TB SSD and physically unplug the SN750 and both HDDs, so Setup can't drop the boot partition on the old drive.",
+              "Boot the USB in UEFI mode, install to the unallocated 2 TB, let Setup lay out the GPT partitions itself.",
+              "Reconnect the other drives once the new install boots on its own, then wipe the old Windows off the SN750."
+            ] },
+            { p: "Part 2 will cover that install and the GPU swap." },
+            { h3: "Quick reference" },
+            { ul: [
+              "Board: MSI MAG X570 Tomahawk WiFi. BIOS 7C84v10 (04/2020) to 7C84v1K4 (08/2026).",
+              "Flash method: M-Flash, FAT32 / MBR stick, 2 GB, file at root.",
+              "Blocker: 64 GB stick not enumerated by M-Flash ('Media Not Found').",
+              "Settings changed: fTPM on, CSM off, Secure Boot on (in that order).",
+              "Alternative if M-Flash fails: rename the file to MSI.ROM, use the Flash BIOS port and button with the PC powered off."
+            ] }
+          ]
         }
       ]
     },
