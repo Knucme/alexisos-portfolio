@@ -353,6 +353,51 @@
               "Alternative if M-Flash fails: rename the file to MSI.ROM, use the Flash BIOS port and button with the PC powered off."
             ] }
           ]
+        },
+        {
+          id: "tp-link-tx55e",
+          title: "Adding Wi-Fi and Bluetooth to a Lenovo ThinkCentre with a TP-Link PCIe Card",
+          subtitle: "",
+          date: "2026",
+          tags: ["Hardware", "PCIe", "Windows", "Networking"],
+          excerpt: "I put a TP-Link Archer TX55E (Wi-Fi 6 + Bluetooth 5.3) PCIe card into a Lenovo ThinkCentre M720t I use as a learning machine. The install went by the manual for the most part, with one order-of-operations swap on the drivers.",
+          vimeo: "",
+          content: [
+            { p: "I built a Lenovo ThinkCentre M720t into a learning box for practicing hardware work and running small labs. The one thing it was missing was wireless. The room I keep it in doesn't have an easy wall port, and I didn't want to run a cable across the floor. So I picked up a TP-Link Archer TX55E, a Wi-Fi 6 + Bluetooth 5.3 PCIe card, and put it in today." },
+            { h3: "The machine" },
+            { ul: [
+              "Lenovo ThinkCentre M720t",
+              "Intel Core i7-8700 (6 cores / 12 threads, up to 4.6 GHz)",
+              "16 GB DDR4",
+              "500 GB SSD, DVD-ROM",
+              "Intel UHD 630 graphics",
+              "Windows 11 Pro"
+            ] },
+            { h3: "The card" },
+            { ul: [
+              "TP-Link Archer TX55E (AX3000)",
+              "Wi-Fi 6, dual-band 2402 Mbps + 574 Mbps",
+              "Bluetooth 5.3",
+              "PCIe x1, with an internal USB header cable for the Bluetooth side"
+            ] },
+            { h3: "The physical install" },
+            { p: "Powered down, unplugged everything, and took the side panel off. The TX55E is a PCIe x1 card, so I put it in an open slot and screwed the bracket in." },
+            { p: "The Bluetooth side of this card isn't over PCIe. It uses a short USB cable that plugs into an F_USB header on the motherboard. I found an open F_USB header near the front-panel headers and plugged it in. If that cable isn't connected, Bluetooth won't show up at all, even with the driver installed." },
+            { p: "Attached the two antennas to the SMA connectors on the bracket, closed the case, plugged everything back in." },
+            { h3: "One thing I did differently than the manual" },
+            { p: "The manual has you disable any existing Bluetooth in Device Manager first, then install the card, then install the drivers in this order: Wi-Fi first, Bluetooth second." },
+            { p: "On this machine I did the driver step in the opposite order. I disabled the built-in Bluetooth in Device Manager (the M720t has an onboard adapter), installed the Bluetooth driver from TP-Link, and then installed the Wi-Fi driver. Both radios came up cleanly right after that." },
+            { p: "I don't know if the order matters on every setup, but if the manual's order stalls out, the reverse is worth trying." },
+            { h3: "Result" },
+            { p: "Both radios showed up in Windows. The Wi-Fi list populated, I connected to my network, and Bluetooth paired with my phone on the first try. Speedtest matched what I get on the same network from other devices, so the card isn't a bottleneck." },
+            { h3: "Takeaways" },
+            { ul: [
+              "Combo Wi-Fi + Bluetooth PCIe cards use two connections: the PCIe slot for Wi-Fi, and an internal USB header cable for Bluetooth. Skip the USB cable and Bluetooth won't show up even after the driver installs.",
+              "Disable any existing Bluetooth adapter in Device Manager before installing the new card. The manual says this and it's worth doing, especially on prebuilt machines like a ThinkCentre that already have onboard Bluetooth.",
+              "If the manual's driver order gives you trouble, try the reverse. On this card, installing the Bluetooth driver before the Wi-Fi driver went in cleanly.",
+              "F_USB header cables aren't strictly keyed on every board. Match the pin arrangement carefully so the connector doesn't go on backwards."
+            ] }
+          ]
         }
       ]
     },
