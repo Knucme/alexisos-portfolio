@@ -398,6 +398,71 @@
               "F_USB header cables aren't strictly keyed on every board. Match the pin arrangement carefully so the connector doesn't go on backwards."
             ] }
           ]
+        },
+        {
+          id: "0xc000000e-sata",
+          title: "Windows Error 0xc000000e After a Motherboard Swap",
+          subtitle: "",
+          date: "2026",
+          tags: ["Hardware", "Windows", "SATA", "Troubleshooting"],
+          excerpt: "A user on r/PcBuildHelp couldn't boot Windows on a PC with a recently swapped motherboard. Windows Memory Diagnostic looping made it look like a RAM problem. The real error was 0xc000000e, and the fix was reseating a SATA cable.",
+          vimeo: "",
+          content: [
+            { p: "A few days ago I helped someone on r/PcBuildHelp whose PC would not boot into Windows 10. The whole thing took about an hour of back and forth. The fix cost nothing, and along the way there was a very convincing red herring that's worth writing down. If you landed here because you searched the error code, skip to the fix. If you want the reasoning, keep reading." },
+            { h3: "The setup" },
+            { ul: [
+              "i5-3450, Radeon R5 240, 8 GB + 2 GB DDR3 (mixed sticks)",
+              "128 GB PNY SSD for Windows, 500 GB HDD for storage",
+              "A no-name 'Kyo' B75 motherboard, installed about 3 months earlier",
+              "Windows 10 Pro, legacy BIOS boot"
+            ] },
+            { p: "The PC had been working fine a week earlier. Then one day it stopped booting." },
+            { h3: "The red herring: Windows Memory Diagnostic" },
+            { p: "The first thing I was shown wasn't an error. It was a photo of the Windows Memory Diagnostic Tool sitting at 'test pass 1 of 2: 21% complete' after almost two hours. The test normally finishes in 15 to 40 minutes on a machine like this, so it was clearly hung. And every time the PC was restarted, it went straight back into the memory test." },
+            { p: "That looks a lot like bad RAM. A memory test that freezes partway through can be a bad stick, and mixed 8 GB + 2 GB DIMMs on a cheap B75 board is exactly the combination that causes memory faults. I had started writing up a 'pull one stick at a time' plan." },
+            { p: "Two things were actually going on:" },
+            { ul: [
+              "Windows schedules the memory test as a one-time boot entry (the bootsequence value in the BCD). It only unschedules itself after the test completes and Windows loads. If the test hangs, it runs again on every boot. The 'loop' wasn't evidence of anything except that the test never finished.",
+              "The test was never the first symptom. The user had picked 'Windows Memory Diagnostic' off the Windows Boot Manager screen because that's what the failed-boot screen offers you. The real error had already happened before that."
+            ] },
+            { p: "Lesson: when someone shows you a diagnostic tool, ask what they saw before they ran it. The tool isn't the symptom." },
+            { h3: "The real error" },
+            { p: "The screen that came first was the Windows Boot Manager screen:" },
+            { p: "Windows failed to start. A recent hardware or software change might be the cause." },
+            { p: "Status: 0xc000000e" },
+            { p: "Info: A required device isn't connected or can't be accessed." },
+            { p: "This one is more specific than it looks. 0xc000000e means the boot loader (bootmgr) started fine, read its configuration, and then couldn't reach the drive or partition where Windows is installed. It has nothing to do with RAM. Something between the boot loader and the Windows partition is missing." },
+            { p: "For this setup, the suspects in order were:" },
+            { ul: [
+              "The SSD isn't being detected: loose or failed SATA cable, bad SATA port, or a dead drive. Cheap B75 boards are known for flaky ports.",
+              "BIOS settings got reset: a dead CMOS battery, or the board losing settings, can flip SATA mode between AHCI and IDE or change the boot order to the HDD. A recent motherboard swap makes this more likely.",
+              "The BCD (boot configuration data) points at the wrong drive: fixable from a Windows install USB with bootrec."
+            ] },
+            { p: "All three are cheap to check, and the order goes from 'unplug and replug a cable' to 'run commands from a recovery USB.' Start with the thing that takes 30 seconds." },
+            { h3: "The fix" },
+            { p: "I asked the user to do these in order and stop when Windows booted:" },
+            { ul: [
+              "Power off. Unplug and re-seat the SATA cable on the SSD, both at the drive and at the motherboard. Try a different cable if one is available, and a different SATA port on the board.",
+              "Boot into BIOS (Del at power-on) and confirm the SSD shows up in the storage list.",
+              "While in BIOS, confirm SATA mode is AHCI, the SSD is first in the boot order, and the date/time have not reset (a reset date means the CMOS battery is dead).",
+              "Only if the SSD is detected and Windows still fails: boot a Windows 10 install USB made with the Media Creation Tool, choose 'Repair your computer' (not 'Install now'), then Troubleshoot > Command Prompt and run bootrec /fixmbr, bootrec /fixboot, bootrec /rebuildbcd."
+            ] },
+            { p: "Step 1 fixed it. Re-seating the SATA cable brought the SSD back and Windows booted normally. No data lost, no reinstall, no new parts." },
+            { h3: "What I'd do next if it were my machine" },
+            { ul: [
+              "Replace that SATA cable anyway. A cable that came loose once on a board that gets moved or bumped will do it again, and a new one costs almost nothing.",
+              "Check the CMOS battery (CR2032). Not the cause this time, but the same symptom can come from a board that forgets its settings.",
+              "Pull the 2 GB stick. Mixed 8 + 2 GB DIMMs didn't cause this problem, but they're still the most likely source of the next one.",
+              "Back up anything important on that 128 GB PNY. Budget drive on an unknown power supply."
+            ] },
+            { h3: "Takeaways" },
+            { ul: [
+              "Ask what happened first. A running diagnostic isn't the original symptom, and it can send you down the wrong path for an hour.",
+              "0xc000000e is a 'cannot find the Windows drive' error. Check the physical drive connection and BIOS before touching the boot configuration.",
+              "Order your checks by cost, not by how clever they are. Re-seating a cable beats rebuilding the BCD every time it works.",
+              "Mixed RAM on a no-name board is a real problem, just not always the current one. Don't let a plausible suspect skip the evidence."
+            ] }
+          ]
         }
       ]
     },
