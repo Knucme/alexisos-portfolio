@@ -463,6 +463,90 @@
               "Mixed RAM on a no-name board is a real problem, just not always the current one. Don't let a plausible suspect skip the evidence."
             ] }
           ]
+        },
+        {
+          id: "wifi-card-win10",
+          title: "A PCIe Wi-Fi Card That Works on Every OS Except Windows 10",
+          subtitle: "",
+          date: "2026",
+          tags: ["Hardware", "Windows", "Networking", "Troubleshooting"],
+          excerpt: "A user on r/PcBuildHelp had a Wi-Fi card that could see networks but never connect, only on one Windows 10 install. This one didn't end with a fix, but it ended with an answer. Notes on the diagnosis, and on handling a frustrated user along the way.",
+          vimeo: "",
+          content: [
+            { p: "This one didn't end with a fix, and that's part of why I'm writing it up. A user on r/PcBuildHelp had a PCIe Wi-Fi adapter that could see networks but never connect, on one specific Windows 10 install, while working fine everywhere else. The thread had a dozen replies, most of them telling him to buy a new card. He got short with me partway through. By the end he had a logical explanation, a reasonable decision about what to do, and he thanked me for the help." },
+            { p: "There are two parts to this: how the diagnosis went, and how the conversation went." },
+            { h3: "The setup" },
+            { ul: [
+              "PCIe Wi-Fi adapter: a generic red-heatsink card carrying an Intel Dual Band Wireless-AC 7260 (a 2013-era mini-PCIe card on a PCIe x1 riser; the USB header is for Bluetooth only)",
+              "Main PC: Ryzen 5 7600X on an MSI PRO B840-P WIFI (AM5, 2025 board), Windows 10 Pro",
+              "Symptom: adapter shows available networks, fails to connect, asks for the password again"
+            ] },
+            { h3: "The evidence he already had" },
+            { p: "Before anyone replied, he had done more testing than most people do, and it was all in the original post:" },
+            { ul: [
+              "Same PC, Windows 11: works",
+              "Same PC, Linux: works",
+              "Same PC, Windows 7: works",
+              "Same card, a different PC running Windows 10: works",
+              "Main PC, Windows 10, a cheap USB Wi-Fi adapter: works",
+              "Updated drivers, rolled back drivers, tried other networks: no change"
+            ] },
+            { p: "That list is a set of controlled tests. The card is cleared (works on another PC). The driver is cleared (same version works on another Win10 PC). The Windows 10 network stack on this install is cleared (the USB adapter connects). The router is cleared (a phone hotspot and a second router also failed, which he confirmed later). The only combination that fails is this card, this motherboard, and Windows 10." },
+            { p: "Most of the thread ignored the list and answered \"old Intel card, buy a new one.\" That's not bad advice, but it doesn't answer what he asked, which was \"is something wrong with my PC?\" He kept repeating \"but it works on my other PC\" because nobody engaged with it." },
+            { h3: "What the symptom means" },
+            { p: "\"Sees the network, fails, asks for the password again\" is a specific failure. The card can transmit and receive, since it scanned and found the network. The connection started. The WPA2 four-way handshake, the key exchange right after you enter a password, didn't complete. Windows treats a failed handshake as a wrong password and prompts again. So the question is why the key exchange fails on this one combination." },
+            { p: "With a known-good password, handshake failures usually come from a security mode mismatch (WPA3 transition mode on an old driver), a MAC address the access point rejects, or the card dropping out for a moment mid-exchange. The hotspot and second-router tests ruled out the first two. That left the card briefly losing its link." },
+            { h3: "The lead he found himself" },
+            { p: "He mentioned, almost in passing, that the only difference between his two PCs was that the main board only has long (x16-length) PCIe slots. Then he dismissed it: \"but I don't think that's the problem since the adapter works on the main PC using other operating systems.\"" },
+            { p: "Right observation, wrong conclusion. Working on other OSes in that slot doesn't clear the slot. It means the slot is physically fine and the problem is in how Windows 10 drives it. On AM5 boards, the secondary x16-length slots are usually wired through the chipset instead of the CPU, and the Intel 7260 has a long history of problems with PCIe link power management (ASPM). Linux users have been turning it off for this card for years. A card that briefly drops its link under power management would fail the handshake exactly this way." },
+            { h3: "The board was the answer" },
+            { p: "Then he named the motherboard: MSI PRO B840-P WIFI. B840 is AMD's 2025 entry chipset, and AMD only publishes Windows 11 chipset drivers for it. There's no official Windows 10 package. Whatever chipset driver was installed on that machine was either generic or an older AM5 package that doesn't fully cover the platform." },
+            { p: "He had also said earlier, and nobody picked up on it, that the board's onboard Wi-Fi \"only works on Win11.\" Same problem. That board was never meant to run Windows 10. The chipset side of the PCIe setup (power states, link management) isn't properly handled under Win10, and an old, picky card is the first thing to fail when that happens. Linux and Windows 7 drive the hardware generically and don't care. Windows 11 is what the board was built for." },
+            { p: "The answer to his actual question: nothing is wrong with his PC. It's Windows 10 on a board that doesn't support it, with a card old enough to be the first thing that breaks." },
+            { h3: "What I'd still try" },
+            { ul: [
+              "Power Options > Advanced > PCI Express > Link State Power Management > Off. Takes ten seconds and targets the suspected cause directly. He said he'd check it.",
+              "Any ASPM or PCIe power-saving option in the BIOS, off.",
+              "Otherwise, the real fixes are running Windows 11 on that machine (he already has it working) or using the USB adapter. He chose the USB adapter, which is reasonable."
+            ] },
+            { h3: "The conversation" },
+            { p: "This is the part I want to remember. The thread was already hostile when I got there: a dozen \"buy a new card\" replies, a joke about the card looking too clean to be broken, and a user who had been repeating himself for an hour. My first comment made it worse before it made it better." },
+            { h3: "Where I went wrong first" },
+            { p: "My first reply was a long numbered list: run this, check that, paste this output. It was technically sound and it actually engaged with his evidence, which nobody else had done. But it was a wall of commands for someone who had already been told what to do five times. His reaction:" },
+            { p: "\"Did you copy all of this from Google or ChatGPT? Because I already did all of that and it didn't fix anything. That's why I came asking here.\"" },
+            { p: "That was fair. The content was fine, but the format said \"I didn't read your post, here's the standard checklist.\" I had read it, but he had no way of knowing that from a numbered list." },
+            { h3: "Not taking the bait" },
+            { p: "When someone questions you in public, it's tempting to defend yourself, which turns the thread into an argument about you instead of his problem. It's also tempting to over-apologize, which doesn't help him either. I did neither. I replied with a short explanation of why I asked for what I asked for, then asked for the one thing nobody in the thread had asked for: the actual output, not \"I did it.\"" },
+            { p: "\"no, i just read your post. you said sees network / cant connect, so i asked for the log that says why. you say you did it, so whats the reason code?\"" },
+            { p: "That showed I had read his post, because I quoted his own words back as the reason for the question. It also moved the conversation from \"do these steps\" to \"show me the result,\" which is where troubleshooting actually happens. \"I tried everything, nothing worked\" isn't data. A reason code is." },
+            { h3: "Questions instead of instructions" },
+            { p: "From then on I wrote every reply as \"have you tried X?\" instead of \"do X.\" Same content, different shape. With a defensive person that matters. A question lets him answer \"already did that\" and stay in the conversation. An instruction forces him to either go along with it or push back, and he had been pushing back on everyone. Once the replies were questions, he started giving real answers: same driver on both PCs, same advanced settings, hotspot fails too, the slot is the only difference." },
+            { p: "I also stopped repeating things he said he had already done, even without proof. Pushing \"but did you really check the Event Viewer\" would have been technically correct and useless." },
+            { h3: "Giving him credit for the lead" },
+            { p: "When he brought up the slot and dismissed it, the easy reply was \"no, you're wrong, that's probably it.\" I wrote that version and deleted it. It opened with \"no\" and ended with a verdict, and he was one bad reply from leaving. The version I posted said the slot was the first real lead in the thread and that he had found it. Both versions made the same technical point. One of them kept him on the same side as me." },
+            { h3: "A clean exit" },
+            { p: "When he said he was going to give up and use a USB adapter, I didn't try to keep him troubleshooting. I gave him the one piece of context that made the decision a conclusion instead of a loss (the board has no Win10 support, which also explains the onboard Wi-Fi he mentioned earlier) and answered the question he had been asking the whole time: no, your PC isn't broken." },
+            { p: "\"That's probably the logical reason. Thanks for your help bro, I appreciate your efforts.\"" },
+            { h3: "Summary: what he said and what I did with it" },
+            { ul: [
+              "\"It works on my other PC and on other operating systems.\" I treated it as the central fact instead of talking past it.",
+              "\"Did you copy all of this from Google or ChatGPT?\" I didn't defend, apologize, or argue. One sentence on why I asked, then I asked for the actual output.",
+              "\"I checked the Event Viewer, I reset the service, I did the netsh commands.\" I treated \"I did it\" without output as no data, and switched from instructions to questions so he could say \"already did\" without losing face.",
+              "\"The only difference I noticed is the slot. But I don't think that's the problem.\" I took his observation seriously and said so. He found the lead; my job was to not let him throw it away.",
+              "\"It's the PRO B840-P WIFI. I'm probably going to give up.\" I gave him the context that turned giving up into a conclusion: the board has no Win10 support. And I answered his real question. His PC isn't broken."
+            ] },
+            { h3: "Takeaways" },
+            { ul: [
+              "Read the user's evidence before answering. He had already done five controlled tests. The thread ignored them, and that's why he got defensive.",
+              "\"Works on other OSes\" clears the hardware, not the OS and hardware combination. The slot was a real lead.",
+              "Check platform support first on a new board. A 2025 chipset with Windows 11-only drivers running Windows 10 explains a lot of \"works everywhere but here\" problems.",
+              "A long checklist reads as \"I didn't read your post\" even when you did. Lead with one question that shows you read it.",
+              "When someone takes a shot at you, answer the problem, not the shot. One sentence, then back to the data.",
+              "Questions work better than instructions with a defensive person. Same content, and they can say \"already did that\" without losing face.",
+              "When they find the lead, tell them. You don't need the credit; you need them to keep talking.",
+              "A troubleshooting thread can end well without a fix. \"Here's why, and nothing is wrong with your machine\" is a result."
+            ] }
+          ]
         }
       ]
     },
