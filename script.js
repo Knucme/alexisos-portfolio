@@ -547,6 +547,189 @@
               "A troubleshooting thread can end well without a fix. \"Here's why, and nothing is wrong with your machine\" is a result."
             ] }
           ]
+        },
+        {
+          id: "new-build-ram-bisect",
+          title: "New Build Won't Install Windows, Different Stop Code Every Time",
+          subtitle: "",
+          date: "2026",
+          tags: ["Hardware", "RAM", "Windows", "Troubleshooting"],
+          excerpt: "A brand new AM5 build kept blue-screening during the Windows 11 install with a different stop code each time. That pattern points at memory. Notes on narrowing it down by cost, and why \"works with one stick\" is only the start.",
+          vimeo: "",
+          content: [
+            { p: "A user on r/PcBuildHelp had just finished a new build and couldn't get Windows 11 to install. Setup would get partway through, blue-screen, and restart. He posted a photo of one crash (KERNEL_MODE_HEAP_CORRUPTION) and added one detail that ended up being the whole diagnosis: the stop code was different every time." },
+            { p: "This is a different kind of problem from the SATA cable and Windows 10 Wi-Fi threads. Those were about finding the one thing that was different. This one is about taking a system that's known to be bad and splitting it in half until the bad part is isolated." },
+            { h3: "The setup" },
+            { ul: [
+              "Ryzen 5 9600X",
+              "ASUS TUF Gaming B850M WiFi 7",
+              "Radeon RX 9060 XT 16 GB",
+              "2 x 16 GB Klevv Bolt V DDR5 (budget kit, likely 6000 MT/s)",
+              "Brand new build, first OS install"
+            ] },
+            { h3: "Reading the symptom" },
+            { p: "A stop code is Windows telling you which internal check failed when it crashed. If it's the same code every time, something specific is failing: one driver, one subsystem, one component. If it's a different code every time, nothing specific is failing. Data is getting corrupted on its way through the system, and whatever touches the bad data first is what crashes. On a new build that almost always means memory: a bad stick, a bad slot, RAM running at a speed the board can't hold, or, less often, a bad memory controller in the CPU." },
+            { p: "The Windows installer is also just the first thing that puts real load on the memory. \"Windows won't install\" usually isn't a Windows problem. It's the first sign of a hardware problem that would have shown up in the first game anyway." },
+            { h3: "Ruling out the install USB" },
+            { p: "Another commenter suggested trying a Linux install first. That was a good test:" },
+            { ul: [
+              "If Linux installs and runs stable, the hardware is probably fine and the Windows USB is the suspect.",
+              "If Linux also crashes during install, it's hardware and the Windows USB was never the problem."
+            ] },
+            { p: "Linux crashed partway through. The USB was cleared and hardware was confirmed, before anyone opened the case." },
+            { h3: "Ordering the checks" },
+            { p: "With \"hardware, probably memory\" established, the checks went in order of cost:" },
+            { ul: [
+              "Turn off EXPO (ASUS may label it D.O.C.P.) so the RAM runs at its default JEDEC speed. Free, and the most common fix on a new AM5 build, especially with a budget kit that probably isn't on the board's supported memory list.",
+              "Run one stick at a time in slot A2 (second slot from the CPU). Free. Isolates a bad stick.",
+              "Check the CPU socket for bent pins and make sure the CPU is seated flat. Five minutes with the cooler off.",
+              "Run MemTest86 from a USB stick, one full pass. Free, takes about an hour, and turns \"it seems fine\" into a pass or fail.",
+              "Only if everything above passes: the CPU itself. Another commenter had a 7600X that acted the same way and turned out to be a bad chip. It happens, but it's rare, and it's last because it's the most expensive thing to be wrong about."
+            ] },
+            { h3: "What he found" },
+            { p: "He pulled the stick from slot B2 and Windows installed on the first try." },
+            { p: "Then he asked a good question: is the second stick actually bad, and how would he test it? The honest answer was that he didn't know yet. \"Works with one stick\" has three possible explanations, and each has a different fix:" },
+            { ul: [
+              "The stick he pulled is bad (RMA the kit).",
+              "Slot B2 on the board is bad (RMA the board).",
+              "Both sticks are fine on their own, but the board can't run the pair together at the configured speed (BIOS update, or run them slower)."
+            ] },
+            { p: "If he RMAs the kit and it was actually the slot, he gets a new kit and the same crash. So the next step was a short set of swaps: move the suspect stick to the known-good slot, move the known-good stick to the suspect slot, then try both sticks with EXPO off. Each test takes a few minutes and the results don't overlap." },
+            { h3: "The swap tests" },
+            { ul: [
+              "Stick 2 alone in A2. Crashes: stick 2 is bad, RMA the kit. Stable: stick 2 is fine.",
+              "Stick 1 alone in B2. Crashes: slot B2 is bad, RMA the board. Stable: the slot is fine.",
+              "Both sticks, EXPO off. Crashes: the pair won't run together even at stock speed, so try a BIOS update, then RMA the kit. Stable: the pair is fine at stock and the problem was EXPO.",
+              "Both sticks, EXPO on. Crashes: the board can't hold the rated speed. Update the BIOS or set 5600 or 5200 manually."
+            ] },
+            { p: "Whatever setup he ends up on, a full MemTest86 pass before putting anything on the machine is the last step. That's the difference between \"it hasn't crashed yet\" and \"it's good.\"" },
+            { h3: "Outcome" },
+            { p: "The thread is still open. I'll update this once he reports which test failed and what he ended up changing." },
+            { h3: "Takeaways" },
+            { ul: [
+              "A different stop code every time means memory until proven otherwise. The same code every time means go look up that code.",
+              "\"Windows won't install\" on a new build is almost never a Windows problem. The installer is just the first heavy load.",
+              "A second OS is a cheap way to rule out the install media. If it also fails, stop remaking USB sticks.",
+              "Order checks by cost. EXPO off and one stick at a time are free. A CPU RMA is a week without a PC.",
+              "\"Works with one stick\" is the start of the diagnosis, not the end. Bad stick, bad slot, and pair compatibility are three different problems with three different fixes.",
+              "Finish with MemTest86. A full pass is what turns a guess into a result."
+            ] }
+          ]
+        },
+        {
+          id: "laggy-pc-ram",
+          title: "Fixing a Laggy Windows PC: A Full Drive and Mismatched RAM",
+          subtitle: "",
+          date: "2026",
+          tags: ["Hardware", "RAM", "BIOS", "Windows"],
+          excerpt: "My desktop was lagging everywhere, even switching browser tabs. Clearing 600 GB fixed most of it. Getting the RAM back to 3200 MHz took most of a day, because two Corsair kits with almost identical model numbers turned out to have different timings.",
+          vimeo: "",
+          content: [
+            { p: "My Windows desktop was lagging everywhere, including simple things like switching browser tabs. This was October 8 and 9, 2026. There turned out to be two separate causes:" },
+            { ul: [
+              "A nearly full drive. Freeing about 600 GB removed most of the lag right away.",
+              "RAM running at its slow default speed. A BIOS update had reset the memory to 2133 MHz instead of its rated 3200 MHz. Turning the fast profile back on gave a black screen, and figuring out why took most of a day."
+            ] },
+            { p: "The cause of the black screen: my four RAM sticks were two different Corsair kits with almost identical model numbers but different timings. The fix was to run one kit by itself. The PC now runs 32 GB at 3200 MHz." },
+            { h3: "The system" },
+            { ul: [
+              "CPU: AMD Ryzen 9 3900X, 12 cores",
+              "Motherboard: MSI MAG X570 TOMAHAWK WIFI (MS-7C84)",
+              "BIOS: E7C84AMS.1K4, build date 08/14/2026",
+              "RAM: 64 GB as four 16 GB Corsair Vengeance RGB Pro DDR4 sticks (two kits of 2 x 16 GB)",
+              "GPU: Nvidia RTX 2070, 8 GB",
+              "Storage: 2 TB NVMe SSD for Windows, plus two 2 TB Seagate hard drives",
+              "OS: Windows 11"
+            ] },
+            { p: "A few terms: XMP is a speed profile stored on each RAM stick (MSI calls it A-XMP on AMD boards). CMOS is the small memory that holds the BIOS settings." },
+            { h3: "Problem 1: the drive was almost full" },
+            { p: "Symptom: general slowness and stutter across Windows, and a pause every time I opened the browser or switched tabs." },
+            { p: "The drive my programs run from was nearly full. Windows uses free drive space as overflow memory, and browsers write cache files constantly. With almost no room left, every one of those writes stalls. SSDs also write a lot slower when they're nearly full." },
+            { p: "I cleared about 600 GB and the heavy lag stopped immediately. Keep at least 15 to 20 percent of a drive free." },
+            { p: "To check this yourself: Ctrl + Shift + Esc opens Task Manager. On the Performance tab, click each disk. A disk sitting near 100 percent active time while the PC stutters is the bottleneck." },
+            { h3: "Problem 2: RAM stuck at 2133 MHz" },
+            { p: "After the drive cleanup, there were still small hitches while browsing. Task Manager (Performance, Memory, Speed) showed 2133 MHz. The RAM is rated for 3200 MHz." },
+            { p: "A month earlier I had updated the BIOS from the launch version to 1K4. A BIOS update wipes all settings, including the A-XMP profile that enables the rated speed. Ryzen 3000 chips are noticeably affected by slow memory." },
+            { p: "In the BIOS I turned A-XMP on, picked Profile 1, and saved with F10. The PC powered on but the monitor stayed black." },
+            { h3: "The mistake I made" },
+            { p: "After a memory speed change, the motherboard runs memory training: it tests the sticks at the new settings before showing a picture. With a lot of RAM that can mean a black screen for one to two minutes, sometimes with a restart in the middle." },
+            { p: "I didn't know that at first. I was powering the PC off about five seconds into the black screen, which interrupted the test every time. That made it impossible to tell a real failure from a test that just hadn't finished." },
+            { p: "Lesson: after any RAM setting change, set a timer for three full minutes before touching the power button." },
+            { h3: "Recovery: clearing CMOS" },
+            { p: "When the board won't show a picture at all, the way back is to clear CMOS, which resets every BIOS setting to default. It doesn't touch Windows or any files." },
+            { ul: [
+              "Hold the power button until the PC shuts off. Switch the power supply off and unplug it.",
+              "Press the case power button once to drain leftover power.",
+              "Find the two pins labeled JBAT1. On this board they're the bottom pair in a column of six pins, to the right of the lower M.2 heatsink and left of the SYS_FAN headers.",
+              "Touch both pins at once with a metal screwdriver tip for 10 seconds.",
+              "Plug back in and power on. The screen reports that CMOS was cleared. Press F1 to enter setup."
+            ] },
+            { p: "Things to fix after every clear:" },
+            { ul: [
+              "The board goes back to CSM (legacy) boot mode. Set \"BIOS UEFI/CSM Mode\" back to UEFI.",
+              "Check and re-enable Secure Boot and fTPM. Windows 11 and some game anti-cheat systems depend on them.",
+              "Windows asked me to set a new sign-in PIN, because the PIN is tied to the fTPM.",
+              "Switching to UEFI turns on \"Above 4G memory\" and \"Re-Size BAR Support\" automatically. That's normal.",
+              "The reset screen offers Alt + F1 to load a saved overclocking profile. Don't load one that might contain the setting that just failed."
+            ] },
+            { h3: "Finding the cause" },
+            { p: "With the timing mistake fixed, I tested one change at a time and waited three minutes on each:" },
+            { ul: [
+              "Test 1: A-XMP Profile 1 at 3200 MHz, all four sticks. Black screen, but not a fair test since I powered off too early.",
+              "Test 2: A-XMP Profile 1 with the speed lowered to 2933 MHz, all four sticks. Black screen after 3+ minutes.",
+              "Test 3: A-XMP Profile 1 at 3200 MHz, Pair B only in slots 2 and 4. Boots at 3200 MHz.",
+              "Test 4: A-XMP Profile 1 at 3200 MHz, Pair A only in slots 2 and 4. Black screen.",
+              "Test 5: 3200 MHz with timings set by hand to 16-20-20-38, Pair B only. Boots.",
+              "Test 6: 3200 MHz with timings set by hand to 16-20-20-38, all four sticks. Black screen after 3 minutes."
+            ] },
+            { p: "Slots are counted from the CPU outward. A pair goes in slots 2 and 4, which is what the board prefers. Testing both pairs in the same two slots mattered: if only one thing changes between tests, the result points at that one thing." },
+            { h3: "The answer was on the labels" },
+            { p: "I had assumed all four sticks were the same because they were the same brand, size, and speed. The stickers said otherwise:" },
+            { ul: [
+              "Pair A: CMW32GX4M2E3200C16, 3200 MHz, timings 16-20-20-38 (looser), 1.35 V, version 4.49.",
+              "Pair B: CMW32GX4M2C3200C16, 3200 MHz, timings 16-18-18-36 (stricter), 1.35 V, version 4.32."
+            ] },
+            { p: "One letter is different in the model number (E versus C). Timings are how many clock ticks the RAM is allowed to take to respond, so lower numbers are stricter. The BIOS showed the stricter 16-18-18-36 profile and applied it to all four sticks. Pair A is only rated for 16-20-20-38." },
+            { p: "That also explains test 2. Dropping the speed to 2933 MHz kept the strict timings, so the looser kit was still being asked for more than its rating." },
+            { p: "A fast-memory profile is only tested by the manufacturer for the sticks sold together in one box. Mixing kits, even from the same product line, isn't guaranteed to work at the rated speed. At the default 2133 MHz the difference doesn't matter, which is why the PC ran fine with all four." },
+            { p: "Loosening the timings by hand to match Pair A (test 6) still didn't get all four sticks to boot, so on this CPU and board the four-stick combination won't reach 3200 MHz with these kits." },
+            { h3: "Final setup" },
+            { ul: [
+              "RAM: Pair B only (CMW32GX4M2C3200C16) in slots 2 and 4, 32 GB at 3200 MHz.",
+              "Pair A: removed and kept as a spare.",
+              "BIOS: UEFI mode, A-XMP Profile 1 on."
+            ] },
+            { p: "For gaming and everyday use, 32 GB of fast RAM is a better trade than 64 GB of slow RAM. If a job ever needs the full 64 GB, all four sticks at 2133 MHz still works." },
+            { h3: "Still to do" },
+            { ul: [
+              "Test Pair A alone at its own label settings (3200 MHz, 16-20-20-38, full three-minute wait). If it fails, it isn't meeting its advertised speed and Corsair's lifetime warranty may cover a replacement.",
+              "Confirm Secure Boot and fTPM are on after the last CMOS clear.",
+              "Install the current AMD chipset driver and Nvidia driver.",
+              "Watch memory \"In use\" in Task Manager during heavy work for a week. If it never gets near 32 GB, no more RAM is needed. If it does, buy one boxed four-stick kit that was tested together, not a second pair."
+            ] },
+            { h3: "Takeaways" },
+            { ul: [
+              "Check Task Manager before guessing. The Performance tab shows which part is maxed out.",
+              "Keep 15 to 20 percent of every drive free.",
+              "A BIOS update resets everything. Re-check the memory profile, boot mode, Secure Boot, and fTPM afterward.",
+              "Memory training takes minutes. A black screen for the first two to three minutes isn't a failure.",
+              "Same brand and same speed doesn't mean same kit. Read the full model number, timings, and version on every stick.",
+              "Change one thing per test and keep everything else the same.",
+              "Know where the clear-CMOS pins are before experimenting with BIOS settings."
+            ] },
+            { h3: "Quick reference: MSI Click BIOS 5" },
+            { p: "Press F7 in the BIOS to switch to Advanced mode first." },
+            { ul: [
+              "Enter the BIOS from Windows: Settings > System > Recovery > Advanced startup > Restart now > Troubleshoot > Advanced options > UEFI Firmware Settings",
+              "Memory profile (A-XMP): OC > A-XMP",
+              "Memory speed: OC > DRAM Frequency",
+              "Memory timings: OC > Advanced DRAM Configuration (tCL, tRCDRD, tRCDWR, tRP, tRAS)",
+              "UEFI boot mode: Settings > Advanced > Windows OS Configuration > BIOS UEFI/CSM Mode",
+              "Secure Boot: Settings > Advanced > Windows OS Configuration > Secure Boot",
+              "fTPM: Settings > Security > Trusted Computing > Security Device Support, AMD fTPM switch",
+              "Save and exit: F10"
+            ] }
+          ]
         }
       ]
     },
