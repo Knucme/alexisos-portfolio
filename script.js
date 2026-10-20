@@ -1,2147 +1,809 @@
 /* ===================================================================
-   AlexisOS - script.js
-   Handles windows, the Start menu, the taskbar, the clock, and the
-   fake terminal. Plain JavaScript, no frameworks.
+   AlexisOS // Cogitator Terminal - script.js
+   The terminal engine: boot sequence, screens, menus, typed commands.
 
-   HOW IT WORKS:
-   - Every window in index.html has the id "win-<name>" (e.g. win-projects).
-   - Desktop icons / Start menu items carry data-window="<name>".
-   - openWindow(name) shows a window; the taskbar tracks what is open.
+   All CONTENT lives in content.js (PROFILE, SERVICE, PROJECTS, BLOGS,
+   VIDEOS, GAMES). This file only decides how it is presented.
+
+   HOW IT WORKS
+   - Output is printed line by line through a small queue so it "types"
+     onto the screen. Any key press or click skips to the end.
+   - Each screen is a function. go(screen) clears the display and draws
+     it; back() returns to the previous screen.
+   - Menu options are clickable [n] buttons, and typing the same number
+     at the prompt does the same thing.
+   - Typed words (HELP, BLOG, RESUME, ...) are handled by COMMANDS.
    =================================================================== */
 
 (function () {
   "use strict";
 
   /* ----------------------------------------------------------------
-     STATE
+     ELEMENTS + ENVIRONMENT
      ---------------------------------------------------------------- */
-  let zIndexCounter = 100;        // Increments so the newest window is on top.
-  let cascadeOffset = 0;          // Diagonal offset, used only if every spot is full.
+  const out     = document.getElementById("output");
+  const input   = document.getElementById("cmd");
+  const form    = document.getElementById("prompt-line");
+  const tickerEl = document.getElementById("ticker");
+  const clockEl  = document.getElementById("clock");
 
-  /* Window placement is dynamic — see findWindowSpot() below. A window
-     opens centered; if the center is taken it moves to the nearest free
-     space (left, right, above, or below) so windows never overlap. */
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const finePointer  = window.matchMedia("(pointer: fine)").matches;
+
+  const LINE_DELAY = 12;   // ms between printed lines on normal screens
 
   /* ----------------------------------------------------------------
-     VIDEOS CONFIG
-     The Videos window is a folder that contains two sub-folders of
-     Vimeo tutorials:
-       tech  - short tutorials on tech topics
-       cs    - walkthroughs of computer science concepts
-     Add a new video by copying an existing entry into the right
-     category's "videos" array. Each video is embedded from Vimeo,
-     so viewers just hit play in the window - no downloads or links.
-
-     For each video set:
-       title       - shown above the player
-       description - optional short caption under the title
-       vimeo       - Vimeo video ID or URL. Accepts any of:
-                       "76979871"                       (public video)
-                       "76979871/a1b2c3d4e5"            (unlisted, id/hash)
-                       "https://vimeo.com/76979871"     (full URL)
-                       "https://vimeo.com/76979871/abc" (full URL with hash)
+     OUTPUT QUEUE (the "typing" effect)
+     Each queued item is either a DOM node to append, or a function to
+     run once everything before it has printed.
      ---------------------------------------------------------------- */
-  const VIDEOS = {
-    tech: {
-      name: "Tech Tutorials",
-      glyph: "🛠️",
-      description: "Short tutorials on tech topics — the kind of stuff I've had to figure out and want to save others from figuring out from scratch.",
-      videos: [
-        // Add tutorials here. Each entry: { title, description, vimeo }.
-      ]
-    },
-    cs: {
-      name: "Computer Science Tutorials",
-      glyph: "🎓",
-      description: "Walkthroughs of computer science concepts — algorithms, data structures, and the ideas I've found worth explaining.",
-      videos: [
-        // Add tutorials here. Each entry: { title, description, vimeo }.
-      ]
-    }
-  };
+  let queue = [];
+  let timer = null;
+  let autoScroll = false;     // true = keep scrolled to the newest line
 
-  /* ----------------------------------------------------------------
-     PROJECTS CONFIG
-     This is the single place to edit your projects. Each project
-     appears in the Projects window and, when clicked, opens a
-     detail window.
-
-     For each project set:
-       name        - the project title
-       tech        - short tech stack line
-       description - a longer paragraph about the project
-       github      - "owner/repo" on GitHub, or "" if there is none yet.
-                     Example: github: "Knucme/poker-shuffler"
-                     When set, the detail window shows a "View on GitHub"
-                     link and a button that pulls live repo info.
-     ---------------------------------------------------------------- */
-  const PROJECTS = {
-    pos: {
-      name: "SE370 Point of Sale System",
-      tech: "Java",
-      description: "I built this point of sale system for my SE370 " +
-        "software engineering course. I'll write up the architecture, " +
-        "the features I worked on, and what I learned here.",
-      github: ""
-    },
-    survey: {
-      name: "Statistics Survey Website",
-      tech: "HTML, CSS, JavaScript",
-      description: "A web app I made for collecting and analyzing survey " +
-        "responses. I'll add details on the stack I used and the " +
-        "insights it produced.",
-      github: ""
-    },
-    horus: {
-      name: "Horus Heresy Spoiler-Free Character Tracker",
-      tech: "JavaScript",
-      description: "A tool I'm building to track characters across the " +
-        "Horus Heresy series without spoilers. I'll explain how the " +
-        "spoiler free filtering works here.",
-      github: ""
-    },
-    poker: {
-      name: "Java Poker Card Shuffler",
-      tech: "Java",
-      description: "A Java program I wrote that models a deck of cards " +
-        "and different shuffling algorithms. I'll add notes on the " +
-        "algorithms and how I tested them.",
-      github: ""
-    }
-  };
-
-  /* ----------------------------------------------------------------
-     GAMES CONFIG
-     Each game shows up as an icon in the Games window. Clicking an
-     icon opens that game in its own window.
-
-     For each game set:
-       name        - the game's title
-       glyph       - an emoji used as a fallback icon if no image is
-                     found at the "image" path below
-       image       - path to the game's icon image
-                     (save it as images/games/<name>.png)
-       type        - "doom" for the playable Doom embed, or
-                     "placeholder" for a game that isn't built yet
-       description - shown for "placeholder" games
-
-     DOOM_ARCHIVE_ID is the Internet Archive item used for Doom. Swap
-     it for another identifier to use a different version.
-     ---------------------------------------------------------------- */
-  const DOOM_ARCHIVE_ID = "msdos_DOOM_1993";
-
-  const GAMES = [
-    {
-      name: "Doom",
-      glyph: "👹",
-      image: "images/games/doom.png",
-      type: "doom"
-    },
-    {
-      name: "Snake",
-      glyph: "🐍",
-      image: "images/games/snake.png",
-      type: "placeholder",
-      description: "I haven't built Snake yet. I'm planning to make it a " +
-        "playable mini-game — check back soon!"
-    },
-    {
-      name: "Tic Tac Toe",
-      glyph: "⭕",
-      image: "images/games/tictactoe.png",
-      type: "placeholder",
-      description: "Tic Tac Toe isn't built yet. I'm planning to add it " +
-        "as a playable mini-game — check back soon!"
-    },
-    {
-      name: "Text Adventure",
-      glyph: "📜",
-      image: "images/games/textadventure.png",
-      type: "placeholder",
-      description: "My Text Adventure game is still in the works. I'm " +
-        "planning to make it playable — check back soon!"
-    }
-  ];
-
-  /* ----------------------------------------------------------------
-     BLOG CONFIG
-     The Blog window is a folder that contains two sub-folders:
-       tech      - writeups on tech problems I've solved
-       leetcode  - LeetCode problems I found challenging, with writeups
-     Add new posts by copying an existing entry inside the right
-     category's "posts" array. To add a whole new category, add a new
-     top-level key here (its name, glyph, description, and posts).
-
-     For each post set:
-       id       - short unique key (used for the terminal file name)
-       title    - the post headline
-       subtitle - optional smaller line under the title
-       date     - date string (e.g. "2026")
-       tags     - array of short tag labels (optional)
-       excerpt  - one-line summary shown in the post list
-       vimeo    - Vimeo video ID as a string, or "" for no video
-                  (e.g. vimeo: "76979871")
-       content  - an array of blocks; each block is one of:
-                    { p: "..." }        -> paragraph
-                    { h3: "..." }       -> section heading
-                    { ul: ["...","..."] } -> bulleted list
-     ---------------------------------------------------------------- */
-  const BLOGS = {
-    tech: {
-      name: "Tech Blog",
-      glyph: "📝",
-      description: "Writeups on real tech problems I've solved.",
-      posts: [
-        {
-          id: "printer-thermal-paper",
-          title: "A Portable Printer That Wouldn't Print",
-          subtitle: "",
-          date: "2025",
-          tags: ["Hardware", "Printer", "Troubleshooting"],
-          excerpt: "A truck driver at the gate I worked showed up with a brand-new portable printer that would take print jobs and feed paper but print nothing. The fix was simple once I knew what to look for.",
-          vimeo: "",
-          content: [
-            { p: "Not all troubleshooting happens at a help desk. This one happened in 2025 at a truck gate, where drivers get their paperwork sorted before a load moves. A driver rolled up to my window frustrated because she couldn't print a single sheet of paper." },
-            { h3: "The setup: no BOL, no load" },
-            { p: "If you haven't worked around freight: the bill of lading (BOL) is the document that makes a shipment official. It lists the load, the destination, and who's responsible. No BOL, no load. At a busy gate, one stuck driver holds up everyone behind her too." },
-            { p: "This driver had come prepared. She'd just bought a portable printer, one of those small battery-powered units that lives in the cab and prints from a phone. Smart buy for the job. Except it wasn't printing, the paperwork wasn't getting done, and the truck wasn't moving." },
-            { h3: "Talk to the driver first" },
-            { p: "Before touching anything, I asked her about the printer. That's where the most useful clue came from: it was brand new. She'd bought it recently and this was one of its first real jobs." },
-            { p: "That matters. A printer that worked for months and stopped points at something that changed. A printer that has never worked points at setup: wrong settings, wrong assumptions, or wrong supplies." },
-            { h3: "Check the obvious" },
-            { p: "I worked through the layers one at a time. Physically, the printer looked fine. I opened it up and confirmed the paper roll was seated properly and feeding correctly, since a misloaded roll is the top cause of 'new printer won't print.' It was fed right." },
-            { p: "Next, the connection. Her phone paired with the printer without any issue. When she sent the BOL, the printer accepted the job. No errors, no timeouts. The printer said yes to everything and produced a blank page. Paper moved, job completed, nothing on the sheet." },
-            { p: "That combination narrows things down. If the phone couldn't connect, the problem is Bluetooth or the app. If the printer rejected the job, the problem is a driver or format. But 'accepts the job, feeds the paper, prints nothing' means the data path is working and the failure is at the last step, where marks are supposed to end up on the page." },
-            { h3: "Read the specs" },
-            { p: "I looked up the printer's brand and model on my phone. There was the answer: it was a thermal printer. Thermal printers don't use ink or toner. The printhead is a row of small heating elements, and the 'ink' is in the paper itself, a heat-sensitive coating that darkens where the head heats it. Receipt printers work the same way, which is why grocery receipts fade in a hot car." },
-            { p: "Feed a thermal printer plain paper and it will do everything correctly. Accept the job, heat the printhead, feed the page, and produce nothing, because plain paper has no coating to react. The printer wasn't broken. Plain paper just doesn't have the coating that thermal printers need." },
-            { h3: "The fix" },
-            { p: "I asked her whether the printer came with any rolls of its own. She checked the packaging and found a starter roll of thermal paper. We swapped it in, she resent the BOL, and the printer printed it cleanly on the first try. Paperwork in hand, load accepted, and the line at the gate started moving again. Cost: zero dollars, about ten minutes." },
-            { h3: "Takeaways" },
-            { ul: [
-              "Ask the user about the hardware before touching it. 'It's brand new' pointed the whole investigation at setup and supplies instead of a fault.",
-              "Troubleshoot in layers: physical, connection, output. Each layer that comes back clean narrows where the fault can hide. 'Job accepted but nothing prints' ruled out everything except the page itself.",
-              "Know your printer types. Thermal printers have no ink. The paper is the consumable, and the wrong roll fails silently with no error.",
-              "Check what came in the box. Manufacturers include starter supplies for exactly this reason. The fix was in her cab the whole time.",
-              "Thirty seconds of reading about the model beats twenty minutes of poking at settings."
-            ] },
-            { p: "One more thing: if you're not sure whether a roll is thermal paper or plain, drag a fingernail across it. Thermal paper leaves a faint gray streak where the coating reacts to friction. Plain paper won't mark. It's the fastest way to tell them apart." }
-          ]
-        },
-        {
-          id: "drive-swap",
-          title: "The Hard Drive Swap That Refused to Boot",
-          subtitle: "",
-          date: "2026",
-          tags: ["Hardware", "BIOS", "Windows"],
-          excerpt: "Moving an SSD from an old Dell to a newer HP desktop should have been a quick swap. It wasn't. The fix came down to UEFI vs. legacy boot, plus getting HP Sure Recover out of the way.",
-          vimeo: "",
-          content: [
-            { p: "I wanted to move my SSD from an old Dell OptiPlex 3020 running Windows 10 into a newer HP desktop. Both machines already had the same model of drive, so I figured it would be a quick swap. It took a few days. Most of that was figuring out UEFI vs. legacy boot, and getting past an HP feature that kept trying to reinstall Windows on top of my data." },
-            { h3: "The first symptom: 'Start PXE over IPv4'" },
-            { p: "First boot with the swapped drive, I got a black screen that said 'Start PXE over IPv4.' That message looks like a network problem, but it isn't. It means the firmware couldn't find anything bootable on any of the drives, so it tried the network as a last resort." },
-            { p: "Before assuming the drive was the problem, I checked the BIOS. The drive was detected as 'SATA0: Samsung SSD 870 EVO 500GB.' The cable was seated. The computer could see the drive. It just wouldn't boot from it." },
-            { h3: "UEFI vs. legacy boot" },
-            { p: "Modern PCs can boot two different ways. UEFI expects a GPT-formatted drive. Legacy BIOS boot expects an MBR-formatted drive. If the firmware is set to boot one way but the drive is formatted the other way, the firmware acts like there's no operating system on the drive at all." },
-            { p: "The HP shipped with Windows 11, so it was set up for UEFI and Secure Boot. My drive came from a 2014 Dell, so it was almost certainly MBR and legacy. In the HP's BIOS I switched 'Configure Legacy Support and Secure Boot' to 'Legacy Support Enable and Secure Boot Disable,' confirmed the change with the four-digit code HP asks for, and moved the SSD to the top of the legacy boot order." },
-            { p: "Now instead of the PXE screen I got a white 'HP Sure Recover' screen saying no operating system was found and offering to reinstall Windows. It warned in bold that this would erase everything on the drive. I did not accept." },
-            { h3: "Testing the drive on its own" },
-            { p: "To rule out the drive itself, I put it back in the Dell. It booted straight into Windows. Two built-in Windows tools confirmed the setup. msinfo32 (System Information) showed 'BIOS Mode: Legacy,' so the install really was MBR and legacy mode on the HP was the right call. Disk Management showed a small RECOVERY partition flagged 'System, Active' (that's where the startup files live) next to the main C: partition. The drive was healthy, bootable, and self-contained. So why wouldn't the HP boot it?" },
-            { h3: "What was actually happening" },
-            { p: "Back in the HP, with the legacy settings confirmed and Fast Boot off, the Sure Recover screen showed up again. This time I pressed Esc to cancel it, and Windows 10 booted normally. The drive had been bootable in the HP the whole time." },
-            { p: "The sequence was: the HP tries its UEFI boot list first, doesn't find anything (the drive is legacy-formatted), and calls that a boot failure. Instead of falling through to the legacy boot list, where my drive was sitting, HP Sure Recover intercepts the failure and shows the reinstall prompt. Every boot would stop at that screen, and its default action is wiping the drive." },
-            { h3: "The fix" },
-            { p: "Two BIOS changes fixed it. On the Advanced tab I opened HP Sure Recover and disabled the option that tries to recover on boot failure. In Boot Options I unchecked 'UEFI Boot Order' entirely, leaving only the legacy list. With no UEFI list to fail on, the firmware goes straight to the legacy list and boots Windows. A couple of restarts later, it was booting on its own." },
-            { h3: "Takeaways" },
-            { ul: [
-              "A PXE boot screen isn't a network problem. It means the firmware couldn't find anything to boot from. Check drive detection first, then boot mode.",
-              "The model of the drive doesn't matter. What matters is how the OS was installed on it. MBR needs legacy boot, GPT needs UEFI.",
-              "Before moving a boot drive, spend two minutes on the source machine. msinfo32 shows the BIOS mode. Disk Management shows where the boot files actually live.",
-              "If a recovery screen offers to erase the drive, press Esc first. My data was fine the whole time.",
-              "Firmware 'protection' features assume the factory setup. Once you change the setup, they can get in the way."
-            ] },
-            { p: "One thing still to sort out: Windows licenses are tied to the motherboard they were activated on, so the HP will eventually flag Windows as not activated. That's a separate task. The rest of it, three different 'no OS here' screens for a healthy bootable drive, came down to a boot-mode mismatch and a recovery feature that kept intercepting the fallback." }
-          ]
-        },
-        {
-          id: "x570-bios-tpm",
-          title: "Updating My X570 BIOS to Pass the Windows 11 TPM Check",
-          subtitle: "",
-          date: "2026",
-          tags: ["Hardware", "BIOS", "Windows"],
-          excerpt: "My MSI X570 Tomahawk was on launch-day firmware from 2020 and Windows 11 refused to install because it couldn't see a TPM. Turning on fTPM took three BIOS settings. Getting the BIOS updated in the first place took a smaller USB stick.",
-          vimeo: "",
-          content: [
-            { p: "I'm rebuilding my gaming desktop around a new 2 TB SSD as the boot drive, with a clean install of Windows 11 Pro on it. Before touching the drive, I wanted to make sure the board would actually accept Windows 11. An earlier attempt had been blocked by the system-requirements check and I never chased it down." },
-            { h3: "The setup" },
-            { p: "The machine:" },
-            { ul: [
-              "Motherboard: MSI MAG X570 Tomahawk WiFi (MS-7C84)",
-              "CPU: AMD Ryzen 9 3900X",
-              "RAM: 64 GB DDR4",
-              "GPU: RTX 2070 (RTX 5070 Ti on the way)",
-              "Storage: 500 GB WD Black SN750 NVMe (old boot drive), two 2 TB Seagate HDDs, new 2 TB SSD"
-            ] },
-            { h3: "The error" },
-            { p: "Running Windows 11 Setup from the desktop gave one line under 'Here's why':" },
-            { p: "Setup: The PC must support TPM 2.0." },
-            { p: "That was the only requirement it failed. The 3900X is on Microsoft's supported CPU list, and the board has plenty of RAM and storage, so the issue was something the firmware wasn't exposing, not a hardware limitation." },
-            { h3: "Why fTPM was off" },
-            { p: "AMD CPUs have a firmware TPM built into the processor (fTPM). MSI ships it disabled. So the TPM was there, just switched off. When I got into the BIOS to turn it on, the version at the top of the screen was the real story:" },
-            { p: "BIOS Ver: E7C84AMS.100, build date 04/11/2020." },
-            { p: "Version 1.00. Launch firmware. Twenty-some releases behind. That mattered for more than just Windows 11:" },
-            { ul: [
-              "Early AGESA versions have a known bug where fTPM causes periodic system-wide stutters in Windows 11 (fixed in AGESA 1.2.0.7, BIOS v1B for this board).",
-              "Resizable BAR support was added in v15, relevant with a new GPU coming.",
-              "Several CPU security patches (Inception, Sinkclose, CVE-2024-36877) landed in later versions.",
-              "A 2020 BIOS predates the entire RTX 40/50 series; I'd rather not find out how it handles a PCIe 5 card."
-            ] },
-            { p: "Also, the board was running with CSM (legacy BIOS compatibility) enabled, which blocks Secure Boot. The BIOS actually throws a warning if you try to enable Secure Boot with CSM loaded. So the plan became: flash the newest BIOS first, then set fTPM, disable CSM, enable Secure Boot." },
-            { h3: "Getting the BIOS file onto a stick (from a Mac)" },
-            { p: "My only machine with a browser at the time was a Mac, which is fine. The flash itself happens inside the board's firmware. The Mac only has to get the file onto a USB stick." },
-            { ul: [
-              "Downloaded 7C84v1K4 (2026-08-21, the newest non-beta) from the MSI support page for the board.",
-              "Unzipped it. The firmware is the single file named E7C84AMS.1K4.",
-              "Formatted the stick in Disk Utility as MS-DOS (FAT) with the Master Boot Record scheme.",
-              "Copied the file to the top level of the stick and ejected it."
-            ] },
-            { h3: "M-Flash couldn't see the stick" },
-            { p: "MSI's built-in flasher is called M-Flash. You click it in the BIOS, the board reboots into a stripped-down flash environment, and you pick the file. Except it gave me this:" },
-            { p: "M-Flash: Media Not Found. Please plug in USB media and press 'Retry' to try again." },
-            { p: "The Drive column was empty. It wasn't reading the file wrong. It wasn't seeing the stick at all. I checked the obvious things in order:" },
-            { ul: [
-              "Format. Get Info on the Mac confirmed MS-DOS (FAT32). Not the problem.",
-              "Port. Moved to a rear USB 2.0 port. No change.",
-              "Detection at POST. The POST screen listed 'USB MASS #0: USB,' so the board saw the stick during boot but M-Flash still didn't. That pointed at M-Flash being picky, not a dead port.",
-              "Partition scheme. GUID vs. MBR is a common M-Flash gotcha. Already on MBR.",
-              "Size. The stick was 64 GB."
-            ] },
-            { p: "That last one was it. Older M-Flash builds (and the Flash BIOS button on this board) don't enumerate sticks larger than 32 GB. I swapped to a 2 GB stick, formatted it the same way, copied the file over, and M-Flash listed it immediately." },
-            { p: "Lesson: when a BIOS flasher can't see a stick that the POST screen can, suspect the stick's size before the format. Use the smallest FAT32 stick you own." },
-            { p: "One more thing I noticed along the way. The first Get Info screenshot on the Mac showed only 2 MB used on the 64 GB stick. The BIOS file is 18 MB. The 2 MB was macOS's hidden index files. The firmware hadn't actually been copied yet. Worth double-checking 'Used' before you walk the stick over to the PC." },
-            { h3: "The flash" },
-            { ul: [
-              "BIOS, then M-FLASH, then Yes to reboot into flash mode.",
-              "Selected the stick, then E7C84AMS.1K4. The screen showed Current V1.00 / Selected V1.K4.",
-              "Yes. Hands off for about five minutes. No keyboard, no power button, don't touch the stick.",
-              "The board rebooted on its own. The BIOS header now read E7C84AMS.1K4."
-            ] },
-            { p: "After a flash, all settings reset to factory defaults, which was fine since the whole point was to change them." },
-            { h3: "The three settings" },
-            { p: "Order matters. CSM has to be disabled and the board rebooted before the BIOS will let you touch Secure Boot." },
-            { ul: [
-              "Settings, Security, Trusted Computing: Security Device Support = Enabled, AMD fTPM switch = AMD CPU fTPM.",
-              "Settings, Advanced, Windows OS Configuration: BIOS UEFI/CSM Mode = UEFI. F10 to save and reboot.",
-              "Back into BIOS, Windows OS Configuration, Secure Boot: Enabled, mode Standard. F10 again."
-            ] },
-            { p: "That was the whole TPM 2.0 issue: a feature the CPU always had, hidden behind a default that was never turned on." },
-            { h3: "What's next" },
-            { p: "With the firmware current and the checks passing, the actual install is straightforward:" },
-            { ul: [
-              "Build the Windows 11 installer USB (Media Creation Tool, or Rufus with the ISO).",
-              "Install the 2 TB SSD and physically unplug the SN750 and both HDDs, so Setup can't drop the boot partition on the old drive.",
-              "Boot the USB in UEFI mode, install to the unallocated 2 TB, let Setup lay out the GPT partitions itself.",
-              "Reconnect the other drives once the new install boots on its own, then wipe the old Windows off the SN750."
-            ] },
-            { p: "Part 2 will cover that install and the GPU swap." },
-            { h3: "Quick reference" },
-            { ul: [
-              "Board: MSI MAG X570 Tomahawk WiFi. BIOS 7C84v10 (04/2020) to 7C84v1K4 (08/2026).",
-              "Flash method: M-Flash, FAT32 / MBR stick, 2 GB, file at root.",
-              "Blocker: 64 GB stick not enumerated by M-Flash ('Media Not Found').",
-              "Settings changed: fTPM on, CSM off, Secure Boot on (in that order).",
-              "Alternative if M-Flash fails: rename the file to MSI.ROM, use the Flash BIOS port and button with the PC powered off."
-            ] }
-          ]
-        },
-        {
-          id: "tp-link-tx55e",
-          title: "Adding Wi-Fi and Bluetooth to a Lenovo ThinkCentre with a TP-Link PCIe Card",
-          subtitle: "",
-          date: "2026",
-          tags: ["Hardware", "PCIe", "Windows", "Networking"],
-          excerpt: "I put a TP-Link Archer TX55E (Wi-Fi 6 + Bluetooth 5.3) PCIe card into a Lenovo ThinkCentre M720t I use as a learning machine. The install went by the manual for the most part, with one order-of-operations swap on the drivers.",
-          vimeo: "",
-          content: [
-            { p: "I built a Lenovo ThinkCentre M720t into a learning box for practicing hardware work and running small labs. The one thing it was missing was wireless. The room I keep it in doesn't have an easy wall port, and I didn't want to run a cable across the floor. So I picked up a TP-Link Archer TX55E, a Wi-Fi 6 + Bluetooth 5.3 PCIe card, and put it in today." },
-            { h3: "The machine" },
-            { ul: [
-              "Lenovo ThinkCentre M720t",
-              "Intel Core i7-8700 (6 cores / 12 threads, up to 4.6 GHz)",
-              "16 GB DDR4",
-              "500 GB SSD, DVD-ROM",
-              "Intel UHD 630 graphics",
-              "Windows 11 Pro"
-            ] },
-            { h3: "The card" },
-            { ul: [
-              "TP-Link Archer TX55E (AX3000)",
-              "Wi-Fi 6, dual-band 2402 Mbps + 574 Mbps",
-              "Bluetooth 5.3",
-              "PCIe x1, with an internal USB header cable for the Bluetooth side"
-            ] },
-            { h3: "The physical install" },
-            { p: "Powered down, unplugged everything, and took the side panel off. The TX55E is a PCIe x1 card, so I put it in an open slot and screwed the bracket in." },
-            { p: "The Bluetooth side of this card isn't over PCIe. It uses a short USB cable that plugs into an F_USB header on the motherboard. I found an open F_USB header near the front-panel headers and plugged it in. If that cable isn't connected, Bluetooth won't show up at all, even with the driver installed." },
-            { p: "Attached the two antennas to the SMA connectors on the bracket, closed the case, plugged everything back in." },
-            { h3: "One thing I did differently than the manual" },
-            { p: "The manual has you disable any existing Bluetooth in Device Manager first, then install the card, then install the drivers in this order: Wi-Fi first, Bluetooth second." },
-            { p: "On this machine I did the driver step in the opposite order. I disabled the built-in Bluetooth in Device Manager (the M720t has an onboard adapter), installed the Bluetooth driver from TP-Link, and then installed the Wi-Fi driver. Both radios came up cleanly right after that." },
-            { p: "I don't know if the order matters on every setup, but if the manual's order stalls out, the reverse is worth trying." },
-            { h3: "Result" },
-            { p: "Both radios showed up in Windows. The Wi-Fi list populated, I connected to my network, and Bluetooth paired with my phone on the first try. Speedtest matched what I get on the same network from other devices, so the card isn't a bottleneck." },
-            { h3: "Takeaways" },
-            { ul: [
-              "Combo Wi-Fi + Bluetooth PCIe cards use two connections: the PCIe slot for Wi-Fi, and an internal USB header cable for Bluetooth. Skip the USB cable and Bluetooth won't show up even after the driver installs.",
-              "Disable any existing Bluetooth adapter in Device Manager before installing the new card. The manual says this and it's worth doing, especially on prebuilt machines like a ThinkCentre that already have onboard Bluetooth.",
-              "If the manual's driver order gives you trouble, try the reverse. On this card, installing the Bluetooth driver before the Wi-Fi driver went in cleanly.",
-              "F_USB header cables aren't strictly keyed on every board. Match the pin arrangement carefully so the connector doesn't go on backwards."
-            ] }
-          ]
-        },
-        {
-          id: "0xc000000e-sata",
-          title: "Windows Error 0xc000000e After a Motherboard Swap",
-          subtitle: "",
-          date: "2026",
-          tags: ["Hardware", "Windows", "SATA", "Troubleshooting"],
-          excerpt: "A user on r/PcBuildHelp couldn't boot Windows on a PC with a recently swapped motherboard. Windows Memory Diagnostic looping made it look like a RAM problem. The real error was 0xc000000e, and the fix was reseating a SATA cable.",
-          vimeo: "",
-          content: [
-            { p: "A few days ago I helped someone on r/PcBuildHelp whose PC would not boot into Windows 10. The whole thing took about an hour of back and forth. The fix cost nothing, and along the way there was a very convincing red herring that's worth writing down. If you landed here because you searched the error code, skip to the fix. If you want the reasoning, keep reading." },
-            { h3: "The setup" },
-            { ul: [
-              "i5-3450, Radeon R5 240, 8 GB + 2 GB DDR3 (mixed sticks)",
-              "128 GB PNY SSD for Windows, 500 GB HDD for storage",
-              "A no-name 'Kyo' B75 motherboard, installed about 3 months earlier",
-              "Windows 10 Pro, legacy BIOS boot"
-            ] },
-            { p: "The PC had been working fine a week earlier. Then one day it stopped booting." },
-            { h3: "The red herring: Windows Memory Diagnostic" },
-            { p: "The first thing I was shown wasn't an error. It was a photo of the Windows Memory Diagnostic Tool sitting at 'test pass 1 of 2: 21% complete' after almost two hours. The test normally finishes in 15 to 40 minutes on a machine like this, so it was clearly hung. And every time the PC was restarted, it went straight back into the memory test." },
-            { p: "That looks a lot like bad RAM. A memory test that freezes partway through can be a bad stick, and mixed 8 GB + 2 GB DIMMs on a cheap B75 board is exactly the combination that causes memory faults. I had started writing up a 'pull one stick at a time' plan." },
-            { p: "Two things were actually going on:" },
-            { ul: [
-              "Windows schedules the memory test as a one-time boot entry (the bootsequence value in the BCD). It only unschedules itself after the test completes and Windows loads. If the test hangs, it runs again on every boot. The 'loop' wasn't evidence of anything except that the test never finished.",
-              "The test was never the first symptom. The user had picked 'Windows Memory Diagnostic' off the Windows Boot Manager screen because that's what the failed-boot screen offers you. The real error had already happened before that."
-            ] },
-            { p: "Lesson: when someone shows you a diagnostic tool, ask what they saw before they ran it. The tool isn't the symptom." },
-            { h3: "The real error" },
-            { p: "The screen that came first was the Windows Boot Manager screen:" },
-            { p: "Windows failed to start. A recent hardware or software change might be the cause." },
-            { p: "Status: 0xc000000e" },
-            { p: "Info: A required device isn't connected or can't be accessed." },
-            { p: "This one is more specific than it looks. 0xc000000e means the boot loader (bootmgr) started fine, read its configuration, and then couldn't reach the drive or partition where Windows is installed. It has nothing to do with RAM. Something between the boot loader and the Windows partition is missing." },
-            { p: "For this setup, the suspects in order were:" },
-            { ul: [
-              "The SSD isn't being detected: loose or failed SATA cable, bad SATA port, or a dead drive. Cheap B75 boards are known for flaky ports.",
-              "BIOS settings got reset: a dead CMOS battery, or the board losing settings, can flip SATA mode between AHCI and IDE or change the boot order to the HDD. A recent motherboard swap makes this more likely.",
-              "The BCD (boot configuration data) points at the wrong drive: fixable from a Windows install USB with bootrec."
-            ] },
-            { p: "All three are cheap to check, and the order goes from 'unplug and replug a cable' to 'run commands from a recovery USB.' Start with the thing that takes 30 seconds." },
-            { h3: "The fix" },
-            { p: "I asked the user to do these in order and stop when Windows booted:" },
-            { ul: [
-              "Power off. Unplug and re-seat the SATA cable on the SSD, both at the drive and at the motherboard. Try a different cable if one is available, and a different SATA port on the board.",
-              "Boot into BIOS (Del at power-on) and confirm the SSD shows up in the storage list.",
-              "While in BIOS, confirm SATA mode is AHCI, the SSD is first in the boot order, and the date/time have not reset (a reset date means the CMOS battery is dead).",
-              "Only if the SSD is detected and Windows still fails: boot a Windows 10 install USB made with the Media Creation Tool, choose 'Repair your computer' (not 'Install now'), then Troubleshoot > Command Prompt and run bootrec /fixmbr, bootrec /fixboot, bootrec /rebuildbcd."
-            ] },
-            { p: "Step 1 fixed it. Re-seating the SATA cable brought the SSD back and Windows booted normally. No data lost, no reinstall, no new parts." },
-            { h3: "What I'd do next if it were my machine" },
-            { ul: [
-              "Replace that SATA cable anyway. A cable that came loose once on a board that gets moved or bumped will do it again, and a new one costs almost nothing.",
-              "Check the CMOS battery (CR2032). Not the cause this time, but the same symptom can come from a board that forgets its settings.",
-              "Pull the 2 GB stick. Mixed 8 + 2 GB DIMMs didn't cause this problem, but they're still the most likely source of the next one.",
-              "Back up anything important on that 128 GB PNY. Budget drive on an unknown power supply."
-            ] },
-            { h3: "Takeaways" },
-            { ul: [
-              "Ask what happened first. A running diagnostic isn't the original symptom, and it can send you down the wrong path for an hour.",
-              "0xc000000e is a 'cannot find the Windows drive' error. Check the physical drive connection and BIOS before touching the boot configuration.",
-              "Order your checks by cost, not by how clever they are. Re-seating a cable beats rebuilding the BCD every time it works.",
-              "Mixed RAM on a no-name board is a real problem, just not always the current one. Don't let a plausible suspect skip the evidence."
-            ] }
-          ]
-        },
-        {
-          id: "wifi-card-win10",
-          title: "A PCIe Wi-Fi Card That Works on Every OS Except Windows 10",
-          subtitle: "",
-          date: "2026",
-          tags: ["Hardware", "Windows", "Networking", "Troubleshooting"],
-          excerpt: "A user on r/PcBuildHelp had a Wi-Fi card that could see networks but never connect, only on one Windows 10 install. This one didn't end with a fix, but it ended with an answer. Notes on the diagnosis, and on handling a frustrated user along the way.",
-          vimeo: "",
-          content: [
-            { p: "This one didn't end with a fix, and that's part of why I'm writing it up. A user on r/PcBuildHelp had a PCIe Wi-Fi adapter that could see networks but never connect, on one specific Windows 10 install, while working fine everywhere else. The thread had a dozen replies, most of them telling him to buy a new card. He got short with me partway through. By the end he had a logical explanation, a reasonable decision about what to do, and he thanked me for the help." },
-            { p: "There are two parts to this: how the diagnosis went, and how the conversation went." },
-            { h3: "The setup" },
-            { ul: [
-              "PCIe Wi-Fi adapter: a generic red-heatsink card carrying an Intel Dual Band Wireless-AC 7260 (a 2013-era mini-PCIe card on a PCIe x1 riser; the USB header is for Bluetooth only)",
-              "Main PC: Ryzen 5 7600X on an MSI PRO B840-P WIFI (AM5, 2025 board), Windows 10 Pro",
-              "Symptom: adapter shows available networks, fails to connect, asks for the password again"
-            ] },
-            { h3: "The evidence he already had" },
-            { p: "Before anyone replied, he had done more testing than most people do, and it was all in the original post:" },
-            { ul: [
-              "Same PC, Windows 11: works",
-              "Same PC, Linux: works",
-              "Same PC, Windows 7: works",
-              "Same card, a different PC running Windows 10: works",
-              "Main PC, Windows 10, a cheap USB Wi-Fi adapter: works",
-              "Updated drivers, rolled back drivers, tried other networks: no change"
-            ] },
-            { p: "That list is a set of controlled tests. The card is cleared (works on another PC). The driver is cleared (same version works on another Win10 PC). The Windows 10 network stack on this install is cleared (the USB adapter connects). The router is cleared (a phone hotspot and a second router also failed, which he confirmed later). The only combination that fails is this card, this motherboard, and Windows 10." },
-            { p: "Most of the thread ignored the list and answered \"old Intel card, buy a new one.\" That's not bad advice, but it doesn't answer what he asked, which was \"is something wrong with my PC?\" He kept repeating \"but it works on my other PC\" because nobody engaged with it." },
-            { h3: "What the symptom means" },
-            { p: "\"Sees the network, fails, asks for the password again\" is a specific failure. The card can transmit and receive, since it scanned and found the network. The connection started. The WPA2 four-way handshake, the key exchange right after you enter a password, didn't complete. Windows treats a failed handshake as a wrong password and prompts again. So the question is why the key exchange fails on this one combination." },
-            { p: "With a known-good password, handshake failures usually come from a security mode mismatch (WPA3 transition mode on an old driver), a MAC address the access point rejects, or the card dropping out for a moment mid-exchange. The hotspot and second-router tests ruled out the first two. That left the card briefly losing its link." },
-            { h3: "The lead he found himself" },
-            { p: "He mentioned, almost in passing, that the only difference between his two PCs was that the main board only has long (x16-length) PCIe slots. Then he dismissed it: \"but I don't think that's the problem since the adapter works on the main PC using other operating systems.\"" },
-            { p: "Right observation, wrong conclusion. Working on other OSes in that slot doesn't clear the slot. It means the slot is physically fine and the problem is in how Windows 10 drives it. On AM5 boards, the secondary x16-length slots are usually wired through the chipset instead of the CPU, and the Intel 7260 has a long history of problems with PCIe link power management (ASPM). Linux users have been turning it off for this card for years. A card that briefly drops its link under power management would fail the handshake exactly this way." },
-            { h3: "The board was the answer" },
-            { p: "Then he named the motherboard: MSI PRO B840-P WIFI. B840 is AMD's 2025 entry chipset, and AMD only publishes Windows 11 chipset drivers for it. There's no official Windows 10 package. Whatever chipset driver was installed on that machine was either generic or an older AM5 package that doesn't fully cover the platform." },
-            { p: "He had also said earlier, and nobody picked up on it, that the board's onboard Wi-Fi \"only works on Win11.\" Same problem. That board was never meant to run Windows 10. The chipset side of the PCIe setup (power states, link management) isn't properly handled under Win10, and an old, picky card is the first thing to fail when that happens. Linux and Windows 7 drive the hardware generically and don't care. Windows 11 is what the board was built for." },
-            { p: "The answer to his actual question: nothing is wrong with his PC. It's Windows 10 on a board that doesn't support it, with a card old enough to be the first thing that breaks." },
-            { h3: "What I'd still try" },
-            { ul: [
-              "Power Options > Advanced > PCI Express > Link State Power Management > Off. Takes ten seconds and targets the suspected cause directly. He said he'd check it.",
-              "Any ASPM or PCIe power-saving option in the BIOS, off.",
-              "Otherwise, the real fixes are running Windows 11 on that machine (he already has it working) or using the USB adapter. He chose the USB adapter, which is reasonable."
-            ] },
-            { h3: "The conversation" },
-            { p: "This is the part I want to remember. The thread was already hostile when I got there: a dozen \"buy a new card\" replies, a joke about the card looking too clean to be broken, and a user who had been repeating himself for an hour. My first comment made it worse before it made it better." },
-            { h3: "Where I went wrong first" },
-            { p: "My first reply was a long numbered list: run this, check that, paste this output. It was technically sound and it actually engaged with his evidence, which nobody else had done. But it was a wall of commands for someone who had already been told what to do five times. His reaction:" },
-            { p: "\"Did you copy all of this from Google or ChatGPT? Because I already did all of that and it didn't fix anything. That's why I came asking here.\"" },
-            { p: "That was fair. The content was fine, but the format said \"I didn't read your post, here's the standard checklist.\" I had read it, but he had no way of knowing that from a numbered list." },
-            { h3: "Not taking the bait" },
-            { p: "When someone questions you in public, it's tempting to defend yourself, which turns the thread into an argument about you instead of his problem. It's also tempting to over-apologize, which doesn't help him either. I did neither. I replied with a short explanation of why I asked for what I asked for, then asked for the one thing nobody in the thread had asked for: the actual output, not \"I did it.\"" },
-            { p: "\"no, i just read your post. you said sees network / cant connect, so i asked for the log that says why. you say you did it, so whats the reason code?\"" },
-            { p: "That showed I had read his post, because I quoted his own words back as the reason for the question. It also moved the conversation from \"do these steps\" to \"show me the result,\" which is where troubleshooting actually happens. \"I tried everything, nothing worked\" isn't data. A reason code is." },
-            { h3: "Questions instead of instructions" },
-            { p: "From then on I wrote every reply as \"have you tried X?\" instead of \"do X.\" Same content, different shape. With a defensive person that matters. A question lets him answer \"already did that\" and stay in the conversation. An instruction forces him to either go along with it or push back, and he had been pushing back on everyone. Once the replies were questions, he started giving real answers: same driver on both PCs, same advanced settings, hotspot fails too, the slot is the only difference." },
-            { p: "I also stopped repeating things he said he had already done, even without proof. Pushing \"but did you really check the Event Viewer\" would have been technically correct and useless." },
-            { h3: "Giving him credit for the lead" },
-            { p: "When he brought up the slot and dismissed it, the easy reply was \"no, you're wrong, that's probably it.\" I wrote that version and deleted it. It opened with \"no\" and ended with a verdict, and he was one bad reply from leaving. The version I posted said the slot was the first real lead in the thread and that he had found it. Both versions made the same technical point. One of them kept him on the same side as me." },
-            { h3: "A clean exit" },
-            { p: "When he said he was going to give up and use a USB adapter, I didn't try to keep him troubleshooting. I gave him the one piece of context that made the decision a conclusion instead of a loss (the board has no Win10 support, which also explains the onboard Wi-Fi he mentioned earlier) and answered the question he had been asking the whole time: no, your PC isn't broken." },
-            { p: "\"That's probably the logical reason. Thanks for your help bro, I appreciate your efforts.\"" },
-            { h3: "Summary: what he said and what I did with it" },
-            { ul: [
-              "\"It works on my other PC and on other operating systems.\" I treated it as the central fact instead of talking past it.",
-              "\"Did you copy all of this from Google or ChatGPT?\" I didn't defend, apologize, or argue. One sentence on why I asked, then I asked for the actual output.",
-              "\"I checked the Event Viewer, I reset the service, I did the netsh commands.\" I treated \"I did it\" without output as no data, and switched from instructions to questions so he could say \"already did\" without losing face.",
-              "\"The only difference I noticed is the slot. But I don't think that's the problem.\" I took his observation seriously and said so. He found the lead; my job was to not let him throw it away.",
-              "\"It's the PRO B840-P WIFI. I'm probably going to give up.\" I gave him the context that turned giving up into a conclusion: the board has no Win10 support. And I answered his real question. His PC isn't broken."
-            ] },
-            { h3: "Takeaways" },
-            { ul: [
-              "Read the user's evidence before answering. He had already done five controlled tests. The thread ignored them, and that's why he got defensive.",
-              "\"Works on other OSes\" clears the hardware, not the OS and hardware combination. The slot was a real lead.",
-              "Check platform support first on a new board. A 2025 chipset with Windows 11-only drivers running Windows 10 explains a lot of \"works everywhere but here\" problems.",
-              "A long checklist reads as \"I didn't read your post\" even when you did. Lead with one question that shows you read it.",
-              "When someone takes a shot at you, answer the problem, not the shot. One sentence, then back to the data.",
-              "Questions work better than instructions with a defensive person. Same content, and they can say \"already did that\" without losing face.",
-              "When they find the lead, tell them. You don't need the credit; you need them to keep talking.",
-              "A troubleshooting thread can end well without a fix. \"Here's why, and nothing is wrong with your machine\" is a result."
-            ] }
-          ]
-        },
-        {
-          id: "new-build-ram-bisect",
-          title: "New Build Won't Install Windows, Different Stop Code Every Time",
-          subtitle: "",
-          date: "2026",
-          tags: ["Hardware", "RAM", "Windows", "Troubleshooting"],
-          excerpt: "A brand new AM5 build kept blue-screening during the Windows 11 install with a different stop code each time. That pattern points at memory. Notes on narrowing it down by cost, and why \"works with one stick\" is only the start.",
-          vimeo: "",
-          content: [
-            { p: "A user on r/PcBuildHelp had just finished a new build and couldn't get Windows 11 to install. Setup would get partway through, blue-screen, and restart. He posted a photo of one crash (KERNEL_MODE_HEAP_CORRUPTION) and added one detail that ended up being the whole diagnosis: the stop code was different every time." },
-            { p: "This is a different kind of problem from the SATA cable and Windows 10 Wi-Fi threads. Those were about finding the one thing that was different. This one is about taking a system that's known to be bad and splitting it in half until the bad part is isolated." },
-            { h3: "The setup" },
-            { ul: [
-              "Ryzen 5 9600X",
-              "ASUS TUF Gaming B850M WiFi 7",
-              "Radeon RX 9060 XT 16 GB",
-              "2 x 16 GB Klevv Bolt V DDR5 (budget kit, likely 6000 MT/s)",
-              "Brand new build, first OS install"
-            ] },
-            { h3: "Reading the symptom" },
-            { p: "A stop code is Windows telling you which internal check failed when it crashed. If it's the same code every time, something specific is failing: one driver, one subsystem, one component. If it's a different code every time, nothing specific is failing. Data is getting corrupted on its way through the system, and whatever touches the bad data first is what crashes. On a new build that almost always means memory: a bad stick, a bad slot, RAM running at a speed the board can't hold, or, less often, a bad memory controller in the CPU." },
-            { p: "The Windows installer is also just the first thing that puts real load on the memory. \"Windows won't install\" usually isn't a Windows problem. It's the first sign of a hardware problem that would have shown up in the first game anyway." },
-            { h3: "Ruling out the install USB" },
-            { p: "Another commenter suggested trying a Linux install first. That was a good test:" },
-            { ul: [
-              "If Linux installs and runs stable, the hardware is probably fine and the Windows USB is the suspect.",
-              "If Linux also crashes during install, it's hardware and the Windows USB was never the problem."
-            ] },
-            { p: "Linux crashed partway through. The USB was cleared and hardware was confirmed, before anyone opened the case." },
-            { h3: "Ordering the checks" },
-            { p: "With \"hardware, probably memory\" established, the checks went in order of cost:" },
-            { ul: [
-              "Turn off EXPO (ASUS may label it D.O.C.P.) so the RAM runs at its default JEDEC speed. Free, and the most common fix on a new AM5 build, especially with a budget kit that probably isn't on the board's supported memory list.",
-              "Run one stick at a time in slot A2 (second slot from the CPU). Free. Isolates a bad stick.",
-              "Check the CPU socket for bent pins and make sure the CPU is seated flat. Five minutes with the cooler off.",
-              "Run MemTest86 from a USB stick, one full pass. Free, takes about an hour, and turns \"it seems fine\" into a pass or fail.",
-              "Only if everything above passes: the CPU itself. Another commenter had a 7600X that acted the same way and turned out to be a bad chip. It happens, but it's rare, and it's last because it's the most expensive thing to be wrong about."
-            ] },
-            { h3: "What he found" },
-            { p: "He pulled the stick from slot B2 and Windows installed on the first try." },
-            { p: "Then he asked a good question: is the second stick actually bad, and how would he test it? The honest answer was that he didn't know yet. \"Works with one stick\" has three possible explanations, and each has a different fix:" },
-            { ul: [
-              "The stick he pulled is bad (RMA the kit).",
-              "Slot B2 on the board is bad (RMA the board).",
-              "Both sticks are fine on their own, but the board can't run the pair together at the configured speed (BIOS update, or run them slower)."
-            ] },
-            { p: "If he RMAs the kit and it was actually the slot, he gets a new kit and the same crash. So the next step was a short set of swaps: move the suspect stick to the known-good slot, move the known-good stick to the suspect slot, then try both sticks with EXPO off. Each test takes a few minutes and the results don't overlap." },
-            { h3: "The swap tests" },
-            { ul: [
-              "Stick 2 alone in A2. Crashes: stick 2 is bad, RMA the kit. Stable: stick 2 is fine.",
-              "Stick 1 alone in B2. Crashes: slot B2 is bad, RMA the board. Stable: the slot is fine.",
-              "Both sticks, EXPO off. Crashes: the pair won't run together even at stock speed, so try a BIOS update, then RMA the kit. Stable: the pair is fine at stock and the problem was EXPO.",
-              "Both sticks, EXPO on. Crashes: the board can't hold the rated speed. Update the BIOS or set 5600 or 5200 manually."
-            ] },
-            { p: "Whatever setup he ends up on, a full MemTest86 pass before putting anything on the machine is the last step. That's the difference between \"it hasn't crashed yet\" and \"it's good.\"" },
-            { h3: "Outcome" },
-            { p: "The thread is still open. I'll update this once he reports which test failed and what he ended up changing." },
-            { h3: "Takeaways" },
-            { ul: [
-              "A different stop code every time means memory until proven otherwise. The same code every time means go look up that code.",
-              "\"Windows won't install\" on a new build is almost never a Windows problem. The installer is just the first heavy load.",
-              "A second OS is a cheap way to rule out the install media. If it also fails, stop remaking USB sticks.",
-              "Order checks by cost. EXPO off and one stick at a time are free. A CPU RMA is a week without a PC.",
-              "\"Works with one stick\" is the start of the diagnosis, not the end. Bad stick, bad slot, and pair compatibility are three different problems with three different fixes.",
-              "Finish with MemTest86. A full pass is what turns a guess into a result."
-            ] }
-          ]
-        },
-        {
-          id: "laggy-pc-ram",
-          title: "Fixing a Laggy Windows PC: A Full Drive and Mismatched RAM",
-          subtitle: "",
-          date: "2026",
-          tags: ["Hardware", "RAM", "BIOS", "Windows"],
-          excerpt: "My desktop was lagging everywhere, even switching browser tabs. Clearing 600 GB fixed most of it. Getting the RAM back to 3200 MHz took most of a day, because two Corsair kits with almost identical model numbers turned out to have different timings.",
-          vimeo: "",
-          content: [
-            { p: "My Windows desktop was lagging everywhere, including simple things like switching browser tabs. This was October 8 and 9, 2026. There turned out to be two separate causes:" },
-            { ul: [
-              "A nearly full drive. Freeing about 600 GB removed most of the lag right away.",
-              "RAM running at its slow default speed. A BIOS update had reset the memory to 2133 MHz instead of its rated 3200 MHz. Turning the fast profile back on gave a black screen, and figuring out why took most of a day."
-            ] },
-            { p: "The cause of the black screen: my four RAM sticks were two different Corsair kits with almost identical model numbers but different timings. The fix was to run one kit by itself. The PC now runs 32 GB at 3200 MHz." },
-            { h3: "The system" },
-            { ul: [
-              "CPU: AMD Ryzen 9 3900X, 12 cores",
-              "Motherboard: MSI MAG X570 TOMAHAWK WIFI (MS-7C84)",
-              "BIOS: E7C84AMS.1K4, build date 08/14/2026",
-              "RAM: 64 GB as four 16 GB Corsair Vengeance RGB Pro DDR4 sticks (two kits of 2 x 16 GB)",
-              "GPU: Nvidia RTX 2070, 8 GB",
-              "Storage: 2 TB NVMe SSD for Windows, plus two 2 TB Seagate hard drives",
-              "OS: Windows 11"
-            ] },
-            { p: "A few terms: XMP is a speed profile stored on each RAM stick (MSI calls it A-XMP on AMD boards). CMOS is the small memory that holds the BIOS settings." },
-            { h3: "Problem 1: the drive was almost full" },
-            { p: "Symptom: general slowness and stutter across Windows, and a pause every time I opened the browser or switched tabs." },
-            { p: "The drive my programs run from was nearly full. Windows uses free drive space as overflow memory, and browsers write cache files constantly. With almost no room left, every one of those writes stalls. SSDs also write a lot slower when they're nearly full." },
-            { p: "I cleared about 600 GB and the heavy lag stopped immediately. Keep at least 15 to 20 percent of a drive free." },
-            { p: "To check this yourself: Ctrl + Shift + Esc opens Task Manager. On the Performance tab, click each disk. A disk sitting near 100 percent active time while the PC stutters is the bottleneck." },
-            { h3: "Problem 2: RAM stuck at 2133 MHz" },
-            { p: "After the drive cleanup, there were still small hitches while browsing. Task Manager (Performance, Memory, Speed) showed 2133 MHz. The RAM is rated for 3200 MHz." },
-            { p: "A month earlier I had updated the BIOS from the launch version to 1K4. A BIOS update wipes all settings, including the A-XMP profile that enables the rated speed. Ryzen 3000 chips are noticeably affected by slow memory." },
-            { p: "In the BIOS I turned A-XMP on, picked Profile 1, and saved with F10. The PC powered on but the monitor stayed black." },
-            { h3: "The mistake I made" },
-            { p: "After a memory speed change, the motherboard runs memory training: it tests the sticks at the new settings before showing a picture. With a lot of RAM that can mean a black screen for one to two minutes, sometimes with a restart in the middle." },
-            { p: "I didn't know that at first. I was powering the PC off about five seconds into the black screen, which interrupted the test every time. That made it impossible to tell a real failure from a test that just hadn't finished." },
-            { p: "Lesson: after any RAM setting change, set a timer for three full minutes before touching the power button." },
-            { h3: "Recovery: clearing CMOS" },
-            { p: "When the board won't show a picture at all, the way back is to clear CMOS, which resets every BIOS setting to default. It doesn't touch Windows or any files." },
-            { ul: [
-              "Hold the power button until the PC shuts off. Switch the power supply off and unplug it.",
-              "Press the case power button once to drain leftover power.",
-              "Find the two pins labeled JBAT1. On this board they're the bottom pair in a column of six pins, to the right of the lower M.2 heatsink and left of the SYS_FAN headers.",
-              "Touch both pins at once with a metal screwdriver tip for 10 seconds.",
-              "Plug back in and power on. The screen reports that CMOS was cleared. Press F1 to enter setup."
-            ] },
-            { p: "Things to fix after every clear:" },
-            { ul: [
-              "The board goes back to CSM (legacy) boot mode. Set \"BIOS UEFI/CSM Mode\" back to UEFI.",
-              "Check and re-enable Secure Boot and fTPM. Windows 11 and some game anti-cheat systems depend on them.",
-              "Windows asked me to set a new sign-in PIN, because the PIN is tied to the fTPM.",
-              "Switching to UEFI turns on \"Above 4G memory\" and \"Re-Size BAR Support\" automatically. That's normal.",
-              "The reset screen offers Alt + F1 to load a saved overclocking profile. Don't load one that might contain the setting that just failed."
-            ] },
-            { h3: "Finding the cause" },
-            { p: "With the timing mistake fixed, I tested one change at a time and waited three minutes on each:" },
-            { ul: [
-              "Test 1: A-XMP Profile 1 at 3200 MHz, all four sticks. Black screen, but not a fair test since I powered off too early.",
-              "Test 2: A-XMP Profile 1 with the speed lowered to 2933 MHz, all four sticks. Black screen after 3+ minutes.",
-              "Test 3: A-XMP Profile 1 at 3200 MHz, Pair B only in slots 2 and 4. Boots at 3200 MHz.",
-              "Test 4: A-XMP Profile 1 at 3200 MHz, Pair A only in slots 2 and 4. Black screen.",
-              "Test 5: 3200 MHz with timings set by hand to 16-20-20-38, Pair B only. Boots.",
-              "Test 6: 3200 MHz with timings set by hand to 16-20-20-38, all four sticks. Black screen after 3 minutes."
-            ] },
-            { p: "Slots are counted from the CPU outward. A pair goes in slots 2 and 4, which is what the board prefers. Testing both pairs in the same two slots mattered: if only one thing changes between tests, the result points at that one thing." },
-            { h3: "The answer was on the labels" },
-            { p: "I had assumed all four sticks were the same because they were the same brand, size, and speed. The stickers said otherwise:" },
-            { ul: [
-              "Pair A: CMW32GX4M2E3200C16, 3200 MHz, timings 16-20-20-38 (looser), 1.35 V, version 4.49.",
-              "Pair B: CMW32GX4M2C3200C16, 3200 MHz, timings 16-18-18-36 (stricter), 1.35 V, version 4.32."
-            ] },
-            { p: "One letter is different in the model number (E versus C). Timings are how many clock ticks the RAM is allowed to take to respond, so lower numbers are stricter. The BIOS showed the stricter 16-18-18-36 profile and applied it to all four sticks. Pair A is only rated for 16-20-20-38." },
-            { p: "That also explains test 2. Dropping the speed to 2933 MHz kept the strict timings, so the looser kit was still being asked for more than its rating." },
-            { p: "A fast-memory profile is only tested by the manufacturer for the sticks sold together in one box. Mixing kits, even from the same product line, isn't guaranteed to work at the rated speed. At the default 2133 MHz the difference doesn't matter, which is why the PC ran fine with all four." },
-            { p: "Loosening the timings by hand to match Pair A (test 6) still didn't get all four sticks to boot, so on this CPU and board the four-stick combination won't reach 3200 MHz with these kits." },
-            { h3: "Final setup" },
-            { ul: [
-              "RAM: Pair B only (CMW32GX4M2C3200C16) in slots 2 and 4, 32 GB at 3200 MHz.",
-              "Pair A: removed and kept as a spare.",
-              "BIOS: UEFI mode, A-XMP Profile 1 on."
-            ] },
-            { p: "For gaming and everyday use, 32 GB of fast RAM is a better trade than 64 GB of slow RAM. If a job ever needs the full 64 GB, all four sticks at 2133 MHz still works." },
-            { h3: "Still to do" },
-            { ul: [
-              "Test Pair A alone at its own label settings (3200 MHz, 16-20-20-38, full three-minute wait). If it fails, it isn't meeting its advertised speed and Corsair's lifetime warranty may cover a replacement.",
-              "Confirm Secure Boot and fTPM are on after the last CMOS clear.",
-              "Install the current AMD chipset driver and Nvidia driver.",
-              "Watch memory \"In use\" in Task Manager during heavy work for a week. If it never gets near 32 GB, no more RAM is needed. If it does, buy one boxed four-stick kit that was tested together, not a second pair."
-            ] },
-            { h3: "Takeaways" },
-            { ul: [
-              "Check Task Manager before guessing. The Performance tab shows which part is maxed out.",
-              "Keep 15 to 20 percent of every drive free.",
-              "A BIOS update resets everything. Re-check the memory profile, boot mode, Secure Boot, and fTPM afterward.",
-              "Memory training takes minutes. A black screen for the first two to three minutes isn't a failure.",
-              "Same brand and same speed doesn't mean same kit. Read the full model number, timings, and version on every stick.",
-              "Change one thing per test and keep everything else the same.",
-              "Know where the clear-CMOS pins are before experimenting with BIOS settings."
-            ] },
-            { h3: "Quick reference: MSI Click BIOS 5" },
-            { p: "Press F7 in the BIOS to switch to Advanced mode first." },
-            { ul: [
-              "Enter the BIOS from Windows: Settings > System > Recovery > Advanced startup > Restart now > Troubleshoot > Advanced options > UEFI Firmware Settings",
-              "Memory profile (A-XMP): OC > A-XMP",
-              "Memory speed: OC > DRAM Frequency",
-              "Memory timings: OC > Advanced DRAM Configuration (tCL, tRCDRD, tRCDWR, tRP, tRAS)",
-              "UEFI boot mode: Settings > Advanced > Windows OS Configuration > BIOS UEFI/CSM Mode",
-              "Secure Boot: Settings > Advanced > Windows OS Configuration > Secure Boot",
-              "fTPM: Settings > Security > Trusted Computing > Security Device Support, AMD fTPM switch",
-              "Save and exit: F10"
-            ] }
-          ]
-        }
-      ]
-    },
-    leetcode: {
-      name: "LeetCode",
-      glyph: "🧩",
-      description: "LeetCode problems I found challenging, with my full writeup — first attempts, where I got stuck, and what finally clicked.",
-      posts: [
-        // I'll add my LeetCode writeups here as I work through problems.
-        // Copy the drive-swap post above as a template.
-      ]
-    }
-  };
-
-  /* ----------------------------------------------------------------
-     ELEMENT REFERENCES
-     ---------------------------------------------------------------- */
-  const desktop        = document.getElementById("desktop");
-  const startButton    = document.getElementById("start-button");
-  const startMenu      = document.getElementById("start-menu");
-  const taskbarWindows = document.getElementById("taskbar-windows");
-  const clockEl        = document.getElementById("clock");
-
-  /* ================================================================
-     WINDOW MANAGEMENT
-     ================================================================ */
-
-  /* Bring a window to the front and mark its taskbar button active. */
-  function focusWindow(win) {
-    zIndexCounter += 1;
-    win.style.zIndex = zIndexCounter;
-
-    // Update taskbar button highlighting.
-    document.querySelectorAll(".taskbar-window-btn").forEach(function (btn) {
-      btn.classList.toggle("active", btn.dataset.window === win.dataset.name);
-    });
-  }
-
-  /* ----------------------------------------------------------------
-     WINDOW PLACEMENT
-     A new window opens centered. If the center is already taken, it
-     is placed in the nearest free space (left, right, above, below,
-     then the corners) so that open windows never overlap.
-     ---------------------------------------------------------------- */
-
-  /* True if rectangles a and b overlap at all. */
-  function rectsOverlap(a, b) {
-    return a.left < b.left + b.width &&
-           b.left < a.left + a.width &&
-           a.top  < b.top  + b.height &&
-           b.top  < a.top  + a.height;
-  }
-
-  /* Rectangles of every window that is currently open (visible),
-     skipping the one passed in. */
-  function openWindowRects(exclude) {
-    const rects = [];
-    document.querySelectorAll(".window").forEach(function (w) {
-      if (w === exclude || w.classList.contains("hidden")) {
-        return;
-      }
-      rects.push({
-        left:   w.offsetLeft,
-        top:    w.offsetTop,
-        width:  w.offsetWidth,
-        height: w.offsetHeight
-      });
-    });
-    return rects;
-  }
-
-  /* Find a non-overlapping spot for a window. Tries the center first,
-     then left / right / above / below, then the four corners. Falls
-     back to a small diagonal cascade if every spot is taken. */
-  function findWindowSpot(win) {
-    const gap   = 20;
-    const areaW = window.innerWidth;
-    const areaH = window.innerHeight - 36;   // Desktop minus the taskbar.
-    const winW  = win.offsetWidth  || 460;
-    const winH  = win.offsetHeight || 320;
-
-    const cx = (areaW - winW) / 2;           // Centered left.
-    const cy = (areaH - winH) / 2;           // Centered top.
-
-    // Candidate positions, tried in this order.
-    const candidates = [
-      { left: cx,              top: cy              }, // center
-      { left: cx - winW - gap, top: cy              }, // left
-      { left: cx + winW + gap, top: cy              }, // right
-      { left: cx,              top: cy - winH - gap }, // above
-      { left: cx,              top: cy + winH + gap }, // below
-      { left: cx - winW - gap, top: cy - winH - gap }, // top-left
-      { left: cx + winW + gap, top: cy - winH - gap }, // top-right
-      { left: cx - winW - gap, top: cy + winH + gap }, // bottom-left
-      { left: cx + winW + gap, top: cy + winH + gap }  // bottom-right
-    ];
-
-    const others = openWindowRects(win);
-
-    for (let i = 0; i < candidates.length; i++) {
-      // Clamp the candidate so the window stays fully on screen.
-      const left = Math.min(Math.max(candidates[i].left, 8),
-                            Math.max(8, areaW - winW - 8));
-      const top  = Math.min(Math.max(candidates[i].top, 8),
-                            Math.max(8, areaH - winH - 8));
-      const rect = { left: left, top: top, width: winW, height: winH };
-
-      // Accept the first spot that overlaps no open window.
-      let free = true;
-      for (let j = 0; j < others.length; j++) {
-        if (rectsOverlap(rect, others[j])) {
-          free = false;
-          break;
-        }
-      }
-      if (free) {
-        return { left: left, top: top };
-      }
-    }
-
-    // Every spot is taken: fall back to a small diagonal cascade.
-    const left = Math.min(40 + cascadeOffset, Math.max(8, areaW - winW - 8));
-    const top  = Math.min(40 + cascadeOffset, Math.max(8, areaH - winH - 8));
-    cascadeOffset = (cascadeOffset + 28) % 170;
-    return { left: left, top: top };
-  }
-
-  /* Open (or restore) a window by its short name, e.g. "projects".
-     Special case: "resume" is not an in-app window - it opens the
-     standalone resume.html PDF page in a new browser tab. */
-  function openWindow(name) {
-    if (name === "resume") {
-      window.open("resume.html", "_blank", "noopener");
-      return;
-    }
-
-    const win = document.getElementById("win-" + name);
-    if (!win) {
-      return;
-    }
-
-    win.dataset.name = name;
-
-    // Was the window closed (hidden) before this click?
-    const wasHidden = win.classList.contains("hidden");
-
-    // Show the window so its real size can be measured for placement.
-    win.classList.remove("hidden");
-
-    // Place the window every time it opens from a closed state, so it
-    // lands centered or in the nearest free space. (Restoring a
-    // minimized window from the taskbar does not call openWindow, so
-    // minimized windows still come back exactly where they were.)
-    if (wasHidden) {
-      const spot = findWindowSpot(win);
-      win.style.left = spot.left + "px";
-      win.style.top  = spot.top  + "px";
-    }
-
-    focusWindow(win);
-    addTaskbarButton(name, win);
-
-    // If it is the terminal, focus the input for immediate typing.
-    if (name === "terminal") {
-      const input = document.getElementById("terminal-input");
-      if (input) {
-        input.focus();
-      }
+  function enqueue(item, delay) {
+    queue.push({ item: item, delay: delay == null ? LINE_DELAY : delay });
+    if (!timer) {
+      pump();
     }
   }
 
-  /* Hide a window without removing it (Close). */
-  function closeWindow(win) {
-    win.classList.add("hidden");
-    removeTaskbarButton(win.dataset.name);
-  }
-
-  /* Minimize: hide the window but keep its taskbar button. */
-  function minimizeWindow(win) {
-    win.classList.add("hidden");
-    const btn = taskbarWindows.querySelector(
-      '[data-window="' + win.dataset.name + '"]'
-    );
-    if (btn) {
-      btn.classList.remove("active");
-    }
-  }
-
-  /* ================================================================
-     TASKBAR BUTTONS
-     ================================================================ */
-
-  function addTaskbarButton(name, win) {
-    // Don't add a duplicate button if the window is already tracked.
-    if (taskbarWindows.querySelector('[data-window="' + name + '"]')) {
-      return;
-    }
-
-    const btn = document.createElement("button");
-    btn.className = "taskbar-window-btn";
-    btn.dataset.window = name;
-    btn.textContent = win.dataset.title || name;
-
-    // Clicking a taskbar button toggles minimize / restore + focus.
-    btn.addEventListener("click", function () {
-      const isHidden = win.classList.contains("hidden");
-      const isActive = btn.classList.contains("active");
-
-      if (isHidden) {
-        // Restore a minimized window.
-        win.classList.remove("hidden");
-        focusWindow(win);
-      } else if (isActive) {
-        // Already focused and visible -> minimize it.
-        minimizeWindow(win);
-      } else {
-        // Visible but behind something -> bring to front.
-        focusWindow(win);
-      }
-    });
-
-    taskbarWindows.appendChild(btn);
-  }
-
-  function removeTaskbarButton(name) {
-    const btn = taskbarWindows.querySelector('[data-window="' + name + '"]');
-    if (btn) {
-      btn.remove();
-    }
-  }
-
-  /* ================================================================
-     WINDOW DRAGGING
-     ================================================================ */
-
-  /* True on phone-sized screens. Matches the CSS phone breakpoint, so
-     windows there are full-screen and dragging is turned off. */
-  function isMobile() {
-    return window.matchMedia("(max-width: 600px)").matches;
-  }
-
-  function makeDraggable(win) {
-    const titleBar = win.querySelector(".window-title-bar");
-    let dragging = false;
-    let offsetX = 0;
-    let offsetY = 0;
-
-    titleBar.addEventListener("mousedown", function (e) {
-      // Ignore drags that start on the control buttons.
-      if (e.target.classList.contains("win-btn")) {
-        return;
-      }
-      // No dragging on phones - windows are full-screen there.
-      if (isMobile()) {
-        return;
-      }
-      dragging = true;
-      offsetX = e.clientX - win.offsetLeft;
-      offsetY = e.clientY - win.offsetTop;
-      focusWindow(win);
-      e.preventDefault();
-    });
-
-    document.addEventListener("mousemove", function (e) {
-      if (!dragging) {
-        return;
-      }
-      let newLeft = e.clientX - offsetX;
-      let newTop  = e.clientY - offsetY;
-
-      // Keep the window roughly on-screen.
-      const maxLeft = window.innerWidth - 60;
-      const maxTop  = window.innerHeight - 70;   // Above the taskbar.
-      newLeft = Math.min(Math.max(newLeft, -win.offsetWidth + 80), maxLeft);
-      newTop  = Math.min(Math.max(newTop, 0), maxTop);
-
-      win.style.left = newLeft + "px";
-      win.style.top  = newTop + "px";
-    });
-
-    document.addEventListener("mouseup", function () {
-      dragging = false;
-    });
-  }
-
-  /* ================================================================
-     WIRE UP EACH WINDOW
-     ================================================================ */
-
-  document.querySelectorAll(".window").forEach(function (win) {
-    makeDraggable(win);
-
-    // Clicking anywhere on a window brings it to the front.
-    win.addEventListener("mousedown", function () {
-      focusWindow(win);
-    });
-
-    // Minimize button.
-    win.querySelector(".win-min").addEventListener("click", function (e) {
-      e.stopPropagation();
-      minimizeWindow(win);
-    });
-
-    // Close button.
-    win.querySelector(".win-close").addEventListener("click", function (e) {
-      e.stopPropagation();
-      closeWindow(win);
-    });
-  });
-
-  /* ================================================================
-     DESKTOP ICONS
-     ================================================================ */
-
-  document.querySelectorAll(".desktop-icon").forEach(function (icon) {
-    // Single click opens the window (simple and reliable for v1).
-    icon.addEventListener("click", function () {
-      openWindow(icon.dataset.window);
-    });
-  });
-
-  /* ================================================================
-     START MENU
-     ================================================================ */
-
-  function toggleStartMenu(forceClose) {
-    const willClose = forceClose || !startMenu.classList.contains("hidden");
-    startMenu.classList.toggle("hidden", willClose);
-    startButton.classList.toggle("active", !willClose);
-  }
-
-  startButton.addEventListener("click", function (e) {
-    e.stopPropagation();
-    toggleStartMenu(false);
-  });
-
-  // Start menu items open their window and close the menu.
-  document.querySelectorAll(".start-menu-item").forEach(function (item) {
-    item.addEventListener("click", function () {
-      openWindow(item.dataset.window);
-      toggleStartMenu(true);
-    });
-  });
-
-  // Clicking anywhere else closes the Start menu.
-  document.addEventListener("click", function (e) {
-    if (!startMenu.contains(e.target) && e.target !== startButton) {
-      toggleStartMenu(true);
-    }
-  });
-
-  /* ================================================================
-     CLOCK  (updates every minute)
-     ================================================================ */
-
-  function updateClock() {
-    // Always show Pacific time, regardless of the visitor's location.
-    // "America/Los_Angeles" handles PST/PDT (daylight saving) automatically.
-    const time = new Date().toLocaleTimeString("en-US", {
-      timeZone: "America/Los_Angeles",
-      hour: "numeric",
-      minute: "2-digit"
-    });
-    clockEl.textContent = time + " PT";
-  }
-
-  updateClock();
-  setInterval(updateClock, 60 * 1000);   // Refresh once per minute.
-
-  /* ================================================================
-     FAKE TERMINAL
-     ================================================================ */
-
-  const terminalInput  = document.getElementById("terminal-input");
-  const terminalOutput = document.getElementById("terminal-output");
-
-  /* ---------------------------------------------------------------
-     VIRTUAL FILE SYSTEM
-     This is a FAKE file system that lives only in the browser - it
-     does NOT touch the visitor's real computer. Folders are objects,
-     files are strings (their contents). Edit the text freely.
-     The "projects" folder is filled in automatically from the
-     PROJECTS config near the top of this file.
-     --------------------------------------------------------------- */
-  const FILE_SYSTEM = {
-    "about.txt":
-      "AlexisOS v1.0\n\n" +
-      "A Windows XP inspired personal portfolio, built with plain\n" +
-      "HTML, CSS, and JavaScript.\n\n" +
-      "Use 'ls' (or 'dir') to list files, 'cd <folder>' to move\n" +
-      "around, and 'cat <file>' to read a file.",
-    "contact.txt":
-      "CONTACT\n\n" +
-      "Email:    me@argonzalez.com\n" +
-      "GitHub:   github.com/Knucme\n" +
-      "LinkedIn: linkedin.com/in/a-gonzo",
-    "projects": {
-      // Filled in by the loop below.
-    },
-    "blogs": {
-      // Filled in by the loop below.
-    },
-    "resume": {
-      "education.txt":
-        "EDUCATION\n\n" +
-        "California State University San Marcos\n" +
-        "  B.S. Computer Science | Jan 2026 - Dec 2027\n\n" +
-        "Fullstack Academy\n" +
-        "  Software Engineering Immersive | Oct 2023 - Apr 2024\n\n" +
-        "NPower - IT Fundamentals | Feb 2023 - Jun 2023\n" +
-        "  Earned Google IT Support and CompTIA ITF+ certifications.",
-      "skills.txt":
-        "SKILLS\n\n" +
-        "Languages:   Java, JavaScript, Python, SQL\n" +
-        "Frameworks:  Spring Boot, Node.js, Express, React\n" +
-        "Tools:       PostgreSQL, REST APIs, WebSockets, JWT, Git\n" +
-        "Learning:    automated testing, Docker, cloud deployment",
-      "experience.txt":
-        "EXPERIENCE\n\n" +
-        "Security Supervisor - Allied Universal\n" +
-        "  Mar 2016 - Sep 2020 | Oceanside, California\n" +
-        "  Led a team of security officers across multiple shifts.\n\n" +
-        "Master at Arms - US Navy\n" +
-        "  Jan 2011 - Sep 2019 | San Diego, California\n" +
-        "  Navy law enforcement and security; led teams and ran\n" +
-        "  training programs."
-    }
-  };
-
-  // Build a text file inside /projects for each project in PROJECTS.
-  Object.keys(PROJECTS).forEach(function (id) {
-    const p = PROJECTS[id];
-    FILE_SYSTEM.projects[id + ".txt"] =
-      p.name + "\n" +
-      "Tech: " + p.tech + "\n\n" +
-      p.description +
-      (p.github ? "\n\nGitHub: github.com/" + p.github : "");
-  });
-
-  // Convert a blog post's structured content into plain text for the
-  // terminal file view.
-  function blogPostToText(post) {
-    let out = post.title + "\n";
-    if (post.subtitle) { out += "(" + post.subtitle + ")\n"; }
-    out += post.date;
-    if (post.tags && post.tags.length) { out += "  |  " + post.tags.join(", "); }
-    out += "\n\n";
-    post.content.forEach(function (block) {
-      if (block.h3) {
-        out += "\n" + block.h3.toUpperCase() + "\n\n";
-      } else if (block.p) {
-        out += block.p + "\n\n";
-      } else if (block.ul) {
-        block.ul.forEach(function (item) { out += "  - " + item + "\n"; });
-        out += "\n";
-      }
-    });
-    return out.trimEnd();
-  }
-
-  // Build the /blogs folder tree: one sub-folder per BLOGS category,
-  // each holding one text file per post.
-  FILE_SYSTEM.blogs = {};
-  Object.keys(BLOGS).forEach(function (catId) {
-    FILE_SYSTEM.blogs[catId] = {};
-    BLOGS[catId].posts.forEach(function (post) {
-      FILE_SYSTEM.blogs[catId][post.id + ".txt"] = blogPostToText(post);
-    });
-  });
-
-  // The folder the terminal is currently "in". [] means the root.
-  let currentPath = [];
-
-  /* ---------------------------------------------------------------
-     FILE SYSTEM HELPERS
-     --------------------------------------------------------------- */
-
-  /* Return the folder/file object at a given path array, or null. */
-  function getNode(pathArray) {
-    let node = FILE_SYSTEM;
-    for (let i = 0; i < pathArray.length; i++) {
-      if (!node || typeof node !== "object") {
-        return null;
-      }
-      node = node[pathArray[i]];
-    }
-    return node;
-  }
-
-  /* Turn a path argument (e.g. "../resume") into a path array,
-     or return null if it does not point to anything that exists. */
-  function resolvePath(arg) {
-    // Absolute paths start at the root; otherwise start where we are.
-    let path = (arg.charAt(0) === "/") ? [] : currentPath.slice();
-    const parts = arg.split("/");
-
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
-      if (part === "" || part === ".") {
-        continue;                       // Ignore empty and "current dir".
-      }
-      if (part === "~") {
-        path = [];                      // "~" jumps to the root.
-        continue;
-      }
-      if (part === "..") {
-        path = path.slice(0, -1);       // ".." goes up one level.
-        continue;
-      }
-      const here = getNode(path);
-      if (!here || typeof here !== "object" || !(part in here)) {
-        return null;                    // No such file or folder.
-      }
-      path = path.concat(part);
-    }
-    return path;
-  }
-
-  /* Current path as a string, e.g. "/" or "/projects". */
-  function pathString() {
-    return "/" + currentPath.join("/");
-  }
-
-  /* The prompt text, e.g. "alex@alexos:/projects$". */
-  function promptString() {
-    return "alex@alexos:" + pathString() + "$";
-  }
-
-  /* Update the prompt shown next to the input box. */
-  function updatePromptDisplay() {
-    const promptEl = document.querySelector(".terminal-prompt");
-    if (promptEl) {
-      promptEl.textContent = promptString();
-    }
-  }
-
-  /* ---------------------------------------------------------------
-     FILE SYSTEM COMMANDS
-     --------------------------------------------------------------- */
-
-  /* "ls" / "dir" - list the contents of a folder. */
-  function listDir(arg) {
-    const target = (arg === "") ? currentPath : resolvePath(arg);
-    if (target === null) {
-      return "ls: no such file or directory: " + arg;
-    }
-    const node = getNode(target);
-    if (typeof node === "string") {
-      return arg;                       // Argument pointed at a file.
-    }
-    const keys = Object.keys(node);
-    if (keys.length === 0) {
-      return "(empty folder)";
-    }
-    // Folders get a trailing slash so they stand out.
-    return keys.map(function (k) {
-      return (typeof node[k] === "object") ? k + "/" : k;
-    }).join("    ");
-  }
-
-  /* "cd" - change the current folder. */
-  function changeDir(arg) {
-    if (arg === "" || arg === "~" || arg === "/") {
-      currentPath = [];                 // No argument -> go to the root.
-      updatePromptDisplay();
-      return;
-    }
-    const target = resolvePath(arg);
-    if (target === null) {
-      terminalPrint("cd: no such directory: " + arg);
-      return;
-    }
-    if (typeof getNode(target) === "string") {
-      terminalPrint("cd: not a directory: " + arg);
-      return;
-    }
-    currentPath = target;
-    updatePromptDisplay();
-  }
-
-  /* "cat" - print the contents of a file. */
-  function readFile(arg) {
-    if (arg === "") {
-      return "cat: missing file name";
-    }
-    const target = resolvePath(arg);
-    if (target === null) {
-      return "cat: no such file: " + arg;
-    }
-    const node = getNode(target);
-    if (typeof node === "object") {
-      return "cat: " + arg + " is a directory";
-    }
-    return node;
-  }
-
-  /* ---------------------------------------------------------------
-     SIMPLE INFO COMMANDS
-     Edit the text here to change what each prints.
-     --------------------------------------------------------------- */
-  const TERMINAL_COMMANDS = {
-    help:
-      "Available commands:\n" +
-      "  help             - show this list\n" +
-      "  about            - about AlexisOS\n" +
-      "  ls / dir [path]  - list files in a folder\n" +
-      "  cd <folder>      - change folder (use 'cd ..' to go up)\n" +
-      "  pwd              - show the current folder\n" +
-      "  cat <file>       - show a file's contents\n" +
-      "  projects         - list my projects\n" +
-      "  resume           - resume summary\n" +
-      "  games            - list games\n" +
-      "  blogs            - list blog folders\n" +
-      "  contact          - contact info\n" +
-      "  clear            - clear the screen\n\n" +
-      "Tip: try 'ls', then 'cd blogs/tech', then 'cat drive-swap.txt'.",
-    about:
-      "AlexisOS v1.0\n" +
-      "A Windows XP inspired personal portfolio, built with plain HTML, CSS, and JS.",
-    projects:
-      "Projects:\n" +
-      "  1. SE370 Point of Sale System\n" +
-      "  2. Statistics Survey Website\n" +
-      "  3. Horus Heresy Spoiler-Free Character Tracker\n" +
-      "  4. Java Poker Card Shuffler\n" +
-      "(Open the Projects window, or 'cd projects' to explore.)",
-    resume:
-      "Resume:\n" +
-      "  Click the Resume icon on the desktop to open my resume\n" +
-      "  PDF in a new tab. Or 'cd resume' for a text version.",
-    games:
-      "Games:\n" +
-      "  - Doom (playable - open the Games window)\n" +
-      "  - Snake (coming soon)\n" +
-      "  - Tic Tac Toe (coming soon)\n" +
-      "  - Text Adventure (coming soon)",
-    blogs:
-      "Blogs:\n" +
-      "  tech/       - Writeups on tech problems I've solved\n" +
-      "  leetcode/   - LeetCode problems with writeups\n" +
-      "(Open the Blogs window, or 'cd blogs' then 'ls' to explore.)",
-    contact:
-      "Contact:\n" +
-      "  Email:    me@argonzalez.com\n" +
-      "  GitHub:   github.com/Knucme\n" +
-      "  LinkedIn: linkedin.com/in/a-gonzo"
-  };
-
-  /* Append a line of text to the terminal output area. */
-  function terminalPrint(text) {
-    terminalOutput.textContent += "\n" + text;
-    // Auto-scroll to the newest line.
-    terminalOutput.scrollTop = terminalOutput.scrollHeight;
-  }
-
-  /* Run a single command string. */
-  function runCommand(raw) {
-    // Echo the command next to the prompt as it was when typed.
-    terminalPrint(promptString() + " " + raw);
-
-    const trimmed = raw.trim();
-    if (trimmed === "") {
-      return;
-    }
-
-    // Split into the command word and everything after it (the argument).
-    const parts = trimmed.split(/\s+/);
-    const cmd = parts[0].toLowerCase();
-    const arg = parts.slice(1).join(" ");
-
-    // File-system commands.
-    switch (cmd) {
-      case "clear":
-        terminalOutput.textContent = "";
-        return;
-      case "ls":
-      case "dir":
-        terminalPrint(listDir(arg));
-        return;
-      case "cd":
-        changeDir(arg);
-        return;
-      case "pwd":
-        terminalPrint(pathString());
-        return;
-      case "cat":
-      case "type":                      // "type" is the DOS equivalent.
-        terminalPrint(readFile(arg));
-        return;
-    }
-
-    // Simple info commands.
-    if (TERMINAL_COMMANDS.hasOwnProperty(cmd)) {
-      terminalPrint(TERMINAL_COMMANDS[cmd]);
+  function place(item) {
+    if (typeof item === "function") {
+      item();
     } else {
-      terminalPrint('Command not found: "' + cmd + '". Type "help".');
+      out.appendChild(item);
     }
   }
 
-  if (terminalInput) {
-    terminalInput.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") {
-        runCommand(terminalInput.value);
-        terminalInput.value = "";
-      }
-    });
-    updatePromptDisplay();              // Show the starting prompt ("/").
-  }
-
-  /* ================================================================
-     PROJECTS WINDOW + DETAIL WINDOW
-     ================================================================ */
-
-  /* Build the clickable project list inside the Projects window. */
-  function renderProjectsList() {
-    const listEl = document.getElementById("projects-list");
-    if (!listEl) {
+  function pump() {
+    if (!queue.length) {
+      timer = null;
       return;
     }
-    listEl.innerHTML = "";
-
-    Object.keys(PROJECTS).forEach(function (id) {
-      const p = PROJECTS[id];
-
-      const item = document.createElement("button");
-      item.className = "project-item";
-      item.dataset.project = id;
-
-      const nameEl = document.createElement("span");
-      nameEl.className = "project-item-name";
-      nameEl.textContent = p.name;
-
-      const techEl = document.createElement("span");
-      techEl.className = "project-item-tech";
-      techEl.textContent = p.tech;
-
-      item.appendChild(nameEl);
-      item.appendChild(techEl);
-
-      item.addEventListener("click", function () {
-        openProjectDetail(id);
-      });
-
-      listEl.appendChild(item);
-    });
+    const next = queue.shift();
+    place(next.item);
+    if (autoScroll) {
+      out.scrollTop = out.scrollHeight;
+    }
+    timer = setTimeout(pump, reduceMotion ? 0 : next.delay);
   }
 
-  /* Fill and open the detail window for one project. */
-  function openProjectDetail(id) {
-    const p = PROJECTS[id];
-    if (!p) {
-      return;
+  /* Print everything still waiting, immediately. */
+  function flush() {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
     }
+    while (queue.length) {
+      place(queue.shift().item);
+    }
+    if (autoScroll) {
+      out.scrollTop = out.scrollHeight;
+    }
+  }
 
-    const win  = document.getElementById("win-project-detail");
-    const body = document.getElementById("project-detail-body");
+  /* Throw away anything still waiting (used when changing screens). */
+  function cancel() {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    queue = [];
+  }
 
-    // Show the project name in the title bar.
-    win.querySelector(".window-title").textContent = p.name;
-    win.dataset.title = p.name;
+  function busy() {
+    return queue.length > 0;
+  }
 
-    // Rebuild the detail body from scratch.
-    body.innerHTML = "";
+  /* ----------------------------------------------------------------
+     OUTPUT BUILDERS
+     ---------------------------------------------------------------- */
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) { e.className = cls; }
+    if (text != null) { e.textContent = text; }
+    return e;
+  }
 
-    const h2 = document.createElement("h2");
-    h2.textContent = p.name;
-    body.appendChild(h2);
+  function line(text, cls)  { enqueue(el("div", "line" + (cls ? " " + cls : ""), text)); }
+  function para(text, cls)  { enqueue(el("div", "para" + (cls ? " " + cls : ""), text)); }
+  function blank()          { enqueue(el("div", "line", " ")); }
+  function rule()           { enqueue(el("div", "rule")); }
+  function sect(text)       { enqueue(el("div", "sect", "== " + text.toUpperCase() + " ==")); }
+  function item(text)       { enqueue(el("div", "li", "- " + text)); }
 
-    const tech = document.createElement("p");
-    tech.className = "detail-tech";
-    const techLabel = document.createElement("strong");
-    techLabel.textContent = "Tech: ";
-    tech.appendChild(techLabel);
-    tech.appendChild(document.createTextNode(p.tech));
-    body.appendChild(tech);
+  function header(path) {
+    enqueue(el("div", "line h", ">> " + path.toUpperCase()));
+    rule();
+  }
 
-    const desc = document.createElement("p");
-    desc.textContent = p.description;
-    body.appendChild(desc);
+  /* "LABEL ......... value" with the value as a link. */
+  function linkLine(label, href, text) {
+    const row = el("div", "line");
+    row.appendChild(document.createTextNode(label));
+    const a = el("a", null, text);
+    a.href = href;
+    if (!href.startsWith("mailto:")) {
+      a.target = "_blank";
+      a.rel = "noopener";
+    }
+    row.appendChild(a);
+    enqueue(row);
+  }
 
-    // GitHub area.
-    const ghWrap = document.createElement("div");
-    ghWrap.className = "detail-github";
+  /* Pad a label with dots to a fixed width, like a status readout. */
+  function dots(label, width) {
+    const w = width || 18;
+    let s = label + " ";
+    while (s.length < w) { s += "."; }
+    return s + " ";
+  }
 
-    if (p.github) {
-      // "View on GitHub" opens the repo in a new browser tab.
-      const link = document.createElement("a");
-      link.className = "action-btn";
-      link.href = "https://github.com/" + p.github;
-      link.target = "_blank";
-      link.rel = "noopener";
-      link.textContent = "View on GitHub ↗";
-      ghWrap.appendChild(link);
+  /* ----------------------------------------------------------------
+     MENUS
+     option(key, label, action, hint) prints a clickable [key] LABEL
+     and registers the key so typing it at the prompt does the same.
+     ---------------------------------------------------------------- */
+  let menu = {};
 
-      // "Load live GitHub info" pulls repo stats into the window.
-      const loadBtn = document.createElement("button");
-      loadBtn.className = "action-btn";
-      loadBtn.textContent = "Load live GitHub info";
-      ghWrap.appendChild(loadBtn);
+  function option(key, label, action, hint) {
+    menu[String(key).toLowerCase()] = action;
+    const row = el("div", "opt-row");
+    const btn = el("button", "opt", "[" + key + "] " + label);
+    btn.type = "button";
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      run(action);
+    });
+    row.appendChild(btn);
+    if (hint) {
+      row.appendChild(el("span", "dim", hint));
+    }
+    enqueue(row);
+  }
 
-      const info = document.createElement("div");
-      info.className = "github-info";
-      ghWrap.appendChild(info);
+  function backOption() {
+    option(0, "RETURN", back, "or press ESC");
+  }
 
-      loadBtn.addEventListener("click", function () {
-        loadGitHubInfo(p.github, info, loadBtn);
-      });
+  function run(action) {
+    flush();
+    action();
+    if (finePointer) {
+      input.focus();
+    }
+  }
+
+  /* ----------------------------------------------------------------
+     SCREEN NAVIGATION
+     ---------------------------------------------------------------- */
+  let stack = [];          // previous screens, for BACK
+  let current = null;      // { fn, args }
+
+  function render() {
+    cancel();
+    out.innerHTML = "";
+    out.scrollTop = 0;
+    autoScroll = false;
+    menu = {};
+    current.fn.apply(null, current.args);
+  }
+
+  /* Open a screen and remember the one we came from. */
+  function go(fn, args) {
+    if (current) {
+      stack.push(current);
+    }
+    current = { fn: fn, args: args || [] };
+    render();
+  }
+
+  /* Swap the current screen without adding to history (next/prev log). */
+  function swap(fn, args) {
+    current = { fn: fn, args: args || [] };
+    render();
+  }
+
+  function back() {
+    if (stack.length) {
+      current = stack.pop();
+      render();
     } else {
-      // No repo set yet.
-      const note = document.createElement("p");
-      note.className = "detail-note";
-      note.textContent =
-        "No GitHub repo linked yet. Add one in the PROJECTS config " +
-        "in script.js (set github: \"owner/repo\").";
-      ghWrap.appendChild(note);
-    }
-
-    body.appendChild(ghWrap);
-
-    openWindow("project-detail");
-
-    // Keep the taskbar button label in sync with the current project.
-    const tbBtn = document.querySelector(
-      '.taskbar-window-btn[data-window="project-detail"]'
-    );
-    if (tbBtn) {
-      tbBtn.textContent = p.name;
+      home();
     }
   }
 
-  /* Fetch live repo info from the GitHub API and show it in the window. */
-  function loadGitHubInfo(repoPath, infoEl, btn) {
-    infoEl.textContent = "Loading repo info from GitHub...";
-    btn.disabled = true;
-
-    fetch("https://api.github.com/repos/" + repoPath)
-      .then(function (res) {
-        if (!res.ok) {
-          throw new Error("GitHub returned status " + res.status);
-        }
-        return res.json();
-      })
-      .then(function (data) {
-        infoEl.innerHTML = "";
-
-        // Each row is a [label, value] pair.
-        const rows = [
-          ["Description", data.description || "(none)"],
-          ["Language", data.language || "(not set)"],
-          ["Stars", data.stargazers_count],
-          ["Forks", data.forks_count],
-          ["Open issues", data.open_issues_count],
-          ["Last updated", new Date(data.pushed_at).toLocaleDateString()]
-        ];
-
-        rows.forEach(function (row) {
-          const line = document.createElement("div");
-          line.className = "gh-row";
-
-          const label = document.createElement("span");
-          label.className = "gh-label";
-          label.textContent = row[0] + ": ";
-
-          const value = document.createElement("span");
-          value.textContent = row[1];
-
-          line.appendChild(label);
-          line.appendChild(value);
-          infoEl.appendChild(line);
-        });
-
-        btn.disabled = false;
-        btn.textContent = "Refresh GitHub info";
-      })
-      .catch(function (err) {
-        infoEl.textContent =
-          "Could not load GitHub info (" + err.message + "). " +
-          "Check the repo path in script.js — the repo may be " +
-          "private or may not exist yet.";
-        btn.disabled = false;
-      });
+  function home() {
+    stack = [];
+    current = { fn: mainMenu, args: [] };
+    render();
   }
 
-  /* ================================================================
-     VIDEOS WINDOW
-     The Videos window is a folder that contains two playlist
-     sub-folders (Tech Tutorials, Computer Science Tutorials).
-     Clicking a folder shows an inline list of Vimeo players; each
-     video plays in place with the standard Vimeo controls.
-     ================================================================ */
+  /* ----------------------------------------------------------------
+     EMBEDS
+     ---------------------------------------------------------------- */
 
-  // Tracks what the Videos window is currently showing:
-  //   null   -> root (the two playlist folders)
-  //   catId  -> that playlist's list of Vimeo videos
-  let videosCurrentCategory = null;
-
-  /* Convert a Vimeo ID / hash / URL into a valid /embed/ URL. */
+  /* Accepts a Vimeo ID, "id/hash", or a full vimeo.com URL. */
   function vimeoEmbedUrl(v) {
-    if (!v) {
-      return "";
-    }
-    // Strip protocol and any vimeo.com / player.vimeo.com / /video/ prefix.
-    let s = v.replace(
-      /^https?:\/\/(www\.)?(player\.)?vimeo\.com\/(video\/)?/,
-      ""
-    );
-    // Handle "?h=..." style hashes from Vimeo's share URLs.
+    let s = String(v).replace(/^https?:\/\/(www\.)?(player\.)?vimeo\.com\/(video\/)?/, "");
     if (s.indexOf("?h=") !== -1) {
       const parts = s.split("?h=");
-      return "https://player.vimeo.com/video/" + parts[0] +
-             "?h=" + parts[1].split(/[?&#]/)[0];
+      return "https://player.vimeo.com/video/" + parts[0] + "?h=" + parts[1].split(/[?&#]/)[0];
     }
-    // Otherwise it should be "id" or "id/hash".
     const bits = s.split("/");
-    return "https://player.vimeo.com/video/" + bits[0] +
-           (bits[1] ? "?h=" + bits[1] : "");
+    return "https://player.vimeo.com/video/" + bits[0] + (bits[1] ? "?h=" + bits[1] : "");
   }
 
-  /* Render the Videos window body (root folder view or a playlist). */
-  function renderVideosWindow() {
-    const body = document.getElementById("videos-body");
-    if (!body) {
+  function feed(src, title, extraClass) {
+    const wrap = el("div", "feed" + (extraClass ? " " + extraClass : ""));
+    const frame = document.createElement("iframe");
+    frame.src = src;
+    frame.title = title;
+    frame.setAttribute("allowfullscreen", "");
+    frame.setAttribute("allow", "autoplay; fullscreen; picture-in-picture");
+    wrap.appendChild(frame);
+    return wrap;
+  }
+
+  /* ----------------------------------------------------------------
+     SCREENS
+     ---------------------------------------------------------------- */
+
+  const EMBLEM = [
+    "    ▄█▄ ▄█▄ ▄█▄    ",
+    "  ▄█████████████▄  ",
+    " ███▀▀       ▀▀███ ",
+    "▐██   ▄▀▀▀▀▀▄   ██▌",
+    "▐█▌  █  o o  █  ▐█▌",
+    "▐██   ▀▄ ═ ▄▀   ██▌",
+    " ███▄▄       ▄▄███ ",
+    "  ▀█████████████▀  ",
+    "    ▀█▀ ▀█▀ ▀█▀    "
+  ].join("\n");
+
+  function mainMenu() {
+    const banner = el("div", "banner");
+    const row = el("div", "banner-row");
+    row.appendChild(el("pre", "emblem", EMBLEM));
+    const text = el("div");
+    text.appendChild(el("div", "h", "ALEXIS//OS  COGITATOR NODE 7-ALPHA"));
+    text.appendChild(el("div", "dim", "VESSEL: VIGIL OF ASH  |  STATUS: DERELICT  |  CREW: 0  |  VISITORS: 1"));
+    text.appendChild(el("div", "dim", "OPERATOR ON RECORD: " + PROFILE.name.toUpperCase()));
+    row.appendChild(text);
+    banner.appendChild(row);
+    enqueue(banner);
+
+    para("You have reached the personal data-stacks of " + PROFILE.name +
+         ", " + PROFILE.title + ". The crew is gone. The archive is intact.");
+    blank();
+    option(1, "OPERATOR DOSSIER",    function () { go(dossier); },  "about me");
+    option(2, "FABRICATION RECORDS", function () { go(projects); }, "projects");
+    option(3, "DATA-LOGS",           function () { go(logs); },     "blog");
+    option(4, "PICT-RECORDINGS",     function () { go(videos); },   "videos");
+    option(5, "SIMULATIONS",         function () { go(games); },    "games");
+    option(6, "SERVICE RECORD",      function () { go(service); },  "resume");
+    option(7, "VOX-CHANNELS",        function () { go(vox); },      "contact");
+    blank();
+    line("Click an option, or type its number and press ENTER. HELP lists all commands.", "dim");
+  }
+
+  function dossier() {
+    header("Operator Dossier // About");
+    line(dots("DESIGNATION") + PROFILE.name);
+    line(dots("FUNCTION") + PROFILE.title);
+    line(dots("LAST KNOWN LOC") + PROFILE.location);
+    line(dots("PRIOR SERVICE") + "US Navy, Master-at-Arms, 8 years");
+    blank();
+    PROFILE.intro.forEach(function (p) { para(p); });
+    blank();
+    option(1, "FABRICATION RECORDS", function () { go(projects); }, "projects");
+    option(2, "DATA-LOGS",           function () { go(logs); },     "blog");
+    option(3, "SERVICE RECORD",      function () { go(service); },  "resume");
+    option(4, "VOX-CHANNELS",        function () { go(vox); },      "contact");
+    backOption();
+  }
+
+  /* ---------- Projects ---------- */
+  function projects() {
+    header("Fabrication Records // Projects");
+    Object.keys(PROJECTS).forEach(function (id, i) {
+      option(i + 1, PROJECTS[id].name, function () { go(project, [id]); }, PROJECTS[id].tech);
+    });
+    blank();
+    backOption();
+  }
+
+  function project(id) {
+    const p = PROJECTS[id];
+    header("Fabrication Records // " + p.name);
+    line(dots("TECH") + p.tech);
+    if (p.github) {
+      linkLine(dots("REPOSITORY"), "https://github.com/" + p.github, "github.com/" + p.github);
+    } else {
+      line(dots("REPOSITORY") + "NOT YET LINKED", "dim");
+    }
+    blank();
+    para(p.description);
+    blank();
+    if (p.github) {
+      option(1, "QUERY LIVE REPOSITORY DATA", function () { queryRepo(p.github); }, "via GitHub API");
+    }
+    backOption();
+  }
+
+  function queryRepo(repo) {
+    autoScroll = true;
+    blank();
+    line("TRANSMITTING QUERY TO NOOSPHERE NODE api.github.com ...", "dim");
+    fetch("https://api.github.com/repos/" + repo)
+      .then(function (res) {
+        if (!res.ok) { throw new Error("status " + res.status); }
+        return res.json();
+      })
+      .then(function (d) {
+        line(dots("DESCRIPTION") + (d.description || "(none)"));
+        line(dots("LANGUAGE") + (d.language || "(not set)"));
+        line(dots("STARS") + d.stargazers_count);
+        line(dots("FORKS") + d.forks_count);
+        line(dots("LAST UPDATED") + new Date(d.pushed_at).toLocaleDateString());
+      })
+      .catch(function (err) {
+        line("QUERY FAILED (" + err.message + "). REPOSITORY MAY BE PRIVATE OR MISSING.", "alert");
+      });
+  }
+
+  /* ---------- Blog (data-logs) ---------- */
+  function logs() {
+    header("Data-Logs // Blog");
+    para("Writeups on real tech problems I've solved, and LeetCode problems worth explaining.");
+    blank();
+    Object.keys(BLOGS).forEach(function (c, i) {
+      const n = BLOGS[c].posts.length;
+      option(i + 1, BLOGS[c].name.toUpperCase(), function () { go(logIndex, [c]); },
+             n + " log" + (n === 1 ? "" : "s"));
+    });
+    blank();
+    backOption();
+  }
+
+  function logIndex(c) {
+    const cat = BLOGS[c];
+    header("Data-Logs // " + cat.name);
+    if (cat.description) { para(cat.description, "dim"); }
+    if (!cat.posts.length) {
+      line("NO ENTRIES RECOVERED FROM THIS SECTOR. CHECK BACK LATER.", "alert");
+    }
+    cat.posts.forEach(function (p, i) {
+      option(i + 1, p.title, function () { go(readLog, [c, i]); }, p.date);
+      if (p.excerpt) {
+        enqueue(el("div", "para excerpt dim", p.excerpt));
+      }
+    });
+    blank();
+    backOption();
+  }
+
+  function readLog(c, i) {
+    const cat = BLOGS[c];
+    const p = cat.posts[i];
+    header("Data-Logs // " + cat.name + " // " + (i + 1) + " of " + cat.posts.length);
+    enqueue(el("div", "line title", p.title));
+    if (p.subtitle) { line(p.subtitle, "dim"); }
+    line([p.date].concat(p.tags || []).join("  |  "), "dim");
+    blank();
+    if (p.vimeo) {
+      enqueue(feed(vimeoEmbedUrl(p.vimeo), p.title));
+    }
+    p.content.forEach(function (b) {
+      if (b.h3) {
+        sect(b.h3);
+      } else if (b.p) {
+        para(b.p);
+      } else if (b.ul) {
+        b.ul.forEach(item);
+      }
+    });
+    blank();
+    line("-- END OF LOG --", "dim");
+    blank();
+    if (i + 1 < cat.posts.length) {
+      option(1, "NEXT LOG", function () { swap(readLog, [c, i + 1]); }, cat.posts[i + 1].title);
+    }
+    if (i > 0) {
+      option(2, "PREVIOUS LOG", function () { swap(readLog, [c, i - 1]); }, cat.posts[i - 1].title);
+    }
+    option(0, "RETURN TO INDEX", back, "or press ESC");
+  }
+
+  /* ---------- Videos (pict-recordings) ---------- */
+  function videos() {
+    header("Pict-Recordings // Videos");
+    Object.keys(VIDEOS).forEach(function (c, i) {
+      const n = VIDEOS[c].videos.length;
+      option(i + 1, VIDEOS[c].name.toUpperCase(), function () { go(videoList, [c]); },
+             n + " recording" + (n === 1 ? "" : "s"));
+    });
+    blank();
+    backOption();
+  }
+
+  function videoList(c) {
+    const cat = VIDEOS[c];
+    header("Pict-Recordings // " + cat.name);
+    if (cat.description) { para(cat.description, "dim"); }
+    if (!cat.videos.length) {
+      line("NO PICT-RECORDINGS FOUND. TRANSMISSIONS PENDING.", "alert");
+    }
+    cat.videos.forEach(function (v) {
+      enqueue(el("div", "line title", v.title));
+      if (v.description) { para(v.description, "dim"); }
+      enqueue(feed(vimeoEmbedUrl(v.vimeo), v.title));
+    });
+    blank();
+    backOption();
+  }
+
+  /* ---------- Games (simulations) ---------- */
+  function games() {
+    header("Simulations // Games");
+    GAMES.forEach(function (g, i) {
+      option(i + 1, g.name.toUpperCase(), function () { go(game, [i]); },
+             g.type === "doom" ? "playable" : "not yet compiled");
+    });
+    blank();
+    backOption();
+  }
+
+  function game(i) {
+    const g = GAMES[i];
+    header("Simulations // " + g.name);
+    if (g.type === "doom") {
+      para("Combat simulation loaded from the Internet Archive (shareware episode). " +
+           "Click into the feed to start. Arrow keys move, Ctrl fires. " +
+           "The player has its own fullscreen button.", "dim");
+      enqueue(feed("https://archive.org/embed/" + DOOM_ARCHIVE_ID, "Doom", "doom"));
+    } else {
+      line("SIMULATION NOT YET COMPILED.", "alert");
+      blank();
+      para(g.description);
+    }
+    blank();
+    backOption();
+  }
+
+  /* ---------- Resume (service record) ---------- */
+  function service() {
+    header("Service Record // Resume");
+    enqueue(el("div", "line title", PROFILE.name));
+    line(PROFILE.title, "dim");
+    blank();
+    option(1, "OPEN FULL SERVICE RECORD (PDF)",
+           function () { window.open(PROFILE.resumePage, "_blank", "noopener"); },
+           "opens in a new tab");
+    sect("Education");
+    SERVICE.education.forEach(item);
+    sect("Skills");
+    SERVICE.skills.forEach(function (s) { line(s); });
+    sect("Experience");
+    SERVICE.experience.forEach(function (s) { line(s); });
+    blank();
+    backOption();
+  }
+
+  /* ---------- Contact (vox-channels) ---------- */
+  function strip(url) {
+    return url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
+  }
+
+  function vox() {
+    header("Vox-Channels // Contact");
+    para("Vox relay is functional. Messages will reach the operator.");
+    blank();
+    linkLine(dots("EMAIL"), "mailto:" + PROFILE.email, PROFILE.email);
+    linkLine(dots("GITHUB"), PROFILE.github, strip(PROFILE.github));
+    linkLine(dots("LINKEDIN"), PROFILE.linkedin, strip(PROFILE.linkedin));
+    blank();
+    backOption();
+  }
+
+  /* ---------- Vessel status ---------- */
+  const loadedAt = Date.now();
+
+  function status() {
+    header("Vessel Status");
+    const mins = Math.floor((Date.now() - loadedAt) / 60000);
+    line(dots("VESSEL", 22) + "VIGIL OF ASH");
+    line(dots("HULL INTEGRITY", 22) + "31%");
+    line(dots("REACTOR", 22) + "STANDBY 4%");
+    line(dots("GELLER FIELD", 22) + "OFFLINE", "alert");
+    line(dots("LIFE SIGNS", 22) + "1 (YOU)");
+    line(dots("MACHINE SPIRIT", 22) + "RESTLESS");
+    line(dots("SESSION UPTIME", 22) + mins + " MIN");
+    line(dots("AUSPEX", 22) + "UNKNOWN BIOSIGNS, AFT CARGO", "alert");
+    blank();
+    backOption();
+  }
+
+  /* ---------- Help ---------- */
+  const HELP = [
+    ["MENU",        "main menu"],
+    ["BACK  or 0",  "previous screen (ESC also works)"],
+    ["ABOUT",       "operator dossier"],
+    ["PROJECTS",    "fabrication records"],
+    ["BLOG",        "data-logs (also: BLOG TECH, BLOG LEETCODE)"],
+    ["VIDEOS",      "pict-recordings"],
+    ["GAMES",       "simulations (DOOM launches directly)"],
+    ["RESUME",      "service record"],
+    ["CONTACT",     "vox-channels"],
+    ["STATUS",      "vessel status"],
+    ["CLEAR",       "purge the screen"],
+    ["REBOOT",      "replay the boot sequence"]
+  ];
+
+  function help() {
+    header("Help // Command Litany");
+    HELP.forEach(function (h) {
+      let name = h[0];
+      while (name.length < 14) { name += " "; }
+      line(name + h[1]);
+    });
+    blank();
+    para("You can also click any [bracketed] option, use the PF keys along the bottom, " +
+         "and press the up arrow to recall earlier commands.", "dim");
+    backOption();
+  }
+
+  /* ----------------------------------------------------------------
+     BOOT SEQUENCE
+     Modelled loosely on a BIOS power-on self test, then a cogitator
+     waking up on a ship that has been dark for a long time.
+     ---------------------------------------------------------------- */
+  const BOOT_FULL = [
+    ["ALEXIS//OS COGITATOR BIOS v2.0.26", "", 120],
+    ["(C) FORGE SHIPWRIGHTS. LICENSED TO: VIGIL OF ASH", "dim", 120],
+    [" ", "", 80],
+    ["MEMORY TEST ..................... 0065536K OK", "", 260],
+    ["DETECTING DATA-STACKS ........... 4 FOUND, 1 CORRUPTED", "", 260],
+    ["PICT-FEED ARRAY ................. 2 CHANNELS", "", 140],
+    [" ", "", 60],
+    ["INVOKING RITE OF AWAKENING", "", 220],
+    ["  + ANOINTING POWER COUPLINGS ... DONE", "dim", 200],
+    ["  + RECITING BINARY CANT ........ 01001111 01001011", "dim", 220],
+    ["  + APPEASING MACHINE SPIRIT .... RELUCTANT", "dim", 320],
+    [" ", "", 60],
+    ["HULL INTEGRITY .................. 31%", "", 140],
+    ["LIFE SIGNS ...................... 1 (UNKNOWN BOARDER)", "", 180],
+    ["WARNING: NON-STANDARD SIGNAL ON VOX CHANNEL 9. ORIGIN UNKNOWN.", "alert glitch", 420],
+    [" ", "", 60],
+    ["COGITATOR ONLINE. PRAISE BE.", "", 600]
+  ];
+
+  const BOOT_SHORT = [
+    ["ALEXIS//OS COGITATOR BIOS v2.0.26", "", 90],
+    ["RESUMING SESSION ... MACHINE SPIRIT REMEMBERS YOU.", "dim", 350]
+  ];
+
+  function boot(forceFull) {
+    cancel();
+    out.innerHTML = "";
+    autoScroll = true;
+    menu = {};
+    stack = [];
+    current = null;
+
+    let seen = false;
+    try { seen = sessionStorage.getItem("alexisos-booted") === "1"; } catch (e) { /* storage blocked */ }
+    const seq = (seen && !forceFull) ? BOOT_SHORT : BOOT_FULL;
+
+    if (seq === BOOT_FULL) {
+      out.appendChild(el("div", "line dim blink", "[ PRESS ANY KEY OR CLICK TO SKIP ]"));
+      out.appendChild(el("div", "line", " "));
+    }
+    seq.forEach(function (b) {
+      enqueue(el("div", "line" + (b[1] ? " " + b[1] : ""), b[0]), b[2]);
+    });
+    enqueue(function () {
+      try { sessionStorage.setItem("alexisos-booted", "1"); } catch (e) { /* ignore */ }
+      home();
+    });
+  }
+
+  /* ----------------------------------------------------------------
+     TYPED COMMANDS
+     ---------------------------------------------------------------- */
+  function echo(raw) {
+    autoScroll = true;
+    blank();
+    line("> " + raw, "dim");
+  }
+
+  function say(text, cls) {
+    autoScroll = true;
+    line(text, cls);
+    out.scrollTop = out.scrollHeight;
+  }
+
+  function openBlogCategory(name) {
+    if (BLOGS[name]) { go(logIndex, [name]); } else { go(logs); }
+  }
+
+  const COMMANDS = {
+    "help":     function () { go(help); },
+    "?":        function () { go(help); },
+    "menu":     home,
+    "home":     home,
+    "main":     home,
+    "back":     back,
+    "b":        back,
+    "about":    function () { go(dossier); },
+    "whoami":   function () { go(dossier); },
+    "dossier":  function () { go(dossier); },
+    "projects": function () { go(projects); },
+    "project":  function () { go(projects); },
+    "blog":     function () { go(logs); },
+    "blogs":    function () { go(logs); },
+    "logs":     function () { go(logs); },
+    "blog tech":     function () { openBlogCategory("tech"); },
+    "blog leetcode": function () { openBlogCategory("leetcode"); },
+    "logs tech":     function () { openBlogCategory("tech"); },
+    "logs leetcode": function () { openBlogCategory("leetcode"); },
+    "videos":   function () { go(videos); },
+    "video":    function () { go(videos); },
+    "games":    function () { go(games); },
+    "game":     function () { go(games); },
+    "doom":     function () {
+      const i = GAMES.findIndex(function (g) { return g.type === "doom"; });
+      if (i >= 0) { go(game, [i]); } else { go(games); }
+    },
+    "resume":   function () { go(service); },
+    "service":  function () { go(service); },
+    "contact":  function () { go(vox); },
+    "vox":      function () { go(vox); },
+    "status":   function () { go(status); },
+    "ls":       function () { if (current) { render(); } else { home(); } },
+    "dir":      function () { if (current) { render(); } else { home(); } },
+    "clear":    function () {
+      cancel();
+      out.innerHTML = "";
+      menu = {};
+      say("SCREEN PURGED. TYPE MENU TO CONTINUE.", "dim");
+    },
+    "cls":      function () { COMMANDS.clear(); },
+    "reboot":   function () { boot(true); },
+    "boot":     function () { boot(true); },
+
+    /* A few things a curious visitor might try. */
+    "sudo":     function (raw) { echo(raw); say("ACCESS DENIED. THE MACHINE SPIRIT IS NOT AMUSED.", "alert"); },
+    "exit":     function (raw) { echo(raw); say("THERE IS NO EXIT. THE AIRLOCKS ARE SEALED. TRY MENU.", "alert"); },
+    "hello":    function (raw) { echo(raw); say("...SIGNAL ACKNOWLEDGED. HELLO, VISITOR."); },
+    "hi":       function (raw) { echo(raw); say("...SIGNAL ACKNOWLEDGED. HELLO, VISITOR."); },
+    "praise the omnissiah": function (raw) { echo(raw); say("THE MACHINE SPIRIT IS APPEASED. +1 TO ALL ROLLS.", ""); },
+    "praise omnissiah":     function (raw) { echo(raw); say("THE MACHINE SPIRIT IS APPEASED. +1 TO ALL ROLLS.", ""); }
+  };
+
+  const history = [];
+  let historyIndex = 0;
+
+  function handle(raw) {
+    const cmd = raw.trim().toLowerCase().replace(/\s+/g, " ");
+    if (!cmd) { return; }
+    history.push(raw.trim());
+    historyIndex = history.length;
+    flush();
+
+    if (Object.prototype.hasOwnProperty.call(menu, cmd)) {
+      menu[cmd]();
       return;
     }
-    body.innerHTML = "";
-    if (videosCurrentCategory === null || !VIDEOS[videosCurrentCategory]) {
-      renderVideosRoot(body);
-    } else {
-      renderVideosCategory(body, videosCurrentCategory);
+    const fn = COMMANDS[cmd] || COMMANDS[cmd.split(" ")[0]];
+    if (fn) {
+      fn(raw.trim());
+      return;
     }
+    echo(raw.trim());
+    say("COMMAND NOT RECOGNIZED: " + raw.trim().toUpperCase() + ". TYPE HELP.", "alert");
   }
 
-  /* Root view: two folder icons, one per VIDEOS category. */
-  function renderVideosRoot(body) {
-    const h2 = document.createElement("h2");
-    h2.textContent = "Videos";
-    body.appendChild(h2);
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    const raw = input.value;
+    input.value = "";
+    handle(raw);
+  });
 
-    const intro = document.createElement("p");
-    intro.textContent = "Open a folder to watch the playlist.";
-    body.appendChild(intro);
-
-    // Reuses the same folder-grid styling as the Blogs window.
-    const grid = document.createElement("div");
-    grid.className = "blog-folder-grid";
-
-    Object.keys(VIDEOS).forEach(function (catId) {
-      const cat = VIDEOS[catId];
-      const folder = document.createElement("button");
-      folder.className = "blog-folder";
-
-      const glyph = document.createElement("span");
-      glyph.className = "blog-folder-glyph";
-      glyph.textContent = cat.glyph;
-      folder.appendChild(glyph);
-
-      const name = document.createElement("span");
-      name.className = "blog-folder-name";
-      name.textContent = cat.name;
-      folder.appendChild(name);
-
-      const count = document.createElement("span");
-      count.className = "blog-folder-count";
-      const n = cat.videos.length;
-      count.textContent = n + " video" + (n === 1 ? "" : "s");
-      folder.appendChild(count);
-
-      folder.addEventListener("click", function () {
-        videosCurrentCategory = catId;
-        renderVideosWindow();
-      });
-
-      grid.appendChild(folder);
+  /* PF key bar */
+  document.querySelectorAll("#fkeys button").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      handle(btn.dataset.cmd);
+      if (finePointer) { input.focus(); }
     });
+  });
 
-    body.appendChild(grid);
-  }
-
-  /* Category view: breadcrumb, description, then an inline Vimeo player
-     for every video in the playlist. */
-  function renderVideosCategory(body, catId) {
-    const cat = VIDEOS[catId];
-
-    // Breadcrumb "back to Videos" link.
-    const crumb = document.createElement("a");
-    crumb.className = "blog-breadcrumb";
-    crumb.href = "#";
-    crumb.textContent = "← Videos";
-    crumb.addEventListener("click", function (e) {
+  /* Keyboard: any key skips typing; ESC goes back; arrows recall history. */
+  document.addEventListener("keydown", function (e) {
+    if (busy()) {
+      flush();
+      if (e.key !== "Enter") { return; }
+    }
+    if (e.key === "Escape") {
       e.preventDefault();
-      videosCurrentCategory = null;
-      renderVideosWindow();
-    });
-    body.appendChild(crumb);
-
-    const h2 = document.createElement("h2");
-    h2.textContent = cat.name;
-    body.appendChild(h2);
-
-    if (cat.description) {
-      const desc = document.createElement("p");
-      desc.textContent = cat.description;
-      body.appendChild(desc);
-    }
-
-    // Empty state (used before any videos are added to this playlist).
-    if (cat.videos.length === 0) {
-      const empty = document.createElement("p");
-      empty.className = "blog-empty";
-      empty.textContent =
-        "No videos here yet — I'll upload some to Vimeo and add them soon.";
-      body.appendChild(empty);
+      back();
       return;
     }
-
-    const list = document.createElement("div");
-    list.className = "videos-list";
-
-    cat.videos.forEach(function (video) {
-      const item = document.createElement("div");
-      item.className = "videos-item";
-
-      const title = document.createElement("div");
-      title.className = "videos-item-title";
-      title.textContent = video.title;
-      item.appendChild(title);
-
-      if (video.description) {
-        const desc = document.createElement("div");
-        desc.className = "videos-item-description";
-        desc.textContent = video.description;
-        item.appendChild(desc);
+    if (document.activeElement === input) {
+      if (e.key === "ArrowUp" && history.length) {
+        e.preventDefault();
+        historyIndex = Math.max(0, historyIndex - 1);
+        input.value = history[historyIndex];
+      } else if (e.key === "ArrowDown" && history.length) {
+        e.preventDefault();
+        historyIndex = Math.min(history.length, historyIndex + 1);
+        input.value = history[historyIndex] || "";
       }
+    }
+  });
 
-      // Responsive 16:9 iframe wrapper for the Vimeo player.
-      const frameWrap = document.createElement("div");
-      frameWrap.className = "videos-item-frame";
-      const frame = document.createElement("iframe");
-      frame.src = vimeoEmbedUrl(video.vimeo);
-      frame.title = video.title;
-      frame.setAttribute("allowfullscreen", "");
-      frame.setAttribute("allow", "autoplay; fullscreen; picture-in-picture");
-      frame.setAttribute("frameborder", "0");
-      frameWrap.appendChild(frame);
-      item.appendChild(frameWrap);
+  /* Clicking the screen skips typing and (on desktop) refocuses the prompt,
+     unless the visitor is selecting text or clicking a link/button/feed. */
+  document.getElementById("screen").addEventListener("click", function (e) {
+    if (busy()) { flush(); }
+    if (!finePointer) { return; }
+    if (e.target.closest("a, button, iframe, .feed")) { return; }
+    if (window.getSelection && String(window.getSelection())) { return; }
+    input.focus();
+  });
 
-      list.appendChild(item);
+  /* ----------------------------------------------------------------
+     STATUS BAR: ticker + clock
+     ---------------------------------------------------------------- */
+  const TICKER = [
+    ["DECK 4: PRESSURE SEAL FAILING", true],
+    ["SERVITOR 3-KAPPA: NO RESPONSE", false],
+    ["AUSPEX: UNKNOWN BIOSIGNS, AFT CARGO", true],
+    ["REACTOR: STANDBY 4%", false],
+    ["LAST CREW LOG: 1,207 DAYS AGO", false],
+    ["VOX CH.9: NON-STANDARD SIGNAL", true],
+    ["MACHINE SPIRIT: RESTLESS", false],
+    ["GELLER FIELD: OFFLINE", true],
+    ["INCENSE RESERVES: DEPLETED", false],
+    ["HULL INTEGRITY: 31%", false]
+  ];
+  let tickerIndex = 0;
+
+  function tick() {
+    const t = TICKER[tickerIndex % TICKER.length];
+    tickerEl.textContent = "+++ " + t[0] + " +++";
+    tickerEl.classList.toggle("alert", t[1]);
+    tickerIndex++;
+  }
+
+  /* Clock: an Imperial-style date (year fraction . year . millennium)
+     next to Pacific time. */
+  function updateClock() {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), 0, 1);
+    const dayOfYear = Math.floor((now - start) / 86400000);
+    const frac = String(Math.floor(dayOfYear / 365 * 1000)).padStart(3, "0");
+    const yr = String(now.getFullYear() % 1000).padStart(3, "0");
+    const mil = Math.floor(now.getFullYear() / 1000) + 1;
+    const time = now.toLocaleTimeString("en-US", {
+      timeZone: "America/Los_Angeles",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
     });
-
-    body.appendChild(list);
+    clockEl.textContent = frac + "." + yr + ".M" + mil + "  " + time + " PT";
   }
 
-  /* ================================================================
-     GAMES WINDOW
-     The Games window is a folder of game icons. Clicking an icon
-     opens that game in its own window: the playable Doom embed, or
-     a placeholder for a game that is not built yet.
-     ================================================================ */
-
-  /* Build the grid of game icons inside the Games window. */
-  function renderGamesGrid() {
-    const grid = document.getElementById("games-grid");
-    if (!grid) {
-      return;
-    }
-    grid.innerHTML = "";
-
-    GAMES.forEach(function (game, index) {
-      const icon = document.createElement("button");
-      icon.className = "game-icon";
-      icon.dataset.gameIndex = index;
-
-      // Show the game's image; if the file is missing, fall back to
-      // the emoji glyph so the icon still looks complete.
-      const img = document.createElement("img");
-      img.className = "game-icon-img";
-      img.src = game.image;
-      img.alt = "";
-      img.addEventListener("error", function () {
-        const glyph = document.createElement("span");
-        glyph.className = "game-icon-glyph";
-        glyph.textContent = game.glyph;
-        if (img.parentNode) {
-          img.parentNode.replaceChild(glyph, img);
-        }
-      });
-      icon.appendChild(img);
-
-      const name = document.createElement("span");
-      name.className = "game-icon-name";
-      name.textContent = game.name;
-      icon.appendChild(name);
-
-      // Games that are not built yet get a small "Coming soon" tag.
-      if (game.type === "placeholder") {
-        const tag = document.createElement("span");
-        tag.className = "game-icon-tag";
-        tag.textContent = "Coming soon";
-        icon.appendChild(tag);
-      }
-
-      icon.addEventListener("click", function () {
-        openGame(index);
-      });
-
-      grid.appendChild(icon);
-    });
-  }
-
-  /* Open a game in the shared game window. */
-  function openGame(index) {
-    const game = GAMES[index];
-    if (!game) {
-      return;
-    }
-
-    const win  = document.getElementById("win-game");
-    const body = document.getElementById("game-body");
-
-    // Show the game's name in the title bar.
-    win.querySelector(".window-title").textContent = game.name;
-    win.dataset.title = game.name;
-
-    // Rebuild the window body from scratch.
-    body.innerHTML = "";
-
-    const h2 = document.createElement("h2");
-    h2.textContent = game.name;
-    body.appendChild(h2);
-
-    if (game.type === "doom") {
-      // Playable Doom: embed it from the Internet Archive.
-      const frame = document.createElement("iframe");
-      frame.className = "doom-frame";
-      frame.src = "https://archive.org/embed/" + DOOM_ARCHIVE_ID;
-      frame.title = "Doom";
-      frame.setAttribute("allowfullscreen", "");
-      body.appendChild(frame);
-
-      const note = document.createElement("p");
-      note.className = "doom-note";
-      note.textContent =
-        "Runs the freely distributed shareware episode, embedded from " +
-        "the Internet Archive. Click into the game to start, then use " +
-        "the arrow keys to move and Mouse to fire.";
-      body.appendChild(note);
-    } else {
-      // Placeholder: a game that is not built yet.
-      const desc = document.createElement("p");
-      desc.textContent = game.description;
-      body.appendChild(desc);
-
-      const tagWrap = document.createElement("p");
-      const badge = document.createElement("span");
-      badge.className = "coming-soon";
-      badge.textContent = "Coming soon";
-      tagWrap.appendChild(badge);
-      body.appendChild(tagWrap);
-    }
-
-    openWindow("game");
-
-    // Keep the taskbar button label in sync with the current game.
-    const tbBtn = document.querySelector(
-      '.taskbar-window-btn[data-window="game"]'
-    );
-    if (tbBtn) {
-      tbBtn.textContent = game.name;
-    }
-  }
-
-  /* ================================================================
-     BLOG WINDOW
-     The Blog window is a list of tech posts. Clicking a post opens
-     the shared blog-post window with the full write-up (and an
-     optional Vimeo video embedded above the text).
-     ================================================================ */
-
-  // Tracks what the Blog window is currently showing:
-  //   null   -> root (the two category folders)
-  //   catId  -> that category's list of posts
-  let blogCurrentCategory = null;
-
-  /* Render the Blog window body (root folder view or a category). */
-  function renderBlogWindow() {
-    const body = document.getElementById("blogs-body");
-    if (!body) {
-      return;
-    }
-    body.innerHTML = "";
-    if (blogCurrentCategory === null || !BLOGS[blogCurrentCategory]) {
-      renderBlogRoot(body);
-    } else {
-      renderBlogCategory(body, blogCurrentCategory);
-    }
-  }
-
-  /* Root view: two folder icons, one per BLOGS category. */
-  function renderBlogRoot(body) {
-    const h2 = document.createElement("h2");
-    h2.textContent = "Blog";
-    body.appendChild(h2);
-
-    const intro = document.createElement("p");
-    intro.textContent = "Open a folder to browse the writeups inside.";
-    body.appendChild(intro);
-
-    const grid = document.createElement("div");
-    grid.className = "blog-folder-grid";
-
-    Object.keys(BLOGS).forEach(function (catId) {
-      const cat = BLOGS[catId];
-      const folder = document.createElement("button");
-      folder.className = "blog-folder";
-
-      const glyph = document.createElement("span");
-      glyph.className = "blog-folder-glyph";
-      glyph.textContent = cat.glyph;
-      folder.appendChild(glyph);
-
-      const name = document.createElement("span");
-      name.className = "blog-folder-name";
-      name.textContent = cat.name;
-      folder.appendChild(name);
-
-      const count = document.createElement("span");
-      count.className = "blog-folder-count";
-      const n = cat.posts.length;
-      count.textContent = n + " post" + (n === 1 ? "" : "s");
-      folder.appendChild(count);
-
-      folder.addEventListener("click", function () {
-        blogCurrentCategory = catId;
-        renderBlogWindow();
-      });
-
-      grid.appendChild(folder);
-    });
-
-    body.appendChild(grid);
-  }
-
-  /* Category view: a breadcrumb back to the root plus the post list. */
-  function renderBlogCategory(body, catId) {
-    const cat = BLOGS[catId];
-
-    // Breadcrumb "back to Blog" link.
-    const crumb = document.createElement("a");
-    crumb.className = "blog-breadcrumb";
-    crumb.href = "#";
-    crumb.textContent = "← Blog";
-    crumb.addEventListener("click", function (e) {
-      e.preventDefault();
-      blogCurrentCategory = null;
-      renderBlogWindow();
-    });
-    body.appendChild(crumb);
-
-    const h2 = document.createElement("h2");
-    h2.textContent = cat.name;
-    body.appendChild(h2);
-
-    if (cat.description) {
-      const desc = document.createElement("p");
-      desc.textContent = cat.description;
-      body.appendChild(desc);
-    }
-
-    // Empty state (used before any posts are added to this category).
-    if (cat.posts.length === 0) {
-      const empty = document.createElement("p");
-      empty.className = "blog-empty";
-      empty.textContent = "No writeups here yet — check back soon.";
-      body.appendChild(empty);
-      return;
-    }
-
-    const list = document.createElement("div");
-    list.className = "blog-list";
-
-    cat.posts.forEach(function (post) {
-      const item = document.createElement("button");
-      item.className = "blog-item";
-      item.dataset.postId = post.id;
-
-      const title = document.createElement("div");
-      title.className = "blog-item-title";
-      title.textContent = post.title;
-      item.appendChild(title);
-
-      const meta = document.createElement("div");
-      meta.className = "blog-item-meta";
-      const metaText = post.date +
-        (post.tags && post.tags.length ? "  •  " + post.tags.join(", ") : "");
-      meta.textContent = metaText;
-      item.appendChild(meta);
-
-      if (post.excerpt) {
-        const excerpt = document.createElement("div");
-        excerpt.className = "blog-item-excerpt";
-        excerpt.textContent = post.excerpt;
-        item.appendChild(excerpt);
-      }
-
-      item.addEventListener("click", function () {
-        openBlogPost(catId, post.id);
-      });
-
-      list.appendChild(item);
-    });
-
-    body.appendChild(list);
-  }
-
-  /* Open a blog post in the shared blog-post window. */
-  function openBlogPost(catId, postId) {
-    const cat = BLOGS[catId];
-    if (!cat) {
-      return;
-    }
-    const post = cat.posts.find(function (p) { return p.id === postId; });
-    if (!post) {
-      return;
-    }
-
-    const win  = document.getElementById("win-blog-post");
-    const body = document.getElementById("blog-post-body");
-
-    // Show the post's title in the title bar.
-    win.querySelector(".window-title").textContent = post.title;
-    win.dataset.title = post.title;
-
-    // Rebuild the body from scratch.
-    body.innerHTML = "";
-
-    const h2 = document.createElement("h2");
-    h2.textContent = post.title;
-    body.appendChild(h2);
-
-    if (post.subtitle) {
-      const sub = document.createElement("p");
-      sub.className = "blog-post-subtitle";
-      sub.textContent = post.subtitle;
-      body.appendChild(sub);
-    }
-
-    const meta = document.createElement("p");
-    meta.className = "blog-post-meta";
-    const metaText = post.date +
-      (post.tags && post.tags.length ? "  •  " + post.tags.join(", ") : "");
-    meta.textContent = metaText;
-    body.appendChild(meta);
-
-    // Optional Vimeo video, shown above the content.
-    if (post.vimeo) {
-      const wrap = document.createElement("div");
-      wrap.className = "blog-post-vimeo";
-      const frame = document.createElement("iframe");
-      frame.src = "https://player.vimeo.com/video/" + post.vimeo;
-      frame.title = post.title + " video";
-      frame.setAttribute("allowfullscreen", "");
-      frame.setAttribute("allow", "autoplay; fullscreen; picture-in-picture");
-      frame.setAttribute("frameborder", "0");
-      wrap.appendChild(frame);
-      body.appendChild(wrap);
-    }
-
-    // Content blocks: paragraphs, headings, and bullet lists.
-    const content = document.createElement("div");
-    content.className = "blog-post-content";
-    post.content.forEach(function (block) {
-      if (block.h3) {
-        const h3 = document.createElement("h3");
-        h3.textContent = block.h3;
-        content.appendChild(h3);
-      } else if (block.p) {
-        const p = document.createElement("p");
-        p.textContent = block.p;
-        content.appendChild(p);
-      } else if (block.ul) {
-        const ul = document.createElement("ul");
-        block.ul.forEach(function (item) {
-          const li = document.createElement("li");
-          li.textContent = item;
-          ul.appendChild(li);
-        });
-        content.appendChild(ul);
-      }
-    });
-    body.appendChild(content);
-
-    openWindow("blog-post");
-
-    // Keep the taskbar button label in sync with the current post.
-    const tbBtn = document.querySelector(
-      '.taskbar-window-btn[data-window="blog-post"]'
-    );
-    if (tbBtn) {
-      tbBtn.textContent = post.title;
-    }
-  }
-
-  /* ================================================================
+  /* ----------------------------------------------------------------
      STARTUP
-     Build the project, video, game, and blog lists, then open the
-     Welcome window (centered). Every other window stays closed
-     until its desktop icon or Start menu item is clicked.
-     ================================================================ */
-  renderProjectsList();
-  renderVideosWindow();
-  renderGamesGrid();
-  renderBlogWindow();
-  openWindow("welcome");
+     ---------------------------------------------------------------- */
+  tick();
+  setInterval(tick, 6000);
+  updateClock();
+  setInterval(updateClock, 15000);
+  boot(false);
+  if (finePointer) { input.focus(); }
 
 })();

@@ -1,310 +1,74 @@
 <!DOCTYPE html>
 <!--
-  AlexisOS - A Windows XP inspired personal portfolio landing page.
-  Built with plain HTML, CSS, and JavaScript. No frameworks, no backend.
+  AlexisOS // Cogitator Terminal
+  Personal portfolio of Alexis Gonzalez, presented as a terminal on a
+  derelict ship. Plain HTML, CSS, and JavaScript. No frameworks.
 
-  STRUCTURE
-  - This file holds the desktop, the desktop icons, every window, the
-    Start menu, and the taskbar.
-  - style.css handles all styling, including the responsive layout.
-  - script.js handles window behaviour, the terminal, and the content
-    that is generated from config objects (projects and videos).
-
-  HOW TO EDIT THE CONTENT
-  - Each window lives in its own <section class="window"> block below.
-    Change the text inside a window's .window body to update it.
-  - To rename a window, update both its data title attribute and the
-    .window title text.
-  - Projects and Videos are data driven: edit the PROJECTS and VIDEOS
-    config objects near the top of script.js.
+  FILES
+  - index.html  : the terminal shell (status bar, screen, prompt, PF keys)
+  - style.css   : amber CRT look (scanlines, glow, flicker, vignette)
+  - content.js  : ALL site content (profile, resume text, projects,
+                  blogs, videos, games). Edit this to add content.
+  - script.js   : the terminal engine (boot sequence, menus, commands)
+  - resume.html : full resume PDF viewer
+  - legacy-xp/  : backup of the previous Windows XP-style site
 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AlexisOS</title>
-  <!-- Browser tab icon. Swap images/favicon.png to change it. -->
+  <title>AlexisOS // Cogitator Terminal</title>
+  <meta name="description" content="Alexis Gonzalez: Junior Software Engineer, backend focus. Portfolio, troubleshooting logs, projects, and resume." />
   <link rel="icon" href="images/favicon.png" type="image/png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <div id="crt">
 
-  <!-- ===================== DESKTOP ===================== -->
-  <main id="desktop">
+    <!-- Status bar, styled after the status lines on old DEC/IBM terminals -->
+    <header id="statusbar">
+      <span class="sb-left">ALEXIS//OS <span class="dim">v2.0</span></span>
+      <span class="sb-ticker" id="ticker" aria-hidden="true"></span>
+      <span class="sb-right" id="clock">--:--</span>
+    </header>
 
-    <!-- Desktop icons. data-window points to the window id (without "win-"). -->
-    <div class="desktop-icons">
-      <button class="desktop-icon" data-window="welcome">
-        <span class="icon-glyph">&#128187;</span>
-        <span class="icon-label">Welcome</span>
-      </button>
-      <button class="desktop-icon" data-window="projects">
-        <span class="icon-glyph">&#128193;</span>
-        <span class="icon-label">Projects</span>
-      </button>
-      <button class="desktop-icon" data-window="resume">
-        <span class="icon-glyph">&#128196;</span>
-        <span class="icon-label">Resume</span>
-      </button>
-      <button class="desktop-icon" data-window="games">
-        <span class="icon-glyph">&#127918;</span>
-        <span class="icon-label">Games</span>
-      </button>
-      <button class="desktop-icon" data-window="blogs">
-        <span class="icon-glyph">&#128221;</span>
-        <span class="icon-label">Blogs</span>
-      </button>
-      <button class="desktop-icon" data-window="videos">
-        <span class="icon-glyph">&#127916;</span>
-        <span class="icon-label">Videos</span>
-      </button>
-      <button class="desktop-icon" data-window="terminal">
-        <span class="icon-glyph">&#128421;</span>
-        <span class="icon-label">Terminal</span>
-      </button>
-      <button class="desktop-icon" data-window="contact">
-        <span class="icon-glyph">&#9993;</span>
-        <span class="icon-label">Contact</span>
-      </button>
-    </div>
+    <!-- Main screen: scrollback output + command prompt -->
+    <main id="screen">
+      <div id="output" aria-live="polite"></div>
+      <form id="prompt-line" autocomplete="off">
+        <label for="cmd" id="prompt">+++ VISITOR@VIGIL-7 &gt;</label>
+        <input id="cmd" type="text" spellcheck="false" autocapitalize="off"
+               autocomplete="off" aria-label="Terminal command" />
+      </form>
+    </main>
 
-    <!-- ===================== WINDOWS ===================== -->
-    <!-- All windows start hidden. JavaScript shows/positions them. -->
+    <!-- Program function keys, after the PF key row on IBM 3270 terminals -->
+    <nav id="fkeys" aria-label="Quick commands">
+      <button type="button" data-cmd="help"><b>PF1</b>HELP</button>
+      <button type="button" data-cmd="menu"><b>PF2</b>MENU</button>
+      <button type="button" data-cmd="back"><b>PF3</b>BACK</button>
+      <button type="button" data-cmd="blog"><b>PF4</b>LOGS</button>
+      <button type="button" data-cmd="projects"><b>PF5</b>PROJECTS</button>
+      <button type="button" data-cmd="videos"><b>PF6</b>VIDEOS</button>
+      <button type="button" data-cmd="games"><b>PF7</b>GAMES</button>
+      <button type="button" data-cmd="resume"><b>PF8</b>RESUME</button>
+      <button type="button" data-cmd="contact"><b>PF9</b>CONTACT</button>
+    </nav>
 
-    <!-- Welcome (auto-opens, centered, on page load) -->
-    <section class="window hidden" id="win-welcome" data-title="Welcome">
-      <header class="window-title-bar">
-        <span class="window-title">Welcome</span>
-        <div class="window-controls">
-          <button class="win-btn win-min" title="Minimize">_</button>
-          <button class="win-btn win-close" title="Close">&#10005;</button>
-        </div>
-      </header>
-      <div class="window-body welcome-body">
-        <div class="welcome-logo">&#9733;</div>
-        <h2>Welcome to AlexisOS</h2>
-        <p class="welcome-version">Version 1.0</p>
-        <p>Hi, I'm Alexis. Welcome to my personal portfolio; I built it
-           to look and feel like an early 2000s desktop operating system.</p>
-        <p>Click the icons on the desktop, or use the <strong>Start</strong>
-           menu, to explore my Projects, Resume, Blogs, Videos, and more.
-           I'll keep adding to AlexisOS over time, so feel free to check back
-           as it grows.</p>
-        <p class="welcome-note">Thanks for stopping by! You can find my
-           GitHub and LinkedIn in the Contact window.</p>
-      </div>
-    </section>
+  </div>
 
-    <!-- Projects -->
-    <section class="window hidden" id="win-projects" data-title="Projects">
-      <header class="window-title-bar">
-        <span class="window-title">Projects</span>
-        <div class="window-controls">
-          <button class="win-btn win-min" title="Minimize">_</button>
-          <button class="win-btn win-close" title="Close">&#10005;</button>
-        </div>
-      </header>
-      <div class="window-body">
-        <h2>My Projects</h2>
-        <p>Click a project to open its details.</p>
-        <!-- Project items are generated from the PROJECTS config in script.js. -->
-        <div id="projects-list" class="projects-list"></div>
-      </div>
-    </section>
+  <noscript>
+    <p style="color:#ffb000;background:#0a0703;padding:20px;font-family:monospace">
+      This terminal requires JavaScript. Alexis Gonzalez, Junior Software
+      Engineer. Email: me@argonzalez.com. GitHub: github.com/Knucme.
+      LinkedIn: linkedin.com/in/a-gonzo.
+    </p>
+  </noscript>
 
-    <!-- Resume: no in-app window. The Resume desktop icon opens
-         resume.html in a new tab (see openWindow() in script.js). -->
-
-    <!-- Games -->
-    <section class="window hidden" id="win-games" data-title="Games">
-      <header class="window-title-bar">
-        <span class="window-title">Games</span>
-        <div class="window-controls">
-          <button class="win-btn win-min" title="Minimize">_</button>
-          <button class="win-btn win-close" title="Close">&#10005;</button>
-        </div>
-      </header>
-      <div class="window-body">
-        <h2>Games</h2>
-        <p>Click a game to open it.</p>
-        <!-- Game icons are generated from the GAMES config in script.js. -->
-        <div id="games-grid" class="games-grid"></div>
-      </div>
-    </section>
-
-    <!-- Blogs (a folder of writeups; filled from BLOGS in script.js) -->
-    <section class="window hidden" id="win-blogs" data-title="Blogs">
-      <header class="window-title-bar">
-        <span class="window-title">Blogs</span>
-        <div class="window-controls">
-          <button class="win-btn win-min" title="Minimize">_</button>
-          <button class="win-btn win-close" title="Close">&#10005;</button>
-        </div>
-      </header>
-      <div class="window-body" id="blogs-body">
-        <!-- Rendered by renderBlogWindow() in script.js. The Blogs window
-             shows two folders (Tech Blog, LeetCode); clicking a folder
-             shows its posts; clicking a post opens the detail window. -->
-      </div>
-    </section>
-
-    <!-- Videos -->
-    <section class="window hidden" id="win-videos" data-title="Videos">
-      <header class="window-title-bar">
-        <span class="window-title">Videos</span>
-        <div class="window-controls">
-          <button class="win-btn win-min" title="Minimize">_</button>
-          <button class="win-btn win-close" title="Close">&#10005;</button>
-        </div>
-      </header>
-      <div class="window-body" id="videos-body">
-        <!-- Rendered by renderVideosWindow() in script.js. Shows two
-             folders (Tech Tutorials, Computer Science Tutorials);
-             clicking a folder shows an inline Vimeo playlist. -->
-      </div>
-    </section>
-
-    <!-- Terminal -->
-    <section class="window hidden" id="win-terminal" data-title="Terminal">
-      <header class="window-title-bar">
-        <span class="window-title">Terminal</span>
-        <div class="window-controls">
-          <button class="win-btn win-min" title="Minimize">_</button>
-          <button class="win-btn win-close" title="Close">&#10005;</button>
-        </div>
-      </header>
-      <div class="window-body terminal-body">
-        <div id="terminal-output" class="terminal-output">
-Welcome to AlexisOS Terminal v1.0
-Type "help" to see available commands.
-        </div>
-        <div class="terminal-input-line">
-          <span class="terminal-prompt">alexis@alexos:~$</span>
-          <input type="text" id="terminal-input" class="terminal-input"
-                 autocomplete="off" spellcheck="false" />
-        </div>
-      </div>
-    </section>
-
-    <!-- Contact -->
-    <section class="window hidden" id="win-contact" data-title="Contact">
-      <header class="window-title-bar">
-        <span class="window-title">Contact</span>
-        <div class="window-controls">
-          <button class="win-btn win-min" title="Minimize">_</button>
-          <button class="win-btn win-close" title="Close">&#10005;</button>
-        </div>
-      </header>
-      <div class="window-body">
-        <h2>Contact</h2>
-        <p>Want to get in touch or see more of my work? Here's where to
-           find me.</p>
-        <ul class="plain-list">
-          <li><strong>Email:</strong> me@argonzalez.com</li>
-        </ul>
-        <!-- Pressable profile icons (same style as the Welcome window). -->
-        <div class="social-links">
-          <a class="social-icon" href="https://github.com/Knucme"
-             target="_blank" rel="noopener" title="Visit my GitHub">
-            <img class="social-img" src="images/github.png" alt=""
-                 onerror="this.style.display='none'" />
-            <span>GitHub</span>
-          </a>
-          <a class="social-icon" href="https://www.linkedin.com/in/a-gonzo/"
-             target="_blank" rel="noopener" title="Visit my LinkedIn">
-            <img class="social-img" src="images/linkedin.png" alt=""
-                 onerror="this.style.display='none'" />
-            <span>LinkedIn</span>
-          </a>
-        </div>
-      </div>
-    </section>
-
-    <!-- Project Detail (opens when a project is clicked; filled by JS) -->
-    <section class="window hidden" id="win-project-detail" data-title="Project">
-      <header class="window-title-bar">
-        <span class="window-title">Project</span>
-        <div class="window-controls">
-          <button class="win-btn win-min" title="Minimize">_</button>
-          <button class="win-btn win-close" title="Close">&#10005;</button>
-        </div>
-      </header>
-      <div class="window-body" id="project-detail-body">
-        <!-- Content is generated by JavaScript from the PROJECTS config. -->
-      </div>
-    </section>
-
-    <!-- Blog post (opens when a blog list item is clicked; filled by JS) -->
-    <section class="window hidden" id="win-blog-post" data-title="Post">
-      <header class="window-title-bar">
-        <span class="window-title">Post</span>
-        <div class="window-controls">
-          <button class="win-btn win-min" title="Minimize">_</button>
-          <button class="win-btn win-close" title="Close">&#10005;</button>
-        </div>
-      </header>
-      <div class="window-body" id="blog-post-body">
-        <!-- Content is generated by JavaScript from the BLOGS config. -->
-      </div>
-    </section>
-
-    <!-- Game (opens when a game icon is clicked; filled by JS) -->
-    <section class="window hidden" id="win-game" data-title="Game">
-      <header class="window-title-bar">
-        <span class="window-title">Game</span>
-        <div class="window-controls">
-          <button class="win-btn win-min" title="Minimize">_</button>
-          <button class="win-btn win-close" title="Close">&#10005;</button>
-        </div>
-      </header>
-      <div class="window-body" id="game-body">
-        <!-- Content is generated by JavaScript from the GAMES config. -->
-      </div>
-    </section>
-
-  </main>
-
-  <!-- ===================== START MENU ===================== -->
-  <nav id="start-menu" class="hidden">
-    <div class="start-menu-header">AlexisOS</div>
-    <ul class="start-menu-list">
-      <li class="start-menu-item" data-window="welcome">
-        <span class="start-icon">&#128187;</span> Welcome
-      </li>
-      <li class="start-menu-item" data-window="projects">
-        <span class="start-icon">&#128193;</span> Projects
-      </li>
-      <li class="start-menu-item" data-window="resume">
-        <span class="start-icon">&#128196;</span> Resume
-      </li>
-      <li class="start-menu-item" data-window="games">
-        <span class="start-icon">&#127918;</span> Games
-      </li>
-      <li class="start-menu-item" data-window="blogs">
-        <span class="start-icon">&#128221;</span> Blogs
-      </li>
-      <li class="start-menu-item" data-window="videos">
-        <span class="start-icon">&#127916;</span> Videos
-      </li>
-      <li class="start-menu-item" data-window="terminal">
-        <span class="start-icon">&#128421;</span> Terminal
-      </li>
-      <li class="start-menu-item" data-window="contact">
-        <span class="start-icon">&#9993;</span> Contact
-      </li>
-    </ul>
-  </nav>
-
-  <!-- ===================== TASKBAR ===================== -->
-  <footer id="taskbar">
-    <button id="start-button">
-      <span class="start-logo">&#9733;</span> Start
-    </button>
-    <!-- Open-window buttons get inserted here by JavaScript. -->
-    <div id="taskbar-windows"></div>
-    <div id="clock">--:--</div>
-  </footer>
-
+  <script src="content.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
