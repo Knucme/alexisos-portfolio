@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- AlexisOS favicon: original retro cartoon robot head on terminal amber -->
+  <rect width="64" height="64" rx="12" fill="#ffb000"/>
+
+  <!-- shoulders -->
+  <path d="M5 64 C7 53 17 48.5 32 48.5 C47 48.5 57 53 59 64 Z"
+        fill="#f6efe2" stroke="#0a0703" stroke-width="3" stroke-linejoin="round"/>
+
+  <!-- head dome (tilted slightly, like it's looking up) -->
+  <g transform="rotate(-8 32 30)">
+    <path d="M14.5 44 V27 C14.5 15 22 9 32 9 C42 9 49.5 15 49.5 27 V44 Z"
+          fill="#f6efe2" stroke="#0a0703" stroke-width="3.5" stroke-linejoin="round"/>
+    <!-- rim at the base of the head -->
+    <rect x="12.5" y="41.5" width="39" height="6" rx="2" fill="#0a0703"/>
+    <!-- shine stroke on the dome -->
+    <path d="M20 30 C20 22.5 22.5 17.5 26.5 15" fill="none"
+          stroke="#0a0703" stroke-width="2.6" stroke-linecap="round"/>
+    <!-- eyes: amber lenses with grille lines -->
+    <ellipse cx="25.5" cy="34" rx="4.3" ry="5.4" fill="#ffb000" stroke="#0a0703" stroke-width="2.6"/>
+    <ellipse cx="39"   cy="34" rx="4.3" ry="5.4" fill="#ffb000" stroke="#0a0703" stroke-width="2.6"/>
+    <path d="M24 30.5 V37.5 M27 30.5 V37.5 M37.5 30.5 V37.5 M40.5 30.5 V37.5"
+          stroke="#0a0703" stroke-width="1.2"/>
+    <!-- antenna disc -->
+    <path d="M41 12 L44.5 6.5" stroke="#0a0703" stroke-width="3" stroke-linecap="round"/>
+    <ellipse cx="46.5" cy="5.2" rx="5" ry="3.2" fill="#f6efe2" stroke="#0a0703" stroke-width="2.4"/>
+  </g>
+</svg>

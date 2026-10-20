@@ -229,12 +229,15 @@ a:focus-visible {
   align-items: center;
 }
 
+/* Robot emblem: braille art decoded onto a canvas (see script.js).
+   Change the height to resize it; the width follows automatically. */
 .emblem {
-  margin: 0;
-  font-family: var(--font);
-  font-size: 15px;
-  line-height: 1;
-  color: var(--amber-dim);
+  display: block;
+  flex: none;
+  height: 128px;
+  width: auto;
+  opacity: 0.85;
+  filter: drop-shadow(0 0 2px rgba(255, 176, 0, 0.7)) drop-shadow(0 0 7px rgba(255, 140, 0, 0.35));
 }
 
 /* Embedded pict-feeds (Vimeo, Doom) */
