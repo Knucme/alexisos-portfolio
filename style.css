@@ -99,12 +99,22 @@ body {
 .sb-ticker.alert { color: var(--alert); }
 
 /* ---------- Main screen ---------- */
+/* The "screen": a fixed-width column centered in the frame, like the
+   80-column display area of a real terminal. Text stays left-aligned
+   inside it. Change max-width to make the column wider or narrower. */
 #screen {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 14px 22px 10px;
+  width: 100%;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 14px 28px 10px;
+  border-left: 1px solid var(--amber-faint);
+  border-right: 1px solid var(--amber-faint);
+  background: rgba(255, 176, 0, 0.018);
+  box-shadow: inset 0 0 60px rgba(255, 140, 0, 0.05);
 }
 
 #output {
@@ -299,8 +309,8 @@ a:focus-visible {
 
 /* ---------- PF key bar ---------- */
 #fkeys {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
   gap: 6px;
   padding: 8px 18px 10px;
   border-top: 1px solid var(--amber-faint);
@@ -361,7 +371,7 @@ a:focus-visible {
   #statusbar { font-size: 16px; padding: 5px 12px; }
   .sb-ticker { display: none; }
   #statusbar { justify-content: space-between; }
-  #screen    { padding: 10px 12px 8px; }
+  #screen    { padding: 10px 12px 8px; border: 0; box-shadow: none; }
   #output    { font-size: 18px; }
   #prompt-line { font-size: 18px; }
   #prompt    { font-size: 15px; }

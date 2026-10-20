@@ -62,7 +62,13 @@
       return;
     }
     const next = queue.shift();
+    timer = "placing";
     place(next.item);
+    // If the item we just placed changed screens, it already restarted
+    // the queue with its own timer, so this chain stops here.
+    if (timer !== "placing") {
+      return;
+    }
     if (autoScroll) {
       out.scrollTop = out.scrollHeight;
     }
@@ -71,10 +77,10 @@
 
   /* Print everything still waiting, immediately. */
   function flush() {
-    if (timer) {
+    if (timer && timer !== "placing") {
       clearTimeout(timer);
-      timer = null;
     }
+    timer = null;
     while (queue.length) {
       place(queue.shift().item);
     }
@@ -85,10 +91,10 @@
 
   /* Throw away anything still waiting (used when changing screens). */
   function cancel() {
-    if (timer) {
+    if (timer && timer !== "placing") {
       clearTimeout(timer);
-      timer = null;
     }
+    timer = null;
     queue = [];
   }
 
@@ -196,13 +202,96 @@
       stack.push(current);
     }
     current = { fn: fn, args: args || [] };
-    render();
+    transition();
   }
 
   /* Swap the current screen without adding to history (next/prev log). */
   function swap(fn, args) {
     current = { fn: fn, args: args || [] };
-    render();
+    transition();
+  }
+
+  /* ----------------------------------------------------------------
+     LOADING TRANSITION
+     A short "establishing link" screen with a progress bar, shown when
+     moving into a new area. About half a second; any key or click
+     skips it. BACK and MENU skip it so returning always feels instant.
+     ---------------------------------------------------------------- */
+  const LOAD_LINES = [
+    "QUERYING COGITATOR ARCHIVE",
+    "DECRYPTING DATA-STACK",
+    "ROUTING THROUGH NOOSPHERE RELAY",
+    "SCRUBBING CORRUPTED SECTORS",
+    "SPINNING UP MEMORY DRUMS",
+    "RE-SEATING DATA CABLES",
+    "AWAITING MACHINE SPIRIT CONSENT"
+  ];
+
+  const LOAD_ALERTS = [
+    "SECTOR 9 CORRUPTED. REROUTING.",
+    "XENOS INTERFERENCE ON RELAY. COMPENSATING.",
+    "PARITY ERROR. RETRYING."
+  ];
+
+  function pick(list) {
+    return list[Math.floor(Math.random() * list.length)];
+  }
+
+  /* Human-readable name of the area being opened, for the loader. */
+  function areaName(fn, args) {
+    switch (fn) {
+      case dossier:   return "OPERATOR DOSSIER";
+      case projects:  return "FABRICATION RECORDS";
+      case project:   return "RECORD: " + PROJECTS[args[0]].name;
+      case logs:      return "DATA-LOGS";
+      case logIndex:  return "DATA-LOGS // " + BLOGS[args[0]].name;
+      case readLog:   return "LOG " + (args[1] + 1) + ": " + BLOGS[args[0]].posts[args[1]].title;
+      case videos:    return "PICT-RECORDINGS";
+      case videoList: return "PICT-FEED // " + VIDEOS[args[0]].name;
+      case games:     return "SIMULATIONS";
+      case game:      return "SIMULATION: " + GAMES[args[0]].name;
+      case service:   return "SERVICE RECORD";
+      case vox:       return "VOX-CHANNELS";
+      case status:    return "VESSEL STATUS";
+      case help:      return "COMMAND LITANY";
+      default:        return "DATA-STACK";
+    }
+  }
+
+  function progressBar(pct) {
+    const filled = Math.round(pct / 5);
+    return "   [" + "█".repeat(filled) + "░".repeat(20 - filled) + "] " +
+           String(pct).padStart(3, " ") + "%";
+  }
+
+  function transition() {
+    if (reduceMotion) {
+      render();
+      return;
+    }
+    cancel();
+    out.innerHTML = "";
+    out.scrollTop = 0;
+    autoScroll = false;
+    menu = {};
+
+    const target = current;
+    enqueue(el("div", "line h", ">> ESTABLISHING LINK: " + areaName(target.fn, target.args).toUpperCase()), 70);
+    enqueue(el("div", "line dim", "   " + pick(LOAD_LINES) + " ..."), 80);
+    if (Math.random() < 0.15) {
+      enqueue(el("div", "line alert glitch", "   " + pick(LOAD_ALERTS)), 140);
+    }
+    const bar = el("div", "line", progressBar(0));
+    enqueue(bar, 40);
+    [17, 38, 61, 79, 93, 100].forEach(function (p) {
+      enqueue(function () { bar.textContent = progressBar(p); }, 55);
+    });
+    enqueue(function () {
+      // Only draw if the visitor hasn't already moved somewhere else.
+      if (current === target) {
+        render();
+      }
+    }, 0);
   }
 
   function back() {
@@ -802,7 +891,7 @@
   document.addEventListener("keydown", function (e) {
     if (busy()) {
       flush();
-      if (e.key !== "Enter") { return; }
+      if (e.key !== "Enter" && e.key !== "Escape") { return; }
     }
     if (e.key === "Escape") {
       e.preventDefault();
