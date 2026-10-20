@@ -193,6 +193,7 @@
     out.scrollTop = 0;
     autoScroll = false;
     menu = {};
+    activeGame = null;
     current.fn.apply(null, current.args);
   }
 
@@ -616,10 +617,66 @@
     header("Simulations // Games");
     GAMES.forEach(function (g, i) {
       option(i + 1, g.name.toUpperCase(), function () { go(game, [i]); },
-             g.type === "doom" ? "playable" : "not yet compiled");
+             GAME_HINTS[g.type] || "");
     });
     blank();
     backOption();
+  }
+
+  const GAME_HINTS = {
+    doom:    "combat // shareware episode",
+    cube:    "puzzle // 3x3 cube in hex",
+    hangman: "word game // guess my skills"
+  };
+
+  function hangmanScreen() {
+    if (!window.Hangman) {
+      line("HANGMAN MODULE MISSING (hangman.js DID NOT LOAD).", "alert");
+      return;
+    }
+    if (!hangmanGame) { hangmanGame = Hangman.createGame(HANGMAN_WORDS); }
+    para("Decode the word before the robot on the stand is fully assembled. Every " +
+         "miss adds a part, and six misses finishes it. Every word is a skill or " +
+         "something about me, and each round ends with why it matters.", "dim");
+    para("Click letters or type one at the prompt. Type the whole word to guess it " +
+         "(a wrong guess costs a miss). Type NEW for the next word, HINT for a clue. " +
+         "Use 0 or ESC to leave.", "dim");
+    const panel = Hangman.mount(hangmanGame, {
+      onAction: function () { if (finePointer) { input.focus(); } }
+    });
+    activeGame = panel;
+    enqueue(panel.el);
+  }
+
+  /* One cube for the whole visit, so progress survives leaving the screen. */
+  let cubeModel = null;
+  let activeGame = null;   // the game panel on screen, if any (gets typed input)
+  let hangmanGame = null;  // one hangman session per visit (keeps score)
+
+  function cubeScreen() {
+    if (!window.HexCube) {
+      line("CUBE MODULE MISSING (cube.js DID NOT LOAD).", "alert");
+      return;
+    }
+    if (!cubeModel) {
+      cubeModel = HexCube.createModel();
+      cubeModel.scramble(20);
+    }
+    para("A 3x3 puzzle cube. This terminal has no color output, so every square " +
+         "shows a hex code instead. The legend translates them. Get every side " +
+         "to a single code.", "dim");
+    para("You work on one side at a time. Click a square to select it, then slide " +
+         "its row or column (the center square also turns the whole side). The " +
+         "arrows around the side show the code of the side in that direction; click " +
+         "one (or type UP, DOWN, LEFT, RIGHT) to bring that side to the front.", "dim");
+    para("You can also type moves at the prompt in cube notation (R U R' U', F2) or " +
+         "use the TURN buttons. Other commands: SCRAMBLE, UNDO, RESET, SPIN. Here B " +
+         "means the back face, so use 0 or ESC to leave.", "dim");
+    const panel = HexCube.mount(cubeModel, {
+      onAction: function () { if (finePointer) { input.focus(); } }
+    });
+    activeGame = panel;
+    enqueue(panel.el);
   }
 
   function game(i) {
@@ -630,10 +687,12 @@
            "Click into the feed to start. Arrow keys move, Ctrl fires. " +
            "The player has its own fullscreen button.", "dim");
       enqueue(feed("https://archive.org/embed/" + DOOM_ARCHIVE_ID, "Doom", "doom"));
+    } else if (g.type === "cube") {
+      cubeScreen();
+    } else if (g.type === "hangman") {
+      hangmanScreen();
     } else {
       line("SIMULATION NOT YET COMPILED.", "alert");
-      blank();
-      para(g.description);
     }
     blank();
     backOption();
@@ -643,17 +702,41 @@
   function service() {
     header("Service Record // Resume");
     enqueue(el("div", "line title", PROFILE.name));
-    line(PROFILE.title, "dim");
+    line(SERVICE.headline || PROFILE.title, "dim");
     blank();
     option(1, "OPEN FULL SERVICE RECORD (PDF)",
            function () { window.open(PROFILE.resumePage, "_blank", "noopener"); },
            "opens in a new tab");
-    sect("Education");
-    SERVICE.education.forEach(item);
-    sect("Skills");
+    option(2, "DOWNLOAD PDF",
+           function () {
+             const a = document.createElement("a");
+             a.href = PROFILE.resumePdf;
+             a.download = "Alexis-Gonzalez-Resume.pdf";
+             document.body.appendChild(a);
+             a.click();
+             a.remove();
+           },
+           "saves a copy");
+    if (SERVICE.summary) {
+      sect("Summary");
+      para(SERVICE.summary);
+    }
+    sect("Technical Skills");
     SERVICE.skills.forEach(function (s) { line(s); });
+    if (SERVICE.certifications) {
+      sect("Certifications");
+      SERVICE.certifications.forEach(item);
+    }
     sect("Experience");
     SERVICE.experience.forEach(function (s) { line(s); });
+    sect("Education");
+    SERVICE.education.forEach(item);
+    if (SERVICE.military) {
+      sect("Military Service");
+      SERVICE.military.forEach(function (s) { line(s); });
+    }
+    blank();
+    para("Projects from the resume are under FABRICATION RECORDS (type PROJECTS).", "dim");
     blank();
     backOption();
   }
@@ -700,7 +783,7 @@
     ["PROJECTS",    "fabrication records"],
     ["BLOG",        "data-logs (also: BLOG TECH, BLOG LEETCODE)"],
     ["VIDEOS",      "pict-recordings"],
-    ["GAMES",       "simulations (DOOM launches directly)"],
+    ["GAMES",       "simulations (DOOM, CUBE, HANGMAN launch directly)"],
     ["RESUME",      "service record"],
     ["CONTACT",     "vox-channels"],
     ["STATUS",      "vessel status"],
@@ -795,6 +878,11 @@
     if (BLOGS[name]) { go(logIndex, [name]); } else { go(logs); }
   }
 
+  function openGame(type) {
+    const i = GAMES.findIndex(function (g) { return g.type === type; });
+    if (i >= 0) { go(game, [i]); } else { go(games); }
+  }
+
   const COMMANDS = {
     "help":     function () { go(help); },
     "?":        function () { go(help); },
@@ -819,10 +907,11 @@
     "video":    function () { go(videos); },
     "games":    function () { go(games); },
     "game":     function () { go(games); },
-    "doom":     function () {
-      const i = GAMES.findIndex(function (g) { return g.type === "doom"; });
-      if (i >= 0) { go(game, [i]); } else { go(games); }
-    },
+    "doom":     function () { openGame("doom"); },
+    "cube":     function () { openGame("cube"); },
+    "rubik":    function () { openGame("cube"); },
+    "rubiks":   function () { openGame("cube"); },
+    "hangman":  function () { openGame("hangman"); },
     "resume":   function () { go(service); },
     "service":  function () { go(service); },
     "contact":  function () { go(vox); },
@@ -864,6 +953,11 @@
       return;
     }
     const fn = COMMANDS[cmd] || COMMANDS[cmd.split(" ")[0]];
+    // On a game screen, game input comes first (single letters like "b"
+    // are moves or guesses there), but words like MENU still work.
+    if (activeGame && !(fn && cmd.length > 1)) {
+      if (activeGame.command(raw.trim())) { return; }
+    }
     if (fn) {
       fn(raw.trim());
       return;

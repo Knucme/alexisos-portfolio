@@ -10,7 +10,8 @@
      SERVICE   - the text version of the resume (education, skills, work)
      VIDEOS    - Vimeo playlists (tech, cs)
      PROJECTS  - project records
-     GAMES     - simulations (Doom embed + placeholders)
+     GAMES     - simulations (Doom embed, Hex Cube, Hangman)
+     HANGMAN_WORDS - word bank for Hangman
      BLOGS     - data-logs (tech, leetcode)
    =================================================================== */
 
@@ -29,7 +30,8 @@ const PROFILE = {
   email: "me@argonzalez.com",
   github: "https://github.com/Knucme",
   linkedin: "https://www.linkedin.com/in/a-gonzo/",
-  resumePage: "resume.html"
+  resumePage: "resume.html",
+  resumePdf: "resume/Alexis-Gonzalez-Resume.pdf"
 };
 
 /* ----------------------------------------------------------------
@@ -37,22 +39,36 @@ const PROFILE = {
    The full PDF opens from resume.html.
    ---------------------------------------------------------------- */
 const SERVICE = {
-  education: [
-    "California State University San Marcos | B.S. Computer Science | Jan 2026 - Dec 2027",
-    "Fullstack Academy | Software Engineering Immersive | Oct 2023 - Apr 2024",
-    "NPower | IT Fundamentals | Feb 2023 - Jun 2023 | Google IT Support, CompTIA ITF+"
-  ],
+  headline: "Backend Developer | Computer Science Student | U.S. Navy Veteran",
+  summary: "Computer Science student at CSU San Marcos building backend systems in Java and Spring Boot. Led a five person team through a full backend migration of a real time point of sale platform, owning the architecture, authentication, and access control design. Navy veteran with a security operations and IT support background.",
   skills: [
-    "Languages:   Java, JavaScript, Python, SQL, C, C++",
-    "Frameworks:  Spring Boot, Node.js, Express, React",
-    "Tools:       PostgreSQL, REST APIs, WebSockets, JWT, Git",
-    "Learning:    automated testing, Docker, cloud deployment"
+    "Languages:       Java, JavaScript, Python, C/C++, SQL, HTML/CSS",
+    "Backend:         Spring Boot, Spring Security, Spring Data JPA / Hibernate, Node.js, Express, REST APIs, JWT, WebSockets",
+    "Frontend/Tools:  React, Redux, PostgreSQL, Plotly, matplotlib, Tesseract / pytesseract, Git / GitHub, Maven, Linux"
+  ],
+  certifications: [
+    "CompTIA IT Fundamentals (ITF+), 2023",
+    "Google IT Support Specialization, 2023",
+    "In progress: CompTIA A+ (expected Oct 2026), Network+ (Dec 2026), Security+ (Jan 2027)"
   ],
   experience: [
-    "Security Supervisor | Allied Universal | Mar 2016 - Sep 2020 | Oceanside, CA",
-    "  Led a team of security officers across multiple shifts; rolled out a new access-control protocol.",
-    "Master-at-Arms | US Navy | Jan 2011 - Sep 2019 | San Diego, CA",
-    "  Eight years of active duty in Navy law enforcement and security. Led teams and ran training programs."
+    "Security Supervisor | Allied Universal | Oct 2016 - Dec 2020 | Oceanside, CA",
+    "  Supervised a team of 20+ security personnel and ensured compliance with site regulations and post orders.",
+    "  Trained 30+ new hires on security protocols and built an environmental safety exam that site staff passed at a 95% rate.",
+    "  Established a monitoring center for critical infrastructure, criminal reports, and incidents; resolved 200+ escalations at 90% satisfaction.",
+    "Additional: Loss Prevention (Target, JC Penney), Safety Officer (Pechanga), Warehouse Security (Ross), Gate Security, Delivery Driver (DoorDash)"
+  ],
+  education: [
+    "California State University San Marcos | B.S. Computer Science | Expected Dec 2027",
+    "Fullstack Academy | Software Engineering Certificate | Oct 2023 - Apr 2024",
+    "NPower Technical Training Academy | Tech Fundamentals Bootcamp | Feb 2023 - Jun 2023",
+    "Relevant coursework: Software Engineering, Data Structures, Computer Organization & Assembly, Embedded Systems, Linux"
+  ],
+  military: [
+    "Master-at-Arms | United States Navy Reserve | Jan 2011 - Sep 2019",
+    "  Stood security watch for Secretary of Defense and Secretary of the Navy site visits; responded to 180+ calls for service and maintained records for 100+ operational actions.",
+    "  Completed active duty basic and technical training, then served in a drilling Reserve status with an active duty mobilization to Germany.",
+    "  Clearances: Secret (inactive, 2011-2021), Confidential (inactive, 2011-2019)."
   ]
 };
 
@@ -111,11 +127,33 @@ const VIDEOS = {
    ---------------------------------------------------------------- */
 const PROJECTS = {
   pos: {
-    name: "SE370 Point of Sale System",
-    tech: "Java",
-    description: "I built this point of sale system for my SE370 " +
-      "software engineering course. I'll write up the architecture, " +
-      "the features I worked on, and what I learned here.",
+    name: "SOS: Support of Sale (SE370 Team Lead)",
+    tech: "Java, Spring Boot, PostgreSQL, React, Socket.IO",
+    description: "A real time restaurant point of sale platform built by a " +
+      "five person team I led for CSUSM SE370 (Spring 2026). It unifies " +
+      "Back of House, Front of House, and Manager workflows over a shared " +
+      "networked system. I owned the system architecture and wrote the " +
+      "backend end to end, including a rewrite from Node/Express to Java " +
+      "and Spring Boot that kept every REST endpoint, Socket.IO event, and " +
+      "BCrypt password hash intact. I added JWT authentication, role based " +
+      "access control with Spring Security, login rate limiting, session " +
+      "expiry, audit logging, real time kitchen to floor order updates, and " +
+      "PDF reports with OpenPDF. I also wrote the setup docs that got four " +
+      "teammates running the full stack locally.",
+    github: ""
+  },
+  fuel: {
+    name: "Fuel Usage Reporting Dashboard",
+    tech: "Python, Plotly, matplotlib, Tesseract OCR",
+    description: "A Python dashboard I built (Jun 2023 to Mar 2024) for a " +
+      "family owned owner operator trucking business, replacing fuel and " +
+      "cost calculations that were tracked by hand. It reads expenses from " +
+      "scanned receipts with Tesseract OCR, cleaning up each image first " +
+      "(grayscale, thresholding, deskew, upscaling) and falling back to " +
+      "manual entry when a scan won't parse. A per state map breaks down " +
+      "miles, fuel, meals, and truck maintenance, and monthly reports export " +
+      "to spreadsheet and PDF. I'm rebuilding it in 2026 as a public demo " +
+      "with multi user accounts and a trend dashboard.",
     github: ""
   },
   survey: {
@@ -146,18 +184,12 @@ const PROJECTS = {
 
 /* ----------------------------------------------------------------
    GAMES CONFIG
-   Each game shows up as an icon in the Games window. Clicking an
-   icon opens that game in its own window.
+   Each game is listed under SIMULATIONS in the terminal.
 
    For each game set:
-     name        - the game's title
-     glyph       - an emoji used as a fallback icon if no image is
-                   found at the "image" path below
-     image       - path to the game's icon image
-                   (save it as images/games/<name>.png)
-     type        - "doom" for the playable Doom embed, or
-                   "placeholder" for a game that isn't built yet
-     description - shown for "placeholder" games
+     name - the game's title
+     type - "doom" for the Doom embed, "cube" for the Hex Cube
+            (the cube itself lives in cube.js)
 
    DOOM_ARCHIVE_ID is the Internet Archive item used for Doom. Swap
    it for another identifier to use a different version.
@@ -165,36 +197,101 @@ const PROJECTS = {
 const DOOM_ARCHIVE_ID = "msdos_DOOM_1993";
 
 const GAMES = [
-  {
-    name: "Doom",
-    glyph: "👹",
-    image: "images/games/doom.png",
-    type: "doom"
-  },
-  {
-    name: "Snake",
-    glyph: "🐍",
-    image: "images/games/snake.png",
-    type: "placeholder",
-    description: "I haven't built Snake yet. I'm planning to make it a " +
-      "playable mini-game — check back soon!"
-  },
-  {
-    name: "Tic Tac Toe",
-    glyph: "⭕",
-    image: "images/games/tictactoe.png",
-    type: "placeholder",
-    description: "Tic Tac Toe isn't built yet. I'm planning to add it " +
-      "as a playable mini-game — check back soon!"
-  },
-  {
-    name: "Text Adventure",
-    glyph: "📜",
-    image: "images/games/textadventure.png",
-    type: "placeholder",
-    description: "My Text Adventure game is still in the works. I'm " +
-      "planning to make it playable — check back soon!"
-  }
+  { name: "Doom",     type: "doom" },
+  { name: "Hex Cube", type: "cube" },
+  { name: "Hangman",  type: "hangman" }
+];
+
+/* ----------------------------------------------------------------
+   HANGMAN WORD BANK
+   Each round picks a word from this list, and won't repeat one until
+   every word has been played. After the round, the "note" is shown so
+   the player learns why that skill matters for me as a hire.
+
+   For each word set:
+     word     - the answer (letters, spaces, and symbols like + or .
+                are fine; only letters have to be guessed)
+     category - shown as the hint while playing
+     note     - shown when the round ends
+   ---------------------------------------------------------------- */
+const HANGMAN_WORDS = [
+  /* ---- Languages ---- */
+  { word: "JAVA", category: "LANGUAGE",
+    note: "Java is my main backend language. I rewrote the SOS point of sale backend in Java and Spring Boot." },
+  { word: "JAVASCRIPT", category: "LANGUAGE",
+    note: "I work in JavaScript on both ends: Node and Express on the server, React in the browser. This site is plain JavaScript." },
+  { word: "PYTHON", category: "LANGUAGE",
+    note: "I built a fuel usage dashboard in Python for a family owned trucking business, replacing calculations that were done by hand." },
+  { word: "SQL", category: "LANGUAGE",
+    note: "I write SQL against PostgreSQL for the backends I build." },
+
+  /* ---- Backend ---- */
+  { word: "SPRING BOOT", category: "BACKEND",
+    note: "I rebuilt a Node and Express backend in Spring Boot as a drop in replacement, keeping every REST endpoint and Socket.IO event the same." },
+  { word: "SPRING SECURITY", category: "BACKEND",
+    note: "I used Spring Security for JWT authentication and role based access control on the SOS platform." },
+  { word: "HIBERNATE", category: "BACKEND",
+    note: "I use Spring Data JPA and Hibernate to map Java objects to the database." },
+  { word: "NODE.JS", category: "BACKEND",
+    note: "Node.js and Express are where I learned backend development, and SOS started on them before I moved it to Spring Boot." },
+  { word: "REST API", category: "BACKEND",
+    note: "When I migrated the SOS backend I preserved every REST endpoint, so the React client needed no changes." },
+  { word: "JWT", category: "SECURITY",
+    note: "I implemented JWT authentication for the SOS platform, along with session expiry and a password policy." },
+  { word: "WEBSOCKETS", category: "BACKEND",
+    note: "I built real time kitchen to floor order updates for SOS, so orders show up without anyone refreshing." },
+  { word: "ACCESS CONTROL", category: "SECURITY",
+    note: "I designed role based access control for SOS, so each role only sees and does what it should." },
+  { word: "RATE LIMITING", category: "SECURITY",
+    note: "I added login rate limiting, request size caps, and audit logging to harden the SOS backend." },
+  { word: "AUDIT LOGGING", category: "SECURITY",
+    note: "SOS logs every login, order cancellation, and inventory change, so there's a record of who did what." },
+
+  /* ---- Frontend and tools ---- */
+  { word: "REACT", category: "FRONTEND",
+    note: "I can work on the front end too. SOS uses a React client, and I kept it working through the backend rewrite." },
+  { word: "REDUX", category: "FRONTEND",
+    note: "I've used Redux to manage state in React apps." },
+  { word: "POSTGRESQL", category: "DATABASE",
+    note: "PostgreSQL is the database behind SOS and my other backend projects." },
+  { word: "TESSERACT", category: "TOOL",
+    note: "I used Tesseract OCR to read expenses from scanned receipts, with image cleanup before extraction and manual entry as a fallback." },
+  { word: "MATPLOTLIB", category: "TOOL",
+    note: "I used matplotlib and Plotly for the charts and the per state map in my fuel usage dashboard." },
+  { word: "GITHUB", category: "TOOL",
+    note: "I got four teammates from zero to running the full stack locally and pushing to GitHub." },
+  { word: "MAVEN", category: "TOOL",
+    note: "Maven handles builds and dependencies for my Spring Boot projects." },
+  { word: "LINUX", category: "TOOL",
+    note: "I'm comfortable on Linux, and it's part of my CSU San Marcos coursework." },
+
+  /* ---- Leadership and background ---- */
+  { word: "TEAM LEAD", category: "ROLE",
+    note: "I led a five person team building a real time restaurant point of sale platform and owned the system architecture." },
+  { word: "DOCUMENTATION", category: "SOFT SKILL",
+    note: "I wrote the setup and phase docs for my SE370 team so everyone could get the project running on their own." },
+  { word: "ONBOARDING", category: "SOFT SKILL",
+    note: "I've onboarded four teammates on SOS and trained 30+ new hires as a security supervisor." },
+  { word: "SUPERVISOR", category: "EXPERIENCE",
+    note: "As a security supervisor at Allied Universal I led a team of 20+ and resolved 200+ escalations." },
+  { word: "MASTER AT ARMS", category: "MILITARY",
+    note: "I served as a Master-at-Arms in the Navy Reserve from 2011 to 2019, including a mobilization to Germany." },
+  { word: "NAVY VETERAN", category: "BACKGROUND",
+    note: "The Navy taught me discipline and how to stay calm under pressure, including security watch for Secretary of Defense visits." },
+  { word: "SECRET CLEARANCE", category: "MILITARY",
+    note: "I held a Secret clearance from 2011 to 2021." },
+
+  /* ---- Education and certifications ---- */
+  { word: "COMPUTER SCIENCE", category: "EDUCATION",
+    note: "I'm working on a B.S. in Computer Science at CSU San Marcos, expected December 2027." },
+  { word: "DATA STRUCTURES", category: "COURSEWORK",
+    note: "Data Structures is part of my CS coursework, along with Computer Organization, Assembly, and Embedded Systems." },
+  { word: "FULLSTACK ACADEMY", category: "EDUCATION",
+    note: "I earned my Software Engineering Certificate from Fullstack Academy in 2024." },
+  { word: "COMPTIA", category: "CERTIFICATION",
+    note: "I hold CompTIA ITF+ and the Google IT Support certificate, and I'm working toward A+, Network+, and Security+." },
+  { word: "SECURITY PLUS", category: "CERTIFICATION",
+    note: "I'm working toward CompTIA Security+, building on my background in security operations." }
 ];
 
 /* ----------------------------------------------------------------
