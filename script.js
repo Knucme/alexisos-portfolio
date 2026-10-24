@@ -1025,7 +1025,17 @@
   const history = [];
   let historyIndex = 0;
 
+  /* An easter egg can take over the prompt (vim, ssh password prompt).
+     While trapped, every line goes to the trap and is NOT saved to
+     history. Shape: { fn(raw), esc() optional }. */
+  let inputTrap = null;
+
   function handle(raw) {
+    if (inputTrap) {
+      flush();
+      inputTrap.fn(raw);
+      return;
+    }
     const cmd = raw.trim().toLowerCase().replace(/\s+/g, " ");
     if (!cmd) { return; }
     history.push(raw.trim());
@@ -1073,6 +1083,10 @@
     }
     if (e.key === "Escape") {
       e.preventDefault();
+      if (inputTrap) {
+        if (inputTrap.esc) { inputTrap.esc(); }
+        return;
+      }
       back();
       return;
     }
@@ -1116,7 +1130,10 @@
   ];
   let tickerIndex = 0;
 
+  let tickerHold = false;   // an easter egg is animating the ticker
+
   function tick() {
+    if (tickerHold) { return; }
     const list = critical ? RED_TICKER : TICKER;
     const t = list[tickerIndex % list.length];
     tickerEl.textContent = "+++ " + t[0] + " +++";
@@ -1141,6 +1158,33 @@
     });
     clockEl.textContent = frac + "." + yr + ".M" + mil + "  " + time + " PT";
   }
+
+  /* ----------------------------------------------------------------
+     EASTER EGG HOOKS
+     eggs.js (loaded after this file) uses these to add hidden commands.
+     ---------------------------------------------------------------- */
+  window.AlexisOS = {
+    el: el,
+    enqueue: enqueue,
+    flush: flush,
+    echo: echo,
+    say: say,
+    line: function (text, cls) { autoScroll = true; line(text, cls); },
+    blank: blank,
+    scroll: function () { out.scrollTop = out.scrollHeight; },
+    output: out,
+    input: input,
+    ticker: tickerEl,
+    holdTicker: function (on) { tickerHold = on; if (!on) { tick(); } },
+    goContact: function () { go(vox); },
+    goDossier: function () { go(dossier); },
+    setCritical: setCritical,
+    isCritical: function () { return critical; },
+    reduceMotion: reduceMotion,
+    register: function (name, fn) { COMMANDS[name] = fn; },
+    trap: function (t) { inputTrap = t; },
+    untrap: function () { inputTrap = null; }
+  };
 
   /* ----------------------------------------------------------------
      STARTUP
