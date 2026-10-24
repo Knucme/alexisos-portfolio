@@ -258,7 +258,7 @@
   OS.register("coffee", function (raw) { OS.echo(raw); OS.say("INSUFFICIENT RECAF. MORALE DROPPING.", "alert"); });
   OS.register("brew",   function (raw) { OS.echo(raw); OS.say("brew: no such keg. INSUFFICIENT RECAF. MORALE DROPPING.", "alert"); });
   OS.register("42",     function (raw) { OS.echo(raw); OS.say("THE ANSWER IS CORRECT. THE QUESTION REMAINS CLASSIFIED.", ""); });
-  OS.register("konami", function (raw) { OS.echo(raw); OS.say("Not typed. Pressed. You know the sequence.", "dim"); });
+  OS.register("konami", function (raw) { OS.echo(raw); OS.say("You know the sequence. Press the keys, or type it out.", "dim"); });
 
   /* ---------------- hire ---------------- */
   function hire(raw) {
@@ -320,17 +320,45 @@
   /* ---------------- Konami code: green phosphor "god mode" ---------------- */
   const KONAMI = ["arrowup", "arrowup", "arrowdown", "arrowdown", "arrowleft", "arrowright", "arrowleft", "arrowright", "b", "a"];
   let kpos = 0;
+
+  function godMode() {
+    const on = !document.body.classList.contains("green-mode");
+    document.body.classList.toggle("green-mode", on);
+    OS.input.value = "";
+    OS.say(on ? "+++ GOD MODE ENABLED. PHOSPHOR RECALIBRATED. +30 LIVES. +++"
+              : "+++ GOD MODE DISABLED. AMBER RESTORED. +++", on ? "win" : "");
+  }
+
+  /* Pressing the real keys anywhere on the page. */
   document.addEventListener("keydown", function (e) {
     const k = (e.key || "").toLowerCase();
-    kpos = k === KONAMI[kpos] ? kpos + 1 : (k === KONAMI[0] ? 1 : 0);
+    if (k === KONAMI[kpos]) {
+      kpos++;
+    } else if (k === "arrowup" && kpos === 2) {
+      kpos = 2;                      // extra "up" presses keep the start going
+    } else {
+      kpos = k === KONAMI[0] ? 1 : 0;
+    }
     if (kpos === KONAMI.length) {
       kpos = 0;
       e.preventDefault();
-      const on = !document.body.classList.contains("green-mode");
-      document.body.classList.toggle("green-mode", on);
-      OS.input.value = "";
-      OS.say(on ? "+++ GOD MODE ENABLED. PHOSPHOR RECALIBRATED. +30 LIVES. +++"
-                : "+++ GOD MODE DISABLED. AMBER RESTORED. +++", on ? "win" : "");
+      godMode();
     }
   });
+
+  /* Typing it also works: "↑↑↓↓←→←→ B A", "uuddlrlrba", or
+     "up up down down left right left right b a". */
+  function typedKonami(raw) {
+    const t = raw.toLowerCase().replace(/\s+/g, "");
+    const ok = t === "↑↑↓↓←→←→ba" || t === "uuddlrlrba" ||
+               t === "upupdowndownleftrightleftrightba";
+    OS.echo(raw);
+    if (ok) { godMode(); } else { OS.say("SEQUENCE CORRUPTED. TRY AGAIN.", "alert"); }
+  }
+  OS.register("↑↑↓↓←→←→", typedKonami);
+  OS.register("↑↑↓↓←→←→ba", typedKonami);
+  OS.register("↑↑↓↓←→←→b", typedKonami);
+  OS.register("uuddlrlrba", typedKonami);
+  // Exact phrase only, so a lone "up" still works in the cube game.
+  OS.register("up up down down left right left right b a", typedKonami);
 })();
