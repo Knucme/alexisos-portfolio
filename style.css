@@ -586,3 +586,66 @@ a:focus-visible {
   .cube.won .cc, .cube-stage.side-won .cc.done { animation: none; }
   .cube.won .cc { background: #33ff66; color: #021a08; text-shadow: none; }
 }
+
+/* ===================================================================
+   CONDITION CRITICAL (hidden easter egg, see script.js)
+   Body gets .red-alert: same content, the whole tube goes red.
+   =================================================================== */
+body.red-alert {
+  --amber:       #ff3b2f;
+  --amber-dim:   #b02a20;
+  --amber-faint: #4a0f0a;
+  --bg:          #0c0202;
+  --alert:       #ffe14d;   /* warnings turn hazard-yellow so they still stand out */
+  --glow:        0 0 2px rgba(255, 59, 47, 0.8), 0 0 10px rgba(255, 30, 20, 0.4);
+}
+
+body.red-alert #crt {
+  background: radial-gradient(ellipse at center, #220503 0%, var(--bg) 65%, #000 100%);
+  animation: flicker 3s infinite;
+}
+
+/* Pulsing alarm light around the edges of the tube */
+body.red-alert #crt::after {
+  animation: alarm-pulse 1.6s ease-in-out infinite;
+}
+
+body.red-alert #statusbar,
+body.red-alert #fkeys { background: rgba(255, 40, 30, 0.08); }
+body.red-alert #screen {
+  background: rgba(255, 40, 30, 0.025);
+  box-shadow: inset 0 0 60px rgba(255, 30, 20, 0.08);
+}
+body.red-alert .emblem { filter: hue-rotate(-40deg) saturate(1.6) drop-shadow(0 0 6px rgba(255, 30, 20, 0.5)); }
+body.red-alert .feed   { box-shadow: 0 0 18px rgba(255, 30, 20, 0.2); }
+body.red-alert .cc     { background: rgba(255, 40, 30, 0.05); }
+
+.sb-condition {
+  color: var(--alert);
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 6px rgba(255, 225, 77, 0.6);
+}
+
+/* One hard jolt when the alarm trips */
+#crt.alarm-hit { animation: alarm-hit 0.5s steps(4) 1; }
+
+@keyframes alarm-pulse {
+  0%, 100% { box-shadow: inset 0 0 140px rgba(0, 0, 0, 0.9), inset 0 0 40px rgba(0, 0, 0, 0.6); }
+  50%      { box-shadow: inset 0 0 160px rgba(255, 0, 0, 0.45), inset 0 0 50px rgba(120, 0, 0, 0.6); }
+}
+
+@keyframes alarm-hit {
+  0%   { transform: translate(0, 0); filter: brightness(2); }
+  25%  { transform: translate(-4px, 2px); }
+  50%  { transform: translate(4px, -2px); filter: brightness(0.6); }
+  75%  { transform: translate(-2px, 1px); }
+  100% { transform: none; filter: none; }
+}
+
+@media (max-width: 700px) {
+  .sb-condition { font-size: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.red-alert #crt, body.red-alert #crt::after, #crt.alarm-hit { animation: none; }
+}

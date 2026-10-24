@@ -935,8 +935,92 @@
     "hello":    function (raw) { echo(raw); say("...SIGNAL ACKNOWLEDGED. HELLO, VISITOR."); },
     "hi":       function (raw) { echo(raw); say("...SIGNAL ACKNOWLEDGED. HELLO, VISITOR."); },
     "praise the omnissiah": function (raw) { echo(raw); say("THE MACHINE SPIRIT IS APPEASED. +1 TO ALL ROLLS.", ""); },
-    "praise omnissiah":     function (raw) { echo(raw); say("THE MACHINE SPIRIT IS APPEASED. +1 TO ALL ROLLS.", ""); }
+    "praise omnissiah":     function (raw) { echo(raw); say("THE MACHINE SPIRIT IS APPEASED. +1 TO ALL ROLLS.", ""); },
+
+    /* Hidden: offensive security tools trip CONDITION CRITICAL (red alert).
+       A firewall lockdown (iptables ...) or STAND DOWN restores it.
+       Deliberately not listed in HELP. */
+    "msfconsole": intrusion,
+    "nmap":       intrusion,
+    "hydra":      intrusion,
+    "sqlmap":     intrusion,
+    "iptables":   containment,
+    "stand down": containment
   };
+
+  /* ----------------------------------------------------------------
+     CONDITION CRITICAL (easter egg)
+     Turns the whole terminal red. Content stays the same; only the
+     look, ticker, and status bar change. Lasts for the browser session.
+     ---------------------------------------------------------------- */
+  let critical = false;
+  const conditionEl = document.createElement("span");
+  conditionEl.className = "sb-condition blink";
+  conditionEl.textContent = "!! CONDITION: CRITICAL !!";
+
+  const RED_TICKER = [
+    ["HOSTILE PROCESS IN COGITATOR CORE", true],
+    ["HULL BREACH: DECKS 3 TO 6", true],
+    ["BULKHEADS SEALING", true],
+    ["REACTOR CONTAINMENT 12% AND FALLING", true],
+    ["UNKNOWN SIGNAL ON VOX CH.9 IS TRANSMITTING", true],
+    ["LIFE SUPPORT ON RESERVE POWER", true]
+  ];
+
+  function setCritical(on) {
+    critical = on;
+    document.body.classList.toggle("red-alert", on);
+    const bar = document.getElementById("statusbar");
+    if (on && !conditionEl.isConnected) {
+      bar.insertBefore(conditionEl, tickerEl);
+    } else if (!on && conditionEl.isConnected) {
+      conditionEl.remove();
+    }
+    try {
+      if (on) { sessionStorage.setItem("alexisos-critical", "1"); }
+      else { sessionStorage.removeItem("alexisos-critical"); }
+    } catch (e) { /* storage blocked */ }
+    tickerIndex = 0;
+    tick();
+  }
+
+  function intrusion(raw) {
+    echo(raw);
+    autoScroll = true;
+    if (critical) {
+      say("SESSION ALREADY COMPROMISED. THE SHIP IS STILL BURNING.", "alert");
+      return;
+    }
+    const crt = document.getElementById("crt");
+    const seq = [
+      ["[*] PAYLOAD STAGED... SENDING", "dim", 260],
+      ["!! INTRUSION DETECTED: HOSTILE TOOLING ON VOX CH.9 !!", "alert glitch", 320],
+      ["!! MACHINE SPIRIT REJECTS FOREIGN CODE. COUNTERMEASURES FAILED !!", "alert", 320],
+      ["!! HULL BREACH. BULKHEADS SEALING. REACTOR CONTAINMENT UNSTABLE !!", "alert", 380]
+    ];
+    seq.forEach(function (s) { enqueue(el("div", "line " + s[1], s[0]), s[2]); });
+    enqueue(function () {
+      setCritical(true);
+      crt.classList.remove("alarm-hit");
+      void crt.offsetWidth;
+      crt.classList.add("alarm-hit");
+    }, 200);
+    enqueue(el("div", "line alert", "+++ CONDITION: CRITICAL +++"), 200);
+    enqueue(el("div", "line dim", "A good admin knows which firewall to raise. (Or type STAND DOWN.)"));
+  }
+
+  function containment(raw) {
+    echo(raw);
+    if (!critical) {
+      say("FIREWALL HOLDING. NO HOSTILES DETECTED.", "dim");
+      return;
+    }
+    autoScroll = true;
+    enqueue(el("div", "line", "INBOUND TRAFFIC DROPPED. HOSTILE PROCESS TERMINATED."), 260);
+    enqueue(el("div", "line", "BULKHEADS HOLDING. REACTOR CONTAINMENT RESTORED."), 260);
+    enqueue(function () { setCritical(false); }, 120);
+    enqueue(el("div", "line", "+++ CONDITION: STABLE. PRAISE BE. +++"));
+  }
 
   const history = [];
   let historyIndex = 0;
@@ -1033,7 +1117,8 @@
   let tickerIndex = 0;
 
   function tick() {
-    const t = TICKER[tickerIndex % TICKER.length];
+    const list = critical ? RED_TICKER : TICKER;
+    const t = list[tickerIndex % list.length];
     tickerEl.textContent = "+++ " + t[0] + " +++";
     tickerEl.classList.toggle("alert", t[1]);
     tickerIndex++;
@@ -1060,6 +1145,9 @@
   /* ----------------------------------------------------------------
      STARTUP
      ---------------------------------------------------------------- */
+  try {
+    if (sessionStorage.getItem("alexisos-critical") === "1") { setCritical(true); }
+  } catch (e) { /* storage blocked */ }
   tick();
   setInterval(tick, 6000);
   updateClock();
