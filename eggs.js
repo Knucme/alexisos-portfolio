@@ -317,17 +317,153 @@
     OS.say("WAKE UP, VISITOR. (press any key)", "dim");
   });
 
-  /* ---------------- Konami code: green phosphor "god mode" ---------------- */
+  /* ---------------- Konami code: GOD MODE ----------------
+     Green phosphor, green matrix rain in the side gutters (the terminal
+     column stays readable), and a panel with a picture and a rotating
+     quote from GOD_MODE in content.js. Any new command ends it. */
   const KONAMI = ["arrowup", "arrowup", "arrowdown", "arrowdown", "arrowleft", "arrowright", "arrowleft", "arrowright", "b", "a"];
   let kpos = 0;
+  const GM = (typeof GOD_MODE !== "undefined") ? GOD_MODE : { image: "", quoteSeconds: 30, quotes: [] };
+  const god = { on: false, panel: null, stopRain: null, quoteTimer: null };
 
-  function godMode() {
-    const on = !document.body.classList.contains("green-mode");
-    document.body.classList.toggle("green-mode", on);
-    OS.input.value = "";
-    OS.say(on ? "+++ GOD MODE ENABLED. PHOSPHOR RECALIBRATED. +30 LIVES. +++"
-              : "+++ GOD MODE DISABLED. AMBER RESTORED. +++", on ? "win" : "");
+  function isKonami(raw) {
+    const t = String(raw).toLowerCase().replace(/\s+/g, "");
+    return t === "↑↑↓↓←→←→ba" || t === "uuddlrlrba" || t === "upupdowndownleftrightleftrightba";
   }
+
+  /* Quotes: shuffled, no repeats until all have shown. */
+  let quoteDeck = [];
+  let lastQuote = null;
+  function nextQuote() {
+    if (!GM.quotes.length) { return null; }
+    if (!quoteDeck.length) {
+      quoteDeck = GM.quotes.slice().sort(function () { return Math.random() - 0.5; });
+      if (quoteDeck.length > 1 && quoteDeck[0] === lastQuote) { quoteDeck.push(quoteDeck.shift()); }
+    }
+    lastQuote = quoteDeck.shift();
+    return lastQuote;
+  }
+
+  function showQuote(box) {
+    const q = nextQuote();
+    if (!q) { return; }
+    box.classList.add("fading");
+    setTimeout(function () {
+      box.innerHTML = "";
+      box.appendChild(el("div", "god-text", "“" + q.text + "”"));
+      box.appendChild(el("div", "god-author", "― " + q.author + (q.source ? ", " + q.source : "")));
+      box.classList.remove("fading");
+      if (OS.output.scrollHeight - OS.output.scrollTop - OS.output.clientHeight < 200) { OS.scroll(); }
+    }, box.childNodes.length ? 450 : 0);
+  }
+
+  function buildPanel() {
+    const panel = el("div", "god-panel");
+    panel.appendChild(el("div", "line win", "+++ GOD MODE ENABLED. +30 LIVES. ANY COMMAND RETURNS TO NORMAL. +++"));
+    const frame = el("div", "god-frame");
+    if (GM.image) {
+      const img = document.createElement("img");
+      img.className = "god-img";
+      img.alt = "";
+      img.src = GM.image;
+      img.onerror = function () {
+        img.replaceWith(el("div", "god-img-missing", "[ PICT-FEED OFFLINE: add " + GM.image + " ]"));
+      };
+      frame.appendChild(img);
+    }
+    const quote = el("div", "god-quote");
+    frame.appendChild(quote);
+    panel.appendChild(frame);
+    showQuote(quote);
+    god.quoteTimer = setInterval(function () { showQuote(quote); }, (GM.quoteSeconds || 30) * 1000);
+    return panel;
+  }
+
+  /* Matrix rain only outside the centered terminal column. */
+  function startRain() {
+    if (OS.reduceMotion) { return null; }
+    const crt = document.getElementById("crt");
+    const screen = document.getElementById("screen");
+    const c = document.createElement("canvas");
+    c.className = "god-rain";
+    crt.appendChild(c);
+    const ctx = c.getContext && c.getContext("2d");
+    if (!ctx) { c.remove(); return null; }
+    const size = 18;
+    let W, H, left, right, top, bottom, cols, drops;
+    function measure() {
+      W = c.width = crt.clientWidth;
+      H = c.height = crt.clientHeight;
+      const r = screen.getBoundingClientRect();
+      const base = crt.getBoundingClientRect();
+      left = r.left - base.left;
+      right = r.right - base.left;
+      top = r.top - base.top;          // stay between the status bar
+      bottom = r.bottom - base.top;    // and the PF key row
+      cols = Math.ceil(W / size);
+      drops = [];
+      for (let i = 0; i < cols; i++) { drops.push(Math.random() * -50); }
+    }
+    measure();
+    window.addEventListener("resize", measure);
+    const glyphs = "01ABCDEF#$%&*+=<>[]{}/\\アカサタナハマ";
+    const timer = setInterval(function () {
+      ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
+      if (left > 0) { ctx.fillRect(0, top, left, bottom - top); }
+      if (right < W) { ctx.fillRect(right, top, W - right, bottom - top); }
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, top, W, bottom - top);
+      ctx.clip();
+      ctx.font = size + "px VT323, monospace";
+      for (let i = 0; i < cols; i++) {
+        const x = i * size;
+        if (x + size > left && x < right) { continue; }     // keep the terminal clear
+        const y = top + drops[i] * size;
+        ctx.fillStyle = Math.random() > 0.92 ? "#c8ffd6" : "#33ff66";
+        ctx.fillText(glyphs[Math.floor(Math.random() * glyphs.length)], x, y);
+        if (y > bottom && Math.random() > 0.975) { drops[i] = 0; }
+        drops[i]++;
+      }
+      ctx.restore();
+    }, 55);
+    return function () {
+      clearInterval(timer);
+      window.removeEventListener("resize", measure);
+      c.remove();
+    };
+  }
+
+  function startGod() {
+    if (god.on) { return; }
+    god.on = true;
+    document.body.classList.add("green-mode");
+    OS.input.value = "";
+    OS.flush();
+    god.panel = buildPanel();
+    OS.output.appendChild(god.panel);
+    OS.scroll();
+    god.stopRain = startRain();
+  }
+
+  function endGod(announce) {
+    if (!god.on) { return; }
+    god.on = false;
+    document.body.classList.remove("green-mode");
+    if (god.stopRain) { god.stopRain(); god.stopRain = null; }
+    if (god.quoteTimer) { clearInterval(god.quoteTimer); god.quoteTimer = null; }
+    if (god.panel) { god.panel.remove(); god.panel = null; }
+    if (announce) { OS.say("+++ GOD MODE DISABLED. AMBER RESTORED. +++", ""); }
+  }
+
+  function toggleGod(announce) {
+    if (god.on) { endGod(announce); } else { startGod(); }
+  }
+
+  /* Any other command (or screen change) ends god mode. */
+  OS.onCommand(function (raw) {
+    if (god.on && !isKonami(raw)) { endGod(false); }
+  });
 
   /* Pressing the real keys anywhere on the page. */
   document.addEventListener("keydown", function (e) {
@@ -342,18 +478,20 @@
     if (kpos === KONAMI.length) {
       kpos = 0;
       e.preventDefault();
-      godMode();
+      toggleGod(true);
     }
   });
 
   /* Typing it also works: "↑↑↓↓←→←→ B A", "uuddlrlrba", or
      "up up down down left right left right b a". */
   function typedKonami(raw) {
-    const t = raw.toLowerCase().replace(/\s+/g, "");
-    const ok = t === "↑↑↓↓←→←→ba" || t === "uuddlrlrba" ||
-               t === "upupdowndownleftrightleftrightba";
-    OS.echo(raw);
-    if (ok) { godMode(); } else { OS.say("SEQUENCE CORRUPTED. TRY AGAIN.", "alert"); }
+    if (!isKonami(raw)) {
+      OS.echo(raw);
+      OS.say("SEQUENCE CORRUPTED. TRY AGAIN.", "alert");
+      return;
+    }
+    if (!god.on) { OS.echo(raw); }
+    toggleGod(true);
   }
   OS.register("↑↑↓↓←→←→", typedKonami);
   OS.register("↑↑↓↓←→←→ba", typedKonami);

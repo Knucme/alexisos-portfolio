@@ -187,7 +187,15 @@
   let stack = [];          // previous screens, for BACK
   let current = null;      // { fn, args }
 
+  /* Easter eggs can listen for "the visitor did something" (a typed
+     command or a screen change), e.g. to end god mode. */
+  const commandHooks = [];
+  function notifyCommand(raw) {
+    commandHooks.forEach(function (fn) { try { fn(raw || ""); } catch (e) { /* ignore */ } });
+  }
+
   function render() {
+    notifyCommand("");
     cancel();
     out.innerHTML = "";
     out.scrollTop = 0;
@@ -1038,6 +1046,7 @@
     }
     const cmd = raw.trim().toLowerCase().replace(/\s+/g, " ");
     if (!cmd) { return; }
+    notifyCommand(raw.trim());
     history.push(raw.trim());
     historyIndex = history.length;
     flush();
@@ -1182,6 +1191,7 @@
     isCritical: function () { return critical; },
     reduceMotion: reduceMotion,
     register: function (name, fn) { COMMANDS[name] = fn; },
+    onCommand: function (fn) { commandHooks.push(fn); },
     trap: function (t) { inputTrap = t; },
     untrap: function () { inputTrap = null; }
   };

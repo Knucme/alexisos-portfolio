@@ -12,6 +12,7 @@
      PROJECTS  - project records
      GAMES     - simulations (Doom embed, Hex Cube, Hangman)
      HANGMAN_WORDS - word bank for Hangman
+     GOD_MODE  - picture + quotes for the hidden god mode
      BLOGS     - data-logs (tech, leetcode)
    =================================================================== */
 
@@ -201,6 +202,46 @@ const GAMES = [
   { name: "Hex Cube", type: "cube" },
   { name: "Hangman",  type: "hangman" }
 ];
+
+/* ----------------------------------------------------------------
+   GOD MODE (hidden: the Konami code)
+   Shows a picture with a rotating quote below it while green matrix
+   rain falls on the sides. Ends as soon as the visitor runs a command.
+
+     image        - path to the picture
+     quoteSeconds - how long each quote stays up
+     quotes       - add new ones here. Each entry:
+                      text   - the quote (use \n for line breaks)
+                      author - who said it
+                      source - optional book or speech title
+   ---------------------------------------------------------------- */
+const GOD_MODE = {
+  image: "images/god-mode.png",
+  quoteSeconds: 30,
+  quotes: [
+    {
+      text: "A man who procrastinates in his choosing will inevitably have his choice made for him by circumstance.",
+      author: "Hunter S. Thompson",
+      source: "The Proud Highway: Saga of a Desperate Southern Gentleman"
+    },
+    {
+      text: "La vida no es la que vivimos.\nLa vida es el honor y el recuerdo.\nPor eso más vale morir\ncon el pueblo vivo,\ny no vivir\ncon el pueblo muerto.\n\n" +
+            "Life is not as it seems,\nLife is pride and personal history.\nThus it is better that one die\nand that the people should live,\nrather than one live\nand the people should die.\n\n~Lopitos",
+      author: "Oscar Zeta Acosta",
+      source: "The Revolt of the Cockroach People"
+    },
+    {
+      text: "Don't bend; don't water it down; don't try to make it logical; don't edit your own soul according to the fashion. Rather, follow your most intense obsessions mercilessly.",
+      author: "Franz Kafka",
+      source: ""
+    },
+    {
+      text: "You have to decide who you are and force the world to deal with you, not with its idea of you.",
+      author: "James A. Baldwin",
+      source: ""
+    }
+  ]
+};
 
 /* ----------------------------------------------------------------
    HANGMAN WORD BANK

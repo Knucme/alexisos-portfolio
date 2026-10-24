@@ -672,3 +672,44 @@ body.green-mode .emblem { filter: hue-rotate(90deg) saturate(1.3) drop-shadow(0 
   pointer-events: none;
   background: rgba(0, 0, 0, 0.55);
 }
+
+/* God mode rain: full-tube canvas, but it only paints the side gutters */
+.god-rain {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  pointer-events: none;
+}
+
+/* God mode panel: picture with a rotating quote below it */
+.god-panel { margin: 10px 0 14px; max-width: 82ch; }
+.god-frame {
+  border: 3px double var(--amber-dim);
+  padding: 14px 18px;
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.god-img {
+  display: block;
+  max-width: 100%;
+  max-height: 42vh;
+  border: 1px solid var(--amber-dim);
+  box-shadow: 0 0 18px rgba(51, 255, 102, 0.25);
+}
+.god-img-missing {
+  padding: 28px 20px;
+  border: 1px dashed var(--amber-dim);
+  color: var(--amber-dim);
+  text-align: center;
+}
+.god-quote {
+  max-width: 70ch;
+  text-align: center;
+  transition: opacity 0.45s;
+}
+.god-quote.fading { opacity: 0; }
+.god-text   { white-space: pre-line; font-size: 1.05em; line-height: 1.3; }
+.god-author { margin-top: 8px; color: var(--amber-dim); }
