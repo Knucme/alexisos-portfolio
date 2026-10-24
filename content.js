@@ -217,7 +217,7 @@ const GAMES = [
    ---------------------------------------------------------------- */
 const GOD_MODE = {
   image: "images/god-mode.png",
-  quoteSeconds: 30,
+  quoteSeconds: 25,
   quotes: [
     {
       text: "A man who procrastinates in his choosing will inevitably have his choice made for him by circumstance.",
