@@ -9,13 +9,14 @@
   - style.css   : amber CRT look (scanlines, glow, flicker, vignette)
   - content.js  : ALL site content (profile, resume text, projects,
                   blogs, videos, games). Edit this to add content.
+  - wireframe.js: rotating 3D wireframe robot on the main menu
   - cube.js     : Hex Cube puzzle (one side at a time, clickable squares)
   - hangman.js  : Hangman with a robot (words in content.js)
   - script.js   : the terminal engine (boot sequence, menus, commands)
   - resume.html : full resume PDF viewer
   - legacy-xp/  : backup of the previous Windows XP-style site
 
-  CACHE NOTE: the ?v=15 on the CSS/JS links below forces browsers to
+  CACHE NOTE: the ?v=16 on the CSS/JS links below forces browsers to
   load fresh copies. Bump the number whenever you change those files.
 -->
 <html lang="en">
@@ -30,7 +31,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=15" />
+  <link rel="stylesheet" href="style.css?v=16" />
 </head>
 <body>
   <div id="crt">
@@ -77,10 +78,11 @@
     </p>
   </noscript>
 
-  <script src="content.js?v=15"></script>
-  <script src="cube.js?v=15"></script>
-  <script src="hangman.js?v=15"></script>
-  <script src="script.js?v=15"></script>
-  <script src="eggs.js?v=15"></script>
+  <script src="content.js?v=16"></script>
+  <script src="wireframe.js?v=16"></script>
+  <script src="cube.js?v=16"></script>
+  <script src="hangman.js?v=16"></script>
+  <script src="script.js?v=16"></script>
+  <script src="eggs.js?v=16"></script>
 </body>
 </html>

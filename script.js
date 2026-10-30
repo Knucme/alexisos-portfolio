@@ -438,17 +438,69 @@
     return canvas;
   }
 
+  /* Main-menu telemetry dashboard, laid out like an old vector display:
+     readouts in the corners, the rotating wireframe robot in the middle,
+     and the operator line along the bottom. */
+  function readout(label, value, cls) {
+    const r = el("div", "ro");
+    r.appendChild(el("div", "ro-label", label));
+    r.appendChild(el("div", "ro-value" + (cls ? " " + cls : ""), value));
+    return r;
+  }
+
+  function dashboard() {
+    const dash = el("div", "dash");
+
+    const top = el("div", "dash-top");
+    top.appendChild(el("span", "dim", "NODE 7-ALPHA"));
+    top.appendChild(el("span", "dash-title", "ALEXIS//OS"));
+    const up = el("span", "dim", "UPTIME 00:00:00");
+    top.appendChild(up);
+    dash.appendChild(top);
+
+    const mid = el("div", "dash-mid");
+    const left = el("div", "dash-col");
+    left.appendChild(readout("HULL INTEGRITY", "31%"));
+    left.appendChild(readout("REACTOR", "STANDBY 4%"));
+    left.appendChild(readout("CREW / VISITORS", "0 / 1"));
+    const right = el("div", "dash-col right");
+    right.appendChild(readout("VOX CH.9 SIGNAL", "UNKNOWN", "alert"));
+    right.appendChild(readout("LIFE SIGNS", "1 (YOU)"));
+    right.appendChild(readout("MACHINE SPIRIT", "RESTLESS"));
+
+    const canvas = el("canvas", "wire-robot");
+    canvas.setAttribute("role", "img");
+    canvas.setAttribute("aria-label", "Rotating wireframe of the AlexisOS robot");
+
+    mid.appendChild(left);
+    mid.appendChild(canvas);
+    mid.appendChild(right);
+    dash.appendChild(mid);
+
+    dash.appendChild(el("div", "dash-rule"));
+    const bottom = el("div", "dash-bottom");
+    bottom.appendChild(el("div", null, "OPERATOR ON RECORD   " + PROFILE.name.toUpperCase()));
+    bottom.appendChild(el("div", "dim", "VESSEL: VIGIL OF ASH   STATUS: DERELICT"));
+    dash.appendChild(bottom);
+
+    // Start the robot and uptime once the panel is actually on screen.
+    function tickUptime() {
+      if (!up.isConnected) { return false; }
+      const s = Math.floor((Date.now() - loadedAt) / 1000);
+      const pad = function (n) { return String(n).padStart(2, "0"); };
+      up.textContent = "UPTIME " + pad(Math.floor(s / 3600)) + ":" + pad(Math.floor(s / 60) % 60) + ":" + pad(s % 60);
+      return true;
+    }
+    enqueue(dash);
+    enqueue(function () {
+      if (window.Wireframe) { Wireframe.mount(canvas); }
+      tickUptime();
+      const t = setInterval(function () { if (!tickUptime()) { clearInterval(t); } }, 1000);
+    }, 0);
+  }
+
   function mainMenu() {
-    const banner = el("div", "banner");
-    const row = el("div", "banner-row");
-    row.appendChild(brailleToCanvas(EMBLEM, "#ffb000"));
-    const text = el("div");
-    text.appendChild(el("div", "h", "ALEXIS//OS  COGITATOR NODE 7-ALPHA"));
-    text.appendChild(el("div", "dim", "VESSEL: VIGIL OF ASH  |  STATUS: DERELICT  |  CREW: 0  |  VISITORS: 1"));
-    text.appendChild(el("div", "dim", "OPERATOR ON RECORD: " + PROFILE.name.toUpperCase()));
-    row.appendChild(text);
-    banner.appendChild(row);
-    enqueue(banner);
+    dashboard();
 
     para("You have reached the personal data-stacks of " + PROFILE.name +
          ", " + PROFILE.title + ". The crew is gone. The archive is intact.");

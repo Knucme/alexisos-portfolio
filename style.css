@@ -239,6 +239,47 @@ a:focus-visible {
   align-items: center;
 }
 
+/* ---------- Main-menu telemetry dashboard ----------
+   Corner readouts, rotating wireframe robot (wireframe.js) in the
+   middle, a solid rule and the operator line along the bottom. */
+.dash {
+  margin: 2px 0 14px;
+  padding: 10px 16px 8px;
+  border: 1px solid var(--amber-faint);
+  background: rgba(0, 0, 0, 0.18);
+}
+.dash-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  letter-spacing: 0.06em;
+  font-size: 0.9em;
+}
+.dash-title { font-size: 1.25em; letter-spacing: 0.12em; }
+.dash-mid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+}
+.dash-col { display: flex; flex-direction: column; gap: 18px; }
+.dash-col.right { text-align: right; }
+.ro-label { color: var(--amber-dim); font-size: 0.85em; letter-spacing: 0.08em; }
+.ro-value { font-size: 1.15em; letter-spacing: 0.04em; }
+.wire-robot {
+  display: block;
+  width: 300px;
+  height: 300px;
+}
+.dash-rule {
+  height: 3px;
+  margin: 4px 0 8px;
+  background: var(--amber);
+  box-shadow: 0 0 8px var(--amber);
+  opacity: 0.75;
+}
+.dash-bottom { text-align: center; letter-spacing: 0.08em; line-height: 1.35; }
+
 /* Robot emblem: braille art decoded onto a canvas (see script.js).
    Change the height to resize it; the width follows automatically. */
 .emblem {
@@ -572,6 +613,11 @@ a:focus-visible {
   #prompt-line { font-size: 18px; }
   #prompt    { font-size: 15px; }
   .emblem    { display: none; }
+  .dash      { padding: 8px 10px 6px; }
+  .dash-mid  { grid-template-columns: 1fr; justify-items: center; }
+  .dash-col  { display: none; }
+  .wire-robot { width: 210px; height: 210px; }
+  .dash-top  { font-size: 0.8em; }
   #fkeys     { display: grid; grid-template-columns: repeat(3, 1fr); padding: 6px 10px 8px; }
   #fkeys button { font-size: 15px; padding: 4px 4px; }
   #crt::after { border-radius: 0; }
