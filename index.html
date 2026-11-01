@@ -19,7 +19,7 @@
   - resume.html : full resume PDF viewer
   - legacy-xp/  : backup of the previous Windows XP-style site
 
-  CACHE NOTE: the ?v=27 on the CSS/JS links below forces browsers to
+  CACHE NOTE: the ?v=29 on the CSS/JS links below forces browsers to
   load fresh copies. Bump the number whenever you change those files.
 -->
 <html lang="en">
@@ -34,40 +34,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=27" />
+  <link rel="stylesheet" href="style.css?v=29" />
 </head>
 <body>
   <div id="crt">
 
-    <!-- Top bar, laid out like a mission-control monitor:
-         node id on the left, current page in the middle, clock on the right,
-         and a breadcrumb row underneath. -->
-    <header id="statusbar">
-      <div class="tb-row">
-        <span class="sb-left">ALEXIS//OS <span class="dim">v2.1</span></span>
-        <span class="tb-title" id="pagetitle">BOOT</span>
-        <span class="sb-right" id="clock">--:--</span>
-      </div>
-      <div class="tb-sub">
-        <span id="crumb">VIGIL OF ASH</span>
-        <span id="themeflag" class="dim">THEME RETROWAVE</span>
-      </div>
-    </header>
 
-    <!-- Main screen: scrollback output + command prompt -->
-    <main id="screen">
-      <div id="output" aria-live="polite"></div>
-      <form id="prompt-line" autocomplete="off">
-        <label for="cmd" id="prompt">+++ VISITOR@VIGIL-7 &gt;</label>
-        <input id="cmd" type="text" spellcheck="false" autocapitalize="off"
-               autocomplete="off" aria-label="Terminal command" />
-      </form>
-    </main>
-
-    <!-- Bottom status line (the rotating ship messages) -->
-    <div id="statusline"><span class="dim">RECEIVING</span> <span class="sb-ticker" id="ticker" aria-hidden="true"></span></div>
-
-    <!-- Page keys, like the function-key footer on a flight console.
+    <!-- Page keys across the top, like the function-key row on a flight console.
          data-page marks which page each key lights up on. -->
     <nav id="fkeys" aria-label="Pages">
       <button type="button" data-cmd="menu"     data-page="master"><b>F1</b>MASTER</button>
@@ -83,6 +56,30 @@
       <button type="button" data-cmd="back"     data-page="back"><b>ESC</b>BACK</button>
     </nav>
 
+    <!-- Main screen: scrollback output + command prompt -->
+    <main id="screen">
+      <div id="output" aria-live="polite"></div>
+      <form id="prompt-line" autocomplete="off">
+        <label for="cmd" id="prompt">+++ VISITOR@VIGIL-7 &gt;</label>
+        <input id="cmd" type="text" spellcheck="false" autocapitalize="off"
+               autocomplete="off" aria-label="Terminal command" />
+      </form>
+    </main>
+
+    <!-- Bottom status line (the rotating ship messages) -->
+    <div id="statusline"><span class="dim">RECEIVING</span> <span class="sb-ticker" id="ticker" aria-hidden="true"></span></div>
+
+    <!-- Info bar along the bottom, laid out like a mission-control monitor:
+         node id on the left, current page in the middle, clock on the right. -->
+    <footer id="statusbar">
+      <div class="tb-row">
+        <span class="sb-left">ALEXIS//OS <span class="dim">v2.1</span></span>
+        <span class="tb-title" id="pagetitle">BOOT</span>
+        <span class="sb-right" id="clock">--:--</span>
+      </div>
+    </footer>
+
+
   </div>
 
   <!-- servitor 3-kappa maintenance key (b64): RkxBR3t2MWcxbF8wZl80NWhfczB1cmMzX3IzNGQzcn0= -->
@@ -95,14 +92,14 @@
     </p>
   </noscript>
 
-  <script src="content.js?v=27"></script>
-  <script src="wireframe.js?v=27"></script>
-  <script src="ship.js?v=27"></script>
-  <script src="areas.js?v=27"></script>
-  <script src="cube.js?v=27"></script>
-  <script src="hangman.js?v=27"></script>
-  <script src="github.js?v=27"></script>
-  <script src="script.js?v=27"></script>
-  <script src="eggs.js?v=27"></script>
+  <script src="content.js?v=29"></script>
+  <script src="wireframe.js?v=29"></script>
+  <script src="ship.js?v=29"></script>
+  <script src="areas.js?v=29"></script>
+  <script src="cube.js?v=29"></script>
+  <script src="hangman.js?v=29"></script>
+  <script src="github.js?v=29"></script>
+  <script src="script.js?v=29"></script>
+  <script src="eggs.js?v=29"></script>
 </body>
 </html>

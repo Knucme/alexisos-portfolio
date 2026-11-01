@@ -1444,3 +1444,15 @@ body.theme-retrowave:not(.red-alert):not(.green-mode) .emblem { filter: none; }
 @media (max-width: 1000px) {
   .gh-cols { grid-template-columns: 1fr; }
 }
+
+/* ---------- Swapped bars: page keys on top, info bar at the bottom ---------- */
+#fkeys {
+  border-top: 0;
+  border-bottom: 2px solid var(--amber-dim);
+}
+#statusbar {
+  border-bottom: 0;
+  border-top: 1px solid var(--amber-faint);
+  padding: 4px 18px 6px;
+}
+#statusbar .tb-sub { border-top: 1px solid var(--amber-faint); }
