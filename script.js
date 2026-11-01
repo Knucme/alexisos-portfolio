@@ -262,6 +262,7 @@
       case service:   return "SERVICE RECORD";
       case vox:       return "VOX-CHANNELS";
       case status:    return "VESSEL STATUS";
+      case shipArea:  return "SECTION: " + (Ship.systems.find(function (s) { return s.id === args[0]; }) || { name: "" }).name;
       case help:      return "COMMAND LITANY";
       default:        return "DATA-STACK";
     }
@@ -822,6 +823,18 @@
 
   function status() {
     header("Vessel Status");
+    if (window.Ship) {
+      enqueue(Ship.render({ enter: function (sys) { run(function () { go(shipArea, [sys.id]); }); } }));
+      // A numbered option for every area, so they can be clicked or typed
+      sect("Move to area");
+      Ship.systems.forEach(function (sys) {
+        option(sys.num, sys.name, function () { go(shipArea, [sys.id]); },
+               sys.status === "ok" ? "nominal" : sys.status === "damaged" ? "damaged" : "offline");
+      });
+      blank();
+      backOption();
+      return;
+    }
     const mins = Math.floor((Date.now() - loadedAt) / 60000);
     line(dots("VESSEL", 22) + "VIGIL OF ASH");
     line(dots("HULL INTEGRITY", 22) + "31%");
@@ -833,6 +846,29 @@
     line(dots("AUSPEX", 22) + "UNKNOWN BIOSIGNS, AFT CARGO", "alert");
     blank();
     backOption();
+  }
+
+  /* ---------- Ship areas (opened from STATUS) ---------- */
+  function shipArea(id) {
+    const list = Ship.systems;
+    const i = list.findIndex(function (s) { return s.id === id; });
+    const sys = list[i];
+    header("Vigil of Ash // [" + sys.num + "] " + sys.name);
+    line(dots("CONDITION", 14) + (sys.status === "ok" ? "NOMINAL" : sys.status === "damaged" ? "DAMAGED" : "OFFLINE") +
+         "  //  " + sys.pct + "%  //  " + sys.note, sys.status === "ok" ? "" : "alert");
+    blank();
+    const scene = window.ShipAreas && ShipAreas[id];
+    if (scene) {
+      enqueue(scene(sys, Ship.systems));
+    } else {
+      line("NO PICT-FEED FROM THIS SECTION YET. AREA SURVEY PENDING.", "dim");
+    }
+    blank();
+    const next = list[(i + 1) % list.length];
+    const prev = list[(i - 1 + list.length) % list.length];
+    option("N", "NEXT AREA", function () { swap(shipArea, [next.id]); }, "[" + next.num + "] " + next.name.toLowerCase());
+    option("P", "PREVIOUS AREA", function () { swap(shipArea, [prev.id]); }, "[" + prev.num + "] " + prev.name.toLowerCase());
+    option(0, "RETURN TO SCHEMATIC", back, "or press ESC");
   }
 
   /* ---------- Help ---------- */
