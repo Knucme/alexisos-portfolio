@@ -48,11 +48,15 @@
     }
   }
 
+  /* Where printed lines go. Normally the output itself; on framed pages
+     it's the body of the page panel (see header()). */
+  let sink = null;
+
   function place(item) {
     if (typeof item === "function") {
       item();
     } else {
-      out.appendChild(item);
+      (sink || out).appendChild(item);
     }
   }
 
@@ -119,9 +123,53 @@
   function sect(text)       { enqueue(el("div", "sect", "== " + text.toUpperCase() + " ==")); }
   function item(text)       { enqueue(el("div", "li", "- " + text)); }
 
+  /* Starts a framed page: a bordered panel with the title cut into the
+     top edge (like a flight console window). Everything printed after
+     this goes inside the panel. Also updates the top bar. */
   function header(path) {
-    enqueue(el("div", "line h", ">> " + path.toUpperCase()));
-    rule();
+    const title = path.toUpperCase();
+    setPageTitle(title);
+    const page = el("section", "page");
+    page.appendChild(el("div", "page-title line h", title));
+    const body = el("div", "page-body");
+    page.appendChild(body);
+    enqueue(page);
+    enqueue(function () { sink = body; }, 0);
+  }
+
+  /* ---------- Top bar: page title, breadcrumb, active page key ---------- */
+  const pageTitleEl = document.getElementById("pagetitle");
+  const crumbEl = document.getElementById("crumb");
+
+  function setPageTitle(title) {
+    const parts = title.split("//").map(function (p) { return p.trim(); }).filter(Boolean);
+    if (parts.length > 1 && parts[0] === "VIGIL OF ASH") { parts.shift(); }
+    if (pageTitleEl) { pageTitleEl.textContent = parts[0] || title; }
+    if (crumbEl) { crumbEl.textContent = ["VIGIL OF ASH"].concat(parts).join("  //  "); }
+  }
+
+  /* Which page key (F1..F10) lights up for each screen. */
+  function pageKey(fn) {
+    switch (fn) {
+      case mainMenu: return "master";
+      case dossier: return "dossier";
+      case projects: case project: return "records";
+      case logs: case logIndex: case readLog: return "logs";
+      case videos: case videoList: return "pict";
+      case games: case game: return "sim";
+      case service: return "service";
+      case vox: return "vox";
+      case status: case shipArea: return "status";
+      case help: return "help";
+      default: return "";
+    }
+  }
+
+  function lightKey(fn) {
+    const k = pageKey(fn);
+    document.querySelectorAll("#fkeys button").forEach(function (b) {
+      b.classList.toggle("active", !!k && b.dataset.page === k);
+    });
   }
 
   /* "LABEL ......... value" with the value as a link. */
@@ -198,10 +246,12 @@
     notifyCommand("");
     cancel();
     out.innerHTML = "";
+    sink = null;
     out.scrollTop = 0;
     autoScroll = false;
     menu = {};
     activeGame = null;
+    lightKey(current.fn);
     current.fn.apply(null, current.args);
   }
 
@@ -281,11 +331,13 @@
     }
     cancel();
     out.innerHTML = "";
+    sink = null;
     out.scrollTop = 0;
     autoScroll = false;
     menu = {};
 
     const target = current;
+    lightKey(target.fn);
     enqueue(el("div", "line h", ">> ESTABLISHING LINK: " + areaName(target.fn, target.args).toUpperCase()), 70);
     enqueue(el("div", "line dim", "   " + pick(LOAD_LINES) + " ..."), 80);
     if (Math.random() < 0.15) {
@@ -449,72 +501,154 @@
     return r;
   }
 
-  function dashboard() {
+  /* A titled, bordered panel (title cut into the top edge). Returns
+     { el, body } so content can be added to body. */
+  function panelBox(title, cls) {
+    const p = el("section", "panel" + (cls ? " " + cls : ""));
+    p.appendChild(el("div", "panel-title", title));
+    const body = el("div", "panel-body");
+    p.appendChild(body);
+    return { el: p, body: body };
+  }
+
+  /* Print into a specific panel: everything enqueued inside fn lands in
+     `target`, then printing goes back to wherever it was. */
+  function into(target, fn) {
+    let prev = null;
+    enqueue(function () { prev = sink; sink = target; }, 0);
+    fn();
+    enqueue(function () { sink = prev; }, 0);
+  }
+
+  function pad2(n) { return String(n).padStart(2, "0"); }
+  function uptimeText() {
+    const s = Math.floor((Date.now() - loadedAt) / 1000);
+    return pad2(Math.floor(s / 3600)) + ":" + pad2(Math.floor(s / 60) % 60) + ":" + pad2(s % 60);
+  }
+
+  /* Telemetry panel: corner readouts around the rotating robot. */
+  function telemetry() {
     const dash = el("div", "dash");
-
-    const top = el("div", "dash-top");
-    top.appendChild(el("span", "dim", "NODE 7-ALPHA"));
-    top.appendChild(el("span", "dash-title", "ALEXIS//OS"));
-    const up = el("span", "dim", "UPTIME 00:00:00");
-    top.appendChild(up);
-    dash.appendChild(top);
-
     const mid = el("div", "dash-mid");
     const left = el("div", "dash-col");
-    left.appendChild(readout("HULL INTEGRITY", "31%"));
+    const hullPct = window.Ship ? Ship.hull() + "%" : "31%";
+    left.appendChild(readout("HULL INTEGRITY", hullPct));
     left.appendChild(readout("REACTOR", "STANDBY 4%"));
     left.appendChild(readout("CREW / VISITORS", "0 / 1"));
     const right = el("div", "dash-col right");
     right.appendChild(readout("VOX CH.9 SIGNAL", "UNKNOWN", "alert"));
     right.appendChild(readout("LIFE SIGNS", "1 (YOU)"));
-    right.appendChild(readout("MACHINE SPIRIT", "RESTLESS"));
+    const up = readout("UPTIME", uptimeText());
+    right.appendChild(up);
 
     const canvas = el("canvas", "wire-robot");
     canvas.setAttribute("role", "img");
     canvas.setAttribute("aria-label", "Rotating wireframe of the AlexisOS robot");
-
     mid.appendChild(left);
     mid.appendChild(canvas);
     mid.appendChild(right);
     dash.appendChild(mid);
-
     dash.appendChild(el("div", "dash-rule"));
-    const bottom = el("div", "dash-bottom");
-    bottom.appendChild(el("div", null, "OPERATOR ON RECORD   " + PROFILE.name.toUpperCase()));
-    bottom.appendChild(el("div", "dim", "VESSEL: VIGIL OF ASH   STATUS: DERELICT"));
-    dash.appendChild(bottom);
+    dash.appendChild(el("div", "dash-bottom", "OPERATOR ON RECORD   " + PROFILE.name.toUpperCase()));
 
-    // Start the robot and uptime once the panel is actually on screen.
-    function tickUptime() {
-      if (!up.isConnected) { return false; }
-      const s = Math.floor((Date.now() - loadedAt) / 1000);
-      const pad = function (n) { return String(n).padStart(2, "0"); };
-      up.textContent = "UPTIME " + pad(Math.floor(s / 3600)) + ":" + pad(Math.floor(s / 60) % 60) + ":" + pad(s % 60);
-      return true;
-    }
-    enqueue(dash);
-    enqueue(function () {
-      if (window.Wireframe) { Wireframe.mount(canvas); }
-      tickUptime();
-      const t = setInterval(function () { if (!tickUptime()) { clearInterval(t); } }, 1000);
-    }, 0);
+    const upVal = up.querySelector(".ro-value");
+    return {
+      el: dash,
+      start: function () {
+        if (window.Wireframe) { Wireframe.mount(canvas); }
+        const t = setInterval(function () {
+          if (!upVal.isConnected) { clearInterval(t); return; }
+          upVal.textContent = uptimeText();
+        }, 1000);
+      }
+    };
   }
 
-  function mainMenu() {
-    dashboard();
+  /* "LABEL ....... VALUE" row with optional status flag like [PLAN]. */
+  function kv(label, value, flag, cls) {
+    const r = el("div", "kv" + (cls ? " " + cls : ""));
+    r.appendChild(el("span", "kv-l", label));
+    r.appendChild(el("span", "kv-v", value));
+    r.appendChild(el("span", "kv-f", flag || ""));
+    return r;
+  }
 
-    para("You have reached the personal data-stacks of " + PROFILE.name +
-         ", " + PROFILE.title + ". The crew is gone. The archive is intact.");
-    blank();
-    option(1, "OPERATOR DOSSIER",    function () { go(dossier); },  "about me");
-    option(2, "FABRICATION RECORDS", function () { go(projects); }, "projects");
-    option(3, "DATA-LOGS",           function () { go(logs); },     "blog");
-    option(4, "PICT-RECORDINGS",     function () { go(videos); },   "videos");
-    option(5, "SIMULATIONS",         function () { go(games); },    "games");
-    option(6, "SERVICE RECORD",      function () { go(service); },  "resume");
-    option(7, "VOX-CHANNELS",        function () { go(vox); },      "contact");
-    blank();
-    line("Click an option, or type its number and press ENTER. HELP lists all commands.", "dim");
+  /* ---------- MASTER page (main menu) ----------
+     A grid of console panels: telemetry with the robot, the data-stack
+     menu, caution & warning, sources & health, and the operator card. */
+  function mainMenu() {
+    setPageTitle("MASTER");
+    const grid = el("div", "master");
+
+    const tele = panelBox("VIGIL OF ASH  //  TELEMETRY", "m-tele");
+    const t = telemetry();
+    tele.body.appendChild(t.el);
+
+    const stacks = panelBox("DATA-STACKS", "m-menu");
+
+    const cw = panelBox("CAUTION & WARNING", "m-cw");
+    const faults = window.Ship ? Ship.systems.filter(function (x) { return x.status !== "ok"; }) : [];
+    faults.forEach(function (f) {
+      cw.body.appendChild(el("div", "line " + (f.status === "offline" ? "alert" : "cw-cau"),
+        (f.status === "offline" ? "WRN  " : "CAU  ") + f.name));
+    });
+    cw.body.appendChild(el("div", "line dim cw-foot", faults.length + " ACTIVE  //  TYPE STATUS"));
+
+    const src = panelBox("SOURCES  //  HEALTH", "m-src");
+    const posts = Object.keys(BLOGS).reduce(function (n, k) { return n + BLOGS[k].posts.length; }, 0);
+    const newest = BLOGS.tech && BLOGS.tech.posts.length ? BLOGS.tech.posts[BLOGS.tech.posts.length - 1].date : "";
+    const vids = Object.keys(VIDEOS).reduce(function (n, k) { return n + VIDEOS[k].videos.length; }, 0);
+    src.body.appendChild(kv("ARCHIVE", "ONLINE", "[LIVE]"));
+    src.body.appendChild(kv("DATA-LOGS", posts + " ENTRIES", newest ? "[" + newest.toUpperCase() + "]" : ""));
+    src.body.appendChild(kv("RECORDS", Object.keys(PROJECTS).length + " FILED", ""));
+    src.body.appendChild(kv("PICT-FEEDS", vids ? vids + " FEEDS" : "NONE", vids ? "" : "[PENDING]", vids ? "" : "dim"));
+    src.body.appendChild(kv("SIMULATIONS", GAMES.length + " LOADED", ""));
+    src.body.appendChild(kv("VOX CH.9", "NO DATA", "[UNK]", "alert"));
+
+    const op = panelBox("OPERATOR", "m-op");
+    op.body.appendChild(el("div", "line op-name", PROFILE.name.toUpperCase()));
+    op.body.appendChild(el("div", "line dim", PROFILE.title));
+    op.body.appendChild(el("div", "line dim", PROFILE.location));
+    const mail = el("a", null, PROFILE.email);
+    mail.href = "mailto:" + PROFILE.email;
+    const mailRow = el("div", "line");
+    mailRow.appendChild(mail);
+    op.body.appendChild(mailRow);
+
+    const top = el("div", "master-top");
+    top.appendChild(tele.el);
+    top.appendChild(stacks.el);
+    const bottom = el("div", "master-bottom");
+    bottom.appendChild(cw.el);
+    bottom.appendChild(src.el);
+    bottom.appendChild(op.el);
+    grid.appendChild(top);
+    grid.appendChild(bottom);
+
+    // Live GitHub feed across the bottom (github.js)
+    if (window.GitFeed) {
+      const gh = panelBox("GITHUB  //  " + GitFeed.USER.toUpperCase() + "  //  LIVE FEED  ", "m-gh");
+      const flag = el("span", "gh-flag", "[SYNC]");
+      gh.el.querySelector(".panel-title").appendChild(flag);
+      GitFeed.fill(gh.body, flag);
+      grid.appendChild(gh.el);
+    }
+
+    enqueue(grid);
+    enqueue(function () { t.start(); }, 0);
+
+    into(stacks.body, function () {
+      para("Personal data-stacks of " + PROFILE.name + ". The crew is gone. The archive is intact.", "dim");
+      option(1, "OPERATOR DOSSIER",    function () { go(dossier); },  "about me");
+      option(2, "FABRICATION RECORDS", function () { go(projects); }, "projects");
+      option(3, "DATA-LOGS",           function () { go(logs); },     "blog");
+      option(4, "PICT-RECORDINGS",     function () { go(videos); },   "videos");
+      option(5, "SIMULATIONS",         function () { go(games); },    "games");
+      option(6, "SERVICE RECORD",      function () { go(service); },  "resume");
+      option(7, "VOX-CHANNELS",        function () { go(vox); },      "contact");
+      blank();
+      line("Click an option or type its number. HELP lists all commands.", "dim");
+    });
   }
 
   function dossier() {
@@ -884,6 +1018,7 @@
     ["CONTACT",     "vox-channels"],
     ["STATUS",      "vessel status"],
     ["CLEAR",       "purge the screen"],
+    ["THEME",       "cycle display colors (THEME LIST for names)"],
     ["REBOOT",      "replay the boot sequence"]
   ];
 
@@ -933,6 +1068,9 @@
   function boot(forceFull) {
     cancel();
     out.innerHTML = "";
+    sink = null;
+    setPageTitle("BOOT // POWER-ON SELF TEST");
+    lightKey(null);
     autoScroll = true;
     menu = {};
     stack = [];
@@ -953,6 +1091,44 @@
       try { sessionStorage.setItem("alexisos-booted", "1"); } catch (e) { /* ignore */ }
       home();
     });
+  }
+
+  /* ----------------------------------------------------------------
+     THEMES (like the color modes on a flight console)
+     THEME cycles them; THEME <NAME> picks one. Remembered in this browser.
+     Red alert and god mode still take over the colors when active.
+     ---------------------------------------------------------------- */
+  const THEMES = ["retrowave", "amber", "phosphor", "modern"];
+  const DEFAULT_THEME = "retrowave";      // what first-time visitors see
+  let theme = DEFAULT_THEME;
+
+  function savedTheme() {
+    try { return localStorage.getItem("alexisos-theme") || DEFAULT_THEME; } catch (e) { return DEFAULT_THEME; }
+  }
+
+  function applyTheme(name, quiet) {
+    if (THEMES.indexOf(name) < 0) { name = DEFAULT_THEME; }
+    THEMES.forEach(function (t) { document.body.classList.remove("theme-" + t); });
+    if (name !== "amber") { document.body.classList.add("theme-" + name); }
+    theme = name;
+    const flag = document.getElementById("themeflag");
+    if (flag) { flag.textContent = "THEME " + name.toUpperCase(); }
+    try { localStorage.setItem("alexisos-theme", name); } catch (e) { /* storage blocked */ }
+    if (!quiet) { say("DISPLAY RECALIBRATED: " + name.toUpperCase() + ".", ""); }
+  }
+
+  function themeCommand(raw) {
+    echo(raw);
+    const arg = (raw.trim().split(/\s+/)[1] || "").toLowerCase();
+    if (arg === "list") {
+      say("THEMES: " + THEMES.join(", ").toUpperCase() + ". TYPE THEME <NAME>, OR THEME TO CYCLE.", "dim");
+      return;
+    }
+    if (arg && THEMES.indexOf(arg) < 0) {
+      say("UNKNOWN THEME: " + arg.toUpperCase() + ". TRY: " + THEMES.join(", ").toUpperCase(), "alert");
+      return;
+    }
+    applyTheme(arg || THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length]);
   }
 
   /* ----------------------------------------------------------------
@@ -1018,11 +1194,14 @@
     "clear":    function () {
       cancel();
       out.innerHTML = "";
+      sink = null;
       menu = {};
       say("SCREEN PURGED. TYPE MENU TO CONTINUE.", "dim");
     },
     "cls":      function () { COMMANDS.clear(); },
     "reboot":   function () { boot(true); },
+    "theme":    function (raw) { themeCommand(raw); },
+    "themes":   function (raw) { themeCommand("theme list"); },
     "boot":     function () { boot(true); },
 
     /* A few things a curious visitor might try. */
@@ -1066,9 +1245,9 @@
   function setCritical(on) {
     critical = on;
     document.body.classList.toggle("red-alert", on);
-    const bar = document.getElementById("statusbar");
+    const bar = document.getElementById("statusline");
     if (on && !conditionEl.isConnected) {
-      bar.insertBefore(conditionEl, tickerEl);
+      bar.insertBefore(conditionEl, bar.firstChild);
     } else if (!on && conditionEl.isConnected) {
       conditionEl.remove();
     }
@@ -1251,6 +1430,7 @@
       timeZone: "America/Los_Angeles",
       hour: "2-digit",
       minute: "2-digit",
+      second: "2-digit",
       hour12: false
     });
     clockEl.textContent = frac + "." + yr + ".M" + mil + "  " + time + " PT";
@@ -1293,7 +1473,8 @@
   tick();
   setInterval(tick, 6000);
   updateClock();
-  setInterval(updateClock, 15000);
+  setInterval(updateClock, 1000);
+  applyTheme(savedTheme(), true);
   boot(false);
   if (finePointer) { input.focus(); }
 

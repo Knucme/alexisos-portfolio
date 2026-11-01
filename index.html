@@ -14,11 +14,12 @@
   - areas.js    : scenes for each ship area (bridge console, ...)
   - cube.js     : Hex Cube puzzle (one side at a time, clickable squares)
   - hangman.js  : Hangman with a robot (words in content.js)
+  - github.js   : live GitHub feed on the MASTER page (cached 10 min)
   - script.js   : the terminal engine (boot sequence, menus, commands)
   - resume.html : full resume PDF viewer
   - legacy-xp/  : backup of the previous Windows XP-style site
 
-  CACHE NOTE: the ?v=22 on the CSS/JS links below forces browsers to
+  CACHE NOTE: the ?v=27 on the CSS/JS links below forces browsers to
   load fresh copies. Bump the number whenever you change those files.
 -->
 <html lang="en">
@@ -33,16 +34,24 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=22" />
+  <link rel="stylesheet" href="style.css?v=27" />
 </head>
 <body>
   <div id="crt">
 
-    <!-- Status bar, styled after the status lines on old DEC/IBM terminals -->
+    <!-- Top bar, laid out like a mission-control monitor:
+         node id on the left, current page in the middle, clock on the right,
+         and a breadcrumb row underneath. -->
     <header id="statusbar">
-      <span class="sb-left">ALEXIS//OS <span class="dim">v2.0</span></span>
-      <span class="sb-ticker" id="ticker" aria-hidden="true"></span>
-      <span class="sb-right" id="clock">--:--</span>
+      <div class="tb-row">
+        <span class="sb-left">ALEXIS//OS <span class="dim">v2.1</span></span>
+        <span class="tb-title" id="pagetitle">BOOT</span>
+        <span class="sb-right" id="clock">--:--</span>
+      </div>
+      <div class="tb-sub">
+        <span id="crumb">VIGIL OF ASH</span>
+        <span id="themeflag" class="dim">THEME RETROWAVE</span>
+      </div>
     </header>
 
     <!-- Main screen: scrollback output + command prompt -->
@@ -55,17 +64,23 @@
       </form>
     </main>
 
-    <!-- Program function keys, after the PF key row on IBM 3270 terminals -->
-    <nav id="fkeys" aria-label="Quick commands">
-      <button type="button" data-cmd="help"><b>PF1</b>HELP</button>
-      <button type="button" data-cmd="menu"><b>PF2</b>MENU</button>
-      <button type="button" data-cmd="back"><b>PF3</b>BACK</button>
-      <button type="button" data-cmd="blog"><b>PF4</b>LOGS</button>
-      <button type="button" data-cmd="projects"><b>PF5</b>PROJECTS</button>
-      <button type="button" data-cmd="videos"><b>PF6</b>VIDEOS</button>
-      <button type="button" data-cmd="games"><b>PF7</b>GAMES</button>
-      <button type="button" data-cmd="resume"><b>PF8</b>RESUME</button>
-      <button type="button" data-cmd="contact"><b>PF9</b>CONTACT</button>
+    <!-- Bottom status line (the rotating ship messages) -->
+    <div id="statusline"><span class="dim">RECEIVING</span> <span class="sb-ticker" id="ticker" aria-hidden="true"></span></div>
+
+    <!-- Page keys, like the function-key footer on a flight console.
+         data-page marks which page each key lights up on. -->
+    <nav id="fkeys" aria-label="Pages">
+      <button type="button" data-cmd="menu"     data-page="master"><b>F1</b>MASTER</button>
+      <button type="button" data-cmd="about"    data-page="dossier"><b>F2</b>DOSSIER</button>
+      <button type="button" data-cmd="projects" data-page="records"><b>F3</b>RECORDS</button>
+      <button type="button" data-cmd="blog"     data-page="logs"><b>F4</b>LOGS</button>
+      <button type="button" data-cmd="videos"   data-page="pict"><b>F5</b>PICT</button>
+      <button type="button" data-cmd="games"    data-page="sim"><b>F6</b>SIM</button>
+      <button type="button" data-cmd="resume"   data-page="service"><b>F7</b>SERVICE</button>
+      <button type="button" data-cmd="contact"  data-page="vox"><b>F8</b>VOX</button>
+      <button type="button" data-cmd="status"   data-page="status"><b>F9</b>STATUS</button>
+      <button type="button" data-cmd="help"     data-page="help"><b>F10</b>HELP</button>
+      <button type="button" data-cmd="back"     data-page="back"><b>ESC</b>BACK</button>
     </nav>
 
   </div>
@@ -80,13 +95,14 @@
     </p>
   </noscript>
 
-  <script src="content.js?v=22"></script>
-  <script src="wireframe.js?v=22"></script>
-  <script src="ship.js?v=22"></script>
-  <script src="areas.js?v=22"></script>
-  <script src="cube.js?v=22"></script>
-  <script src="hangman.js?v=22"></script>
-  <script src="script.js?v=22"></script>
-  <script src="eggs.js?v=22"></script>
+  <script src="content.js?v=27"></script>
+  <script src="wireframe.js?v=27"></script>
+  <script src="ship.js?v=27"></script>
+  <script src="areas.js?v=27"></script>
+  <script src="cube.js?v=27"></script>
+  <script src="hangman.js?v=27"></script>
+  <script src="github.js?v=27"></script>
+  <script src="script.js?v=27"></script>
+  <script src="eggs.js?v=27"></script>
 </body>
 </html>
