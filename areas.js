@@ -379,8 +379,197 @@
     return wrap;
   }
 
+  /* ---------- DECK PLANS (top-down) ----------
+     Generic renderer for a top-down deck plan in SVG: a hull outline,
+     labeled compartments with furniture, doors, and damage markers.
+     Prow points right. Hover a compartment for its report; click to pin
+     it. Each compartment has an id and status ("ok", "dmg", "sealed")
+     so future repair puzzles can change them. */
+  const SVGNS = "http://www.w3.org/2000/svg";
+  function sv(tag, attrs, parent) {
+    const e = document.createElementNS(SVGNS, tag);
+    Object.keys(attrs || {}).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+    if (parent) { parent.appendChild(e); }
+    return e;
+  }
+
+  function deckPlan(spec) {
+    const wrap = el("div", "dp");
+    const svg = sv("svg", { viewBox: "0 0 800 420", class: "dp-svg", role: "img", "aria-label": spec.title });
+    // blueprint grid
+    const defs = sv("defs", {}, svg);
+    const pat = sv("pattern", { id: "dpgrid-" + spec.id, width: 20, height: 20, patternUnits: "userSpaceOnUse" }, defs);
+    sv("path", { d: "M 20 0 L 0 0 0 20", class: "dp-gridline" }, pat);
+    sv("rect", { x: 0, y: 0, width: 800, height: 420, fill: "url(#dpgrid-" + spec.id + ")" }, svg);
+    // hull
+    sv("polygon", { points: spec.hull, class: "dp-hull" }, svg);
+    sv("polygon", { points: spec.hull, class: "dp-hull-inner", transform: "translate(0,0)" }, svg);
+
+    const info = el("div", "line dp-info dim", "HOVER A COMPARTMENT FOR ITS REPORT. CLICK TO PIN.");
+    let pinned = null;
+    function report(r) {
+      info.className = "line dp-info" + (r.status === "ok" ? "" : " alert");
+      info.textContent = r.name + "  //  " + (r.status === "ok" ? "NOMINAL" : r.status === "dmg" ? "DAMAGED" : "SEALED") + "  //  " + r.note;
+    }
+
+    spec.rooms.forEach(function (r, i) {
+      const g = sv("g", { class: "dp-room " + r.status, tabindex: 0 }, svg);
+      g.style.animationDelay = (i * 0.29 % 1.2).toFixed(2) + "s";
+      sv("rect", { x: r.x, y: r.y, width: r.w, height: r.h, class: "dp-wall" }, g);
+      if (r.furn) { r.furn(g, r); }
+      const label = sv("text", { x: r.x + r.w / 2, y: r.y + (r.labelY || r.h / 2), class: "dp-label" }, g);
+      label.textContent = r.name;
+      // shrink long names so they fit inside narrow compartments
+      const fit = Math.min(15, (r.w - 14) / (r.name.length * 0.68));
+      if (fit < 15) { label.style.fontSize = fit.toFixed(1) + "px"; }
+      if (r.status !== "ok") {
+        const tag = sv("text", { x: r.x + r.w / 2, y: r.y + (r.labelY || r.h / 2) + 16, class: "dp-tag" }, g);
+        tag.textContent = r.status === "dmg" ? "! DAMAGED" : "SEALED";
+      }
+      sv("title", {}, g).textContent = r.name + ": " + r.note;
+      g.addEventListener("mouseenter", function () { if (!pinned) { report(r); } });
+      g.addEventListener("focus", function () { report(r); });
+      g.addEventListener("click", function (e) {
+        e.stopPropagation();
+        pinned = pinned === r ? null : r;
+        svg.querySelectorAll(".dp-room").forEach(function (x) { x.classList.remove("pinned"); });
+        if (pinned) { g.classList.add("pinned"); }
+        report(r);
+      });
+    });
+
+    // doors: [x, y, "h"|"v"] gaps drawn over walls
+    (spec.doors || []).forEach(function (d) {
+      const w = 18;
+      if (d[2] === "h") { sv("line", { x1: d[0] - w / 2, y1: d[1], x2: d[0] + w / 2, y2: d[1], class: "dp-door" }, svg); }
+      else { sv("line", { x1: d[0], y1: d[1] - w / 2, x2: d[0], y2: d[1] + w / 2, class: "dp-door" }, svg); }
+    });
+    if (spec.extra) { spec.extra(svg); }
+
+    // compass / scale
+    const legend = sv("g", { class: "dp-legend" }, svg);
+    sv("text", { x: 790, y: 410, "text-anchor": "end" }, legend).textContent = "PROW →   GRID 2M";
+    sv("text", { x: 10, y: 410 }, legend).textContent = spec.title;
+
+    wrap.appendChild(svg);
+    wrap.appendChild(info);
+
+    // compartment list
+    const list = el("div", "dp-list");
+    spec.rooms.forEach(function (r) {
+      const row = el("div", "dp-row " + r.status);
+      row.appendChild(el("span", null, r.name));
+      row.appendChild(el("span", "dp-state", r.status === "ok" ? "NOM" : r.status === "dmg" ? "DMG" : "SEALED"));
+      list.appendChild(row);
+    });
+    wrap.appendChild(list);
+    return wrap;
+  }
+
+  /* furniture helpers */
+  function bunks(n) {
+    return function (g, r) {
+      for (let i = 0; i < n; i++) {
+        const x = r.x + 10 + i * ((r.w - 20) / n);
+        sv("rect", { x: x, y: r.y + 10, width: (r.w - 20) / n - 6, height: 26, class: "dp-furn" }, g);
+        sv("rect", { x: x, y: r.y + r.h - 36, width: (r.w - 20) / n - 6, height: 26, class: "dp-furn" }, g);
+      }
+    };
+  }
+  function tables(n) {
+    return function (g, r) {
+      for (let i = 0; i < n; i++) {
+        const cx = r.x + (i + 0.5) * (r.w / n), cy = r.y + r.h - 30;
+        sv("circle", { cx: cx, cy: cy, r: 12, class: "dp-furn" }, g);
+        [0, 1, 2, 3].forEach(function (k) {
+          const a = k * Math.PI / 2;
+          sv("rect", { x: cx + Math.cos(a) * 18 - 3, y: cy + Math.sin(a) * 18 - 3, width: 6, height: 6, class: "dp-furn" }, g);
+        });
+      }
+    };
+  }
+  function crates(cols, rows, missing) {
+    return function (g, r) {
+      const cw = (r.w - 24) / cols, ch = (r.h - 50) / rows;
+      for (let c = 0; c < cols; c++) {
+        for (let k = 0; k < rows; k++) {
+          const idx = k * cols + c;
+          const cls = missing === idx ? "dp-furn dp-missing" : "dp-furn";
+          sv("rect", { x: r.x + 12 + c * cw, y: r.y + 34 + k * ch, width: cw - 6, height: ch - 6, class: cls }, g);
+          if (missing !== idx) {
+            sv("line", { x1: r.x + 12 + c * cw, y1: r.y + 34 + k * ch, x2: r.x + 6 + (c + 1) * cw, y2: r.y + 28 + (k + 1) * ch, class: "dp-furn dp-x" }, g);
+          }
+        }
+      }
+    };
+  }
+
+  /* ---------- DECK 4: crew quarters ---------- */
+  function deck4() {
+    return deckPlan({
+      id: "deck4",
+      title: "DECK 4  //  CREW QUARTERS",
+      hull: "40,60 690,60 770,150 770,270 690,360 40,360 20,330 20,90",
+      rooms: [
+        { name: "BUNKS A", x: 50, y: 70, w: 150, h: 120, status: "ok", note: "12 RACKS. ALL EMPTY.", furn: bunks(4) },
+        { name: "BUNKS B", x: 200, y: 70, w: 140, h: 120, status: "dmg", note: "PRESSURE SEAL FAILING. HULL BREACH ALONG OUTER WALL.", furn: bunks(3) },
+        { name: "SANITATION", x: 340, y: 70, w: 90, h: 120, status: "ok", note: "WATER RECLAIM OFFLINE." },
+        { name: "MEDICAE BAY", x: 430, y: 70, w: 140, h: 120, status: "ok", note: "2 SURGICAL SLABS. SUPPLIES 9%.",
+          furn: function (g, r) { [0, 1].forEach(function (i) { sv("rect", { x: r.x + 20 + i * 60, y: r.y + 14, width: 40, height: 22, class: "dp-furn" }, g); }); } },
+        { name: "OFFICER QTRS", x: 570, y: 70, w: 120, h: 120, status: "sealed", note: "LOCKED FROM INSIDE. NO RESPONSE." },
+        { name: "MAIN CORRIDOR", x: 50, y: 190, w: 640, h: 40, status: "ok", note: "LIGHTS AT 12%. FOOTPRINTS IN THE DUST.", labelY: 25 },
+        { name: "LOCKERS", x: 50, y: 230, w: 110, h: 120, status: "ok", note: "38 LOCKERS. 1 FORCED OPEN." },
+        { name: "MESS HALL", x: 160, y: 230, w: 210, h: 120, status: "ok", note: "TRAYS STILL ON THE TABLES.", furn: tables(3), labelY: 30 },
+        { name: "GALLEY", x: 370, y: 230, w: 100, h: 120, status: "ok", note: "RATIONS: 4 YEARS. RECAF: NONE." },
+        { name: "SHRINE", x: 470, y: 230, w: 120, h: 120, status: "ok", note: "CANDLES BURNED DOWN. SOMEONE LIT ONE RECENTLY." },
+        { name: "AIRLOCK 4", x: 590, y: 230, w: 100, h: 120, status: "dmg", note: "OUTER DOOR CYCLING ON ITS OWN." }
+      ],
+      doors: [[125, 190, "h"], [270, 190, "h"], [385, 190, "h"], [500, 190, "h"], [630, 190, "h"],
+              [105, 230, "h"], [265, 230, "h"], [420, 230, "h"], [530, 230, "h"], [640, 230, "h"],
+              [690, 210, "v"], [690, 290, "v"]],
+      extra: function (svg) {
+        // breach along the outer wall of Bunks B
+        sv("path", { d: "M 215 62 L 230 74 L 242 64 L 258 78 L 270 66 L 286 76 L 300 63", class: "dp-breach" }, svg);
+        sv("text", { x: 258, y: 52, class: "dp-callout" }, svg).textContent = "SEAL 4 BREACH";
+      }
+    });
+  }
+
+  /* ---------- AFT CARGO ---------- */
+  function cargoBay() {
+    return deckPlan({
+      id: "cargo",
+      title: "AFT CARGO  //  HOLDS 1-2",
+      hull: "60,40 720,40 790,110 790,310 720,380 60,380 30,340 30,80",
+      rooms: [
+        { name: "HOLD 1", x: 50, y: 50, w: 250, h: 320, status: "ok", note: "24 CONTAINERS. MANIFEST MATCHES.", furn: crates(4, 4), labelY: 20 },
+        { name: "HOLD 2", x: 300, y: 50, w: 220, h: 320, status: "dmg", note: "CONTAINER C-7 TORN FROM ITS CLAMPS. MISSING.", furn: crates(3, 4, 6), labelY: 20 },
+        { name: "QUARANTINE", x: 520, y: 50, w: 130, h: 130, status: "dmg", note: "UNKNOWN BIOSIGNS. 3 CONTACTS. MOVING." },
+        { name: "MANIFEST OFFICE", x: 520, y: 180, w: 130, h: 70, status: "ok", note: "LAST ENTRY 1,207 DAYS AGO." },
+        { name: "CARGO LIFT", x: 520, y: 250, w: 130, h: 120, status: "ok", note: "STUCK BETWEEN DECKS 3 AND 4.",
+          furn: function (g, r) { sv("rect", { x: r.x + 30, y: r.y + 30, width: 70, height: 60, class: "dp-furn" }, g); sv("line", { x1: r.x + 30, y1: r.y + 30, x2: r.x + 100, y2: r.y + 90, class: "dp-furn" }, g); sv("line", { x1: r.x + 100, y1: r.y + 30, x2: r.x + 30, y2: r.y + 90, class: "dp-furn" }, g); } },
+        { name: "SERVITOR BAY", x: 650, y: 80, w: 100, h: 90, status: "sealed", note: "SERVITOR 3-KAPPA: NO RESPONSE." },
+        { name: "DOCK CLAMP", x: 650, y: 170, w: 110, h: 80, status: "ok", note: "CLAMP OPEN. NOTHING DOCKED." },
+        { name: "FUEL BUNKER", x: 650, y: 250, w: 100, h: 90, status: "ok", note: "PROMETHIUM 22%." }
+      ],
+      doors: [[300, 120, "v"], [300, 300, "v"], [520, 215, "v"], [520, 310, "v"], [585, 180, "h"], [585, 250, "h"], [650, 210, "v"], [700, 170, "h"], [700, 250, "h"]],
+      extra: function (svg) {
+        // unknown biosigns drifting inside quarantine
+        [[560, 95, 0], [610, 140, 1.3], [585, 120, 2.4]].forEach(function (b) {
+          const c = sv("circle", { cx: b[0], cy: b[1], r: 4, class: "dp-bio" }, svg);
+          c.style.animationDelay = b[2] + "s";
+        });
+        sv("text", { x: 585, y: 34, class: "dp-callout" }, svg).textContent = "3 UNKNOWN BIOSIGNS";
+        // scrape marks where C-7 broke loose
+        sv("path", { d: "M 440 300 L 470 330 L 490 336 L 505 360", class: "dp-breach" }, svg);
+      }
+    });
+  }
+
   window.ShipAreas = {
     bridge: bridge,
-    reactor: reactor
+    reactor: reactor,
+    deck4: deck4,
+    cargo: cargoBay
   };
 })();
