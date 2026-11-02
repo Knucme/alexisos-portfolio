@@ -174,7 +174,15 @@
     kC.appendChild(knobT("FIELD", -60, false, true));
     center.appendChild(kC);
     const tg2 = el("div", "bp-row");
-    ["SHLD 1", "SHLD 2", "GELLER", "LIGHTS", "GRAV", "DOORS"].forEach(function (t, i) { tg2.appendChild(toggle(t, i === 3 || i === 4)); });
+    ["SHLD 1", "SHLD 2", "GELLER", "LIGHTS", "GRAV", "DOORS"].forEach(function (t, i) {
+      const sw = toggle(t, i === 3 || i === 4);
+      if (t === "GELLER") {                       // the Geller field is run from here
+        const gf = all.find(function (x) { return x.id === "geller"; });
+        if (gf && gf.status !== "ok") { sw.classList.add("fault"); }
+        sw.title = "Geller field: " + (gf ? gf.note : "");
+      }
+      tg2.appendChild(sw);
+    });
     center.appendChild(tg2);
     const strip = el("div", "bp-led");
     strip.appendChild(el("span", "bp-led-text",

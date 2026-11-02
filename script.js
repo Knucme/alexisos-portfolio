@@ -958,10 +958,11 @@
   function status() {
     header("Vessel Status");
     if (window.Ship) {
+      // Clicking a system opens its area (the Geller field is display-only).
       enqueue(Ship.render({ enter: function (sys) { run(function () { go(shipArea, [sys.id]); }); } }));
       // A numbered option for every area, so they can be clicked or typed
       sect("Move to area");
-      Ship.systems.forEach(function (sys) {
+      Ship.systems.filter(function (x) { return x.area !== false; }).forEach(function (sys) {
         option(sys.num, sys.name, function () { go(shipArea, [sys.id]); },
                sys.status === "ok" ? "nominal" : sys.status === "damaged" ? "damaged" : "offline");
       });
@@ -984,7 +985,7 @@
 
   /* ---------- Ship areas (opened from STATUS) ---------- */
   function shipArea(id) {
-    const list = Ship.systems;
+    const list = Ship.systems.filter(function (x) { return x.area !== false; });
     const i = list.findIndex(function (s) { return s.id === id; });
     const sys = list[i];
     header("Vigil of Ash // [" + sys.num + "] " + sys.name);
@@ -993,6 +994,14 @@
     blank();
     const scene = window.ShipAreas && ShipAreas[id];
     if (scene) {
+      if (id === "bridge") {
+        const gf = Ship.systems.find(function (x) { return x.id === "geller"; });
+        if (gf) {
+          line(dots("GELLER FIELD", 14) + (gf.status === "ok" ? "ONLINE" : "OFFLINE") + "  //  " + gf.pct + "%  //  CONTROLLED FROM THIS CONSOLE",
+               gf.status === "ok" ? "" : "alert");
+          blank();
+        }
+      }
       enqueue(scene(sys, Ship.systems));
     } else {
       line("NO PICT-FEED FROM THIS SECTION YET. AREA SURVEY PENDING.", "dim");

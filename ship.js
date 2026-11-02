@@ -22,9 +22,13 @@
     { id: "reactor", name: "REACTOR",      status: "damaged", pct: 4,  note: "STANDBY 4%" },
     { id: "cargo",   name: "AFT CARGO",    status: "damaged", pct: 51, note: "UNKNOWN BIOSIGNS" },
     { id: "engines", name: "ENGINES",      status: "offline", pct: 0,  note: "NO THRUST" },
-    { id: "geller",  name: "GELLER FIELD", status: "offline", pct: 0,  note: "FIELD COLLAPSED" }
+    // Not a place you can go: the field is run from the bridge console.
+    { id: "geller",  name: "GELLER FIELD", status: "offline", pct: 0,  note: "FIELD COLLAPSED", area: false }
   ];
-  SHIP_SYSTEMS.forEach(function (s, i) { s.num = i + 1; });
+  // Number only the systems you can travel to.
+  let areaNum = 0;
+  SHIP_SYSTEMS.forEach(function (s) { s.num = s.area === false ? null : ++areaNum; });
+  function tagOf(s) { return s.num ? "[" + s.num + "] " : ""; }
 
   function hull() {
     const sum = SHIP_SYSTEMS.reduce(function (a, s) { return a + s.pct; }, 0);
@@ -151,14 +155,19 @@
     // Keel and centerline
     line(30, 150, 630, 150, root, "axis");
     SHIP_SYSTEMS.forEach(function (s, i) {
-      const g = svg("g", { class: "ship-sec " + s.status, "data-id": s.id, tabindex: 0 }, root);
+      // Systems that aren't areas (the Geller field) are display-only: no click, no focus.
+      const nav = s.area !== false;
+      const g = svg("g", { class: "ship-sec " + s.status + (nav ? "" : " static"), "data-id": s.id }, root);
+      if (nav) { g.setAttribute("tabindex", 0); }
       g.style.animationDelay = (i * 0.37 % 1.3).toFixed(2) + "s";
       svg("title", {}, g).textContent = s.name + ": " + s.note + " (" + s.pct + "%)";
       SHAPES[s.id](g);
       g.addEventListener("mouseenter", function () { onPick(s); });
       g.addEventListener("focus", function () { onPick(s); });
-      g.addEventListener("click", function (e) { e.stopPropagation(); onEnter(s); });
-      g.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); onEnter(s); } });
+      if (nav) {
+        g.addEventListener("click", function (e) { e.stopPropagation(); onEnter(s); });
+        g.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); onEnter(s); } });
+      }
     });
     // Labels with leader lines
     SHIP_SYSTEMS.forEach(function (s) {
@@ -166,7 +175,7 @@
       const g = svg("g", { class: "ship-label " + s.status }, root);
       line(L.x + 20, L.y + (L.y < L.ty ? 4 : -12), L.tx, L.ty, g, "leader");
       const t = svg("text", { x: L.x, y: L.y }, g);
-      t.textContent = "[" + s.num + "] " + s.name + (s.status === "ok" ? "" : " !");
+      t.textContent = tagOf(s) + s.name + (s.status === "ok" ? "" : " !");
     });
     return root;
   }
@@ -208,7 +217,7 @@
     const picked = el("div", "line sp-picked dim", "HOVER A SECTION FOR DETAIL. CLICK IT, OR TYPE ITS NUMBER, TO GO THERE.");
     left.appendChild(schematic(function (s) {
       picked.className = "line sp-picked" + (s.status === "ok" ? "" : " alert");
-      picked.textContent = "[" + s.num + "] " + s.name + " .... " + s.pct + "%  //  " + s.note;
+      picked.textContent = tagOf(s) + s.name + " .... " + s.pct + "%  //  " + s.note;
       wrap.querySelectorAll(".sp-row").forEach(function (r) {
         r.classList.toggle("on", r.dataset.id === s.id);
       });
@@ -223,8 +232,12 @@
     SHIP_SYSTEMS.forEach(function (s) {
       const r = el("div", "sp-row " + s.status);
       r.dataset.id = s.id;
-      r.appendChild(el("span", "sp-name", s.num + "  " + s.name));
-      r.addEventListener("click", function (e) { e.stopPropagation(); if (opts.enter) { opts.enter(s); } });
+      r.appendChild(el("span", "sp-name", (s.num ? s.num + "  " : "\u00B7  ") + s.name));
+      if (s.area !== false) {
+        r.addEventListener("click", function (e) { e.stopPropagation(); if (opts.enter) { opts.enter(s); } });
+      } else {
+        r.classList.add("static");
+      }
       r.appendChild(el("span", "sp-pct", String(s.pct).padStart(3, " ") + "%"));
       r.appendChild(el("span", "sp-state", s.status === "ok" ? "NOM" : s.status === "damaged" ? "DMG" : "OFF"));
       sys.appendChild(r);

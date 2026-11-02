@@ -1531,3 +1531,10 @@ body.theme-retrowave:not(.red-alert):not(.green-mode) .emblem { filter: none; }
   #fkeys button { font-size: 15px; }
 }
 .rx-canvas.cryo { box-shadow: 0 0 24px rgba(120, 190, 255, 0.25); }
+/* Bridge: the GELLER switch flashes while the field is down */
+.bp-toggle.fault .bp-tag { color: #ff4a30; animation: bp-warn 0.8s steps(2) infinite; }
+.bp-toggle.fault .bp-lever { box-shadow: 0 0 8px rgba(255, 60, 40, 0.8); }
+/* Geller field: visual indicator only, not a place you can open */
+.ship-sec.static { cursor: default; }
+.sp-row.static { cursor: default; }
+.sp-row.static:hover { outline: none; }
