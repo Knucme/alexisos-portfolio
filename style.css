@@ -1525,3 +1525,8 @@ body.theme-retrowave:not(.red-alert):not(.green-mode) .emblem { filter: none; }
   100% { transform: translate(10px, -12px); }
 }
 @media (prefers-reduced-motion: reduce) { .dp-room.dmg .dp-wall, .dp-breach, .dp-missing, .dp-bio { animation: none; } }
+/* Medium widths: drop the F-numbers so the page names fit */
+@media (max-width: 1150px) and (min-width: 701px) {
+  #fkeys button b { display: none; }
+  #fkeys button { font-size: 15px; }
+}
