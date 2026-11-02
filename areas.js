@@ -927,12 +927,193 @@
     return wrap;
   }
 
+  /* ---------- VOX ARRAY ----------
+     The antenna farm on the dorsal hull, seen against open space with a
+     gas giant and its moon in the distance. Dish A still works and
+     slowly tracks the channel 9 signal (incoming pulses arrive from the
+     dark); dish B is cracked and tilted, mast 2 is snapped in half, and
+     loose cables spark. Warning beacons blink on the masts. */
+  function voxArray(sys) {
+    const wrap = el("div", "rx");
+    const W = 256, H = 144;
+    const canvas = el("canvas", "rx-canvas space");
+    canvas.width = W;
+    canvas.height = H;
+    canvas.setAttribute("role", "img");
+    canvas.setAttribute("aria-label", "Antenna array on the hull, some broken, with a planet and moon in the distance");
+    wrap.appendChild(canvas);
+
+    const reads = el("div", "rx-reads");
+    [["DISH A", "TRACKING", "warn"], ["DISH B", "CRACKED", "crit"], ["MAST 2", "SEVERED", "crit"],
+     ["MASTS 1, 3", "NOMINAL", ""], ["CH.9 SIGNAL", "-87 DB", "warn"], ["ORIGIN", "UNKNOWN", "crit"]].forEach(function (r) {
+      const d = el("div", "rx-read " + r[2]);
+      d.appendChild(el("span", "rx-l", r[0]));
+      d.appendChild(el("span", "rx-v", r[1]));
+      reads.appendChild(d);
+    });
+    wrap.appendChild(reads);
+
+    const ctx = canvas.getContext && canvas.getContext("2d");
+    if (!ctx) { return wrap; }
+    ctx.imageSmoothingEnabled = false;
+    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const rnd = seeded(57);
+
+    const stars = [];
+    for (let i = 0; i < 110; i++) { stars.push({ x: rnd() * W, y: rnd() * 100, b: 0.25 + rnd() * 0.75, s: rnd() < 0.08 ? 2 : 1 }); }
+    let sparks = [], pulses = [];
+    const HULL = 112;       // top of the hull surface
+
+    function px(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); }
+
+    function sky(t) {
+      px(0, 0, W, H, "#03040a");
+      stars.forEach(function (st, i) {
+        px(st.x, st.y, st.s, st.s, "rgba(225,230,255," + (st.b * (0.65 + 0.35 * Math.sin(t * 1.3 + i))) + ")");
+      });
+      // gas giant, upper right, partly lit, with bands and a ring
+      const gx = 214, gy = 34, gr = 30;
+      ctx.save();
+      ctx.beginPath(); ctx.arc(gx, gy, gr, 0, Math.PI * 2); ctx.clip();
+      const pg = ctx.createLinearGradient(gx - gr, gy - gr, gx + gr, gy + gr);
+      pg.addColorStop(0, "#c98a5a"); pg.addColorStop(0.5, "#8a4f3a"); pg.addColorStop(1, "#2a1520");
+      ctx.fillStyle = pg; ctx.fillRect(gx - gr, gy - gr, gr * 2, gr * 2);
+      for (let b = -3; b <= 3; b++) {
+        px(gx - gr, gy + b * 8 + Math.sin(b) * 2, gr * 2, 2, "rgba(255,210,170," + (0.08 + (b % 2 ? 0.06 : 0)) + ")");
+      }
+      // night side
+      const ns = ctx.createLinearGradient(gx - gr, 0, gx + gr, 0);
+      ns.addColorStop(0, "rgba(3,4,10,0)"); ns.addColorStop(0.55, "rgba(3,4,10,0.15)"); ns.addColorStop(1, "rgba(3,4,10,0.85)");
+      ctx.fillStyle = ns; ctx.fillRect(gx - gr, gy - gr, gr * 2, gr * 2);
+      ctx.restore();
+      ctx.strokeStyle = "rgba(230,200,170,0.45)";
+      ctx.beginPath(); ctx.ellipse(gx, gy, gr + 14, 5, -0.25, 0, Math.PI * 2); ctx.stroke();
+      // its moon, small and grey, slowly drifting across
+      const mx = 160 + Math.sin(t * 0.05) * 6, my = 18;
+      ctx.beginPath(); ctx.arc(mx, my, 5, 0, Math.PI * 2); ctx.fillStyle = "#9aa0aa"; ctx.fill();
+      ctx.beginPath(); ctx.arc(mx + 2, my, 5, 0, Math.PI * 2); ctx.fillStyle = "rgba(3,4,10,0.6)"; ctx.fill();
+      px(mx - 2, my - 1, 1, 1, "#6c727c");
+    }
+
+    function hull() {
+      px(0, HULL, W, H - HULL, "#2a2e38");
+      px(0, HULL, W, 1, "#5d6476");
+      for (let x = 0; x < W; x += 24) { px(x, HULL + 1, 1, H - HULL, "#1d2029"); }
+      for (let y = HULL + 10; y < H; y += 10) { px(0, y, W, 1, "#22252e"); }
+      // a scorched gash in the plating near the broken mast
+      px(120, HULL + 4, 26, 3, "#14161c"); px(124, HULL + 7, 14, 2, "#14161c");
+    }
+
+    function lattice(x, top, bottom, w) {
+      px(x, top, 1, bottom - top, "#8a92a6"); px(x + w, top, 1, bottom - top, "#8a92a6");
+      ctx.strokeStyle = "#5a6174";
+      ctx.beginPath();
+      for (let y = top; y < bottom - 6; y += 6) { ctx.moveTo(x, y); ctx.lineTo(x + w, y + 6); ctx.moveTo(x + w, y); ctx.lineTo(x, y + 6); }
+      ctx.stroke();
+    }
+
+    function beacon(x, y, t, ph) {
+      if (Math.sin(t * 3 + ph) > 0.4) {
+        px(x - 1, y - 1, 3, 3, "rgba(255,60,40,0.35)");
+        px(x, y, 1, 1, "#ff4a30");
+      } else { px(x, y, 1, 1, "#4a1510"); }
+    }
+
+    function dish(cx, cy, r, aim, broken, t) {
+      // parabolic dish seen from the side: an arc + feed horn
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(aim);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = broken ? "#6b7080" : "#c8cedb";
+      ctx.beginPath(); ctx.ellipse(0, 0, r, r * 0.42, 0, Math.PI * 1.05, Math.PI * (broken ? 1.75 : 1.95)); ctx.stroke();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = broken ? "#4d5160" : "#8a92a6";
+      ctx.beginPath(); ctx.moveTo(-r * 0.6, -r * 0.2); ctx.lineTo(0, -r * 0.95); ctx.lineTo(r * 0.6, -r * 0.2); ctx.stroke();
+      px(-1, -r - 1, 3, 3, broken ? "#3a3d48" : "#e8ecf5");                         // feed horn
+      if (!broken) { px(0, -r - 2, 1, 1, Math.sin(t * 6) > 0 ? "#7dffb0" : "#1f5a3a"); }
+      if (broken) {                                                                   // crack line
+        ctx.strokeStyle = "#1a1c22"; ctx.beginPath(); ctx.moveTo(-r * 0.2, -r * 0.4); ctx.lineTo(-r * 0.05, -r * 0.15); ctx.lineTo(-r * 0.3, 0); ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function spark(x, y) {
+      for (let i = 0; i < 4; i++) {
+        sparks.push({ x: x, y: y, vx: (rnd() - 0.5) * 1.2, vy: -rnd() * 1.2, life: 0, max: 14 + rnd() * 10 });
+      }
+    }
+
+    let frame = 0, raf = 0;
+    function draw() {
+      if (!canvas.isConnected && frame > 0) { cancelAnimationFrame(raf); return; }
+      const t = frame / 60;
+      sky(t);
+
+      // incoming channel 9 pulses: rings travelling in from the upper left toward dish A
+      if (!reduce && frame % 90 === 0) { pulses.push({ r: 70, a: 0.6 }); }
+      const dax = 48, day = 84;
+      pulses.forEach(function (p) {
+        p.r -= 0.6; p.a = Math.max(0, p.a - 0.004);
+        ctx.strokeStyle = "rgba(120,255,170," + p.a + ")";
+        ctx.beginPath(); ctx.arc(dax - 6, day - 10, Math.max(1, p.r), Math.PI * 1.05, Math.PI * 1.55); ctx.stroke();
+      });
+      pulses = pulses.filter(function (p) { return p.r > 4; });
+
+      hull();
+      // Dish A on its pedestal, sweeping slowly
+      px(dax - 2, day, 5, HULL - day, "#6b7285"); px(dax - 8, HULL - 4, 17, 4, "#3a3f4d");
+      dish(dax, day, 20, -0.55 + Math.sin(t * 0.25) * 0.18, false, t);
+
+      // Mast 1 (intact) with whips and beacon
+      lattice(92, 40, HULL, 6);
+      px(95, 26, 1, 14, "#b6bccb"); beacon(95, 25, t, 0);
+      px(86, 52, 18, 1, "#8a92a6"); px(86, 52, 1, 8, "#8a92a6"); px(103, 52, 1, 8, "#8a92a6");
+
+      // Mast 2 (severed): stump, plus the top half hanging down by a cable
+      lattice(130, 74, HULL, 6);
+      px(129, 72, 9, 2, "#3a3d48");                                                      // jagged break
+      ctx.strokeStyle = "#3d4150"; ctx.beginPath(); ctx.moveTo(133, 74); ctx.quadraticCurveTo(140, 92, 146, 96); ctx.stroke();
+      ctx.save(); ctx.translate(146, 96); ctx.rotate(1.9 + Math.sin(t * 0.7) * 0.05);       // dangling section swaying
+      ctx.strokeStyle = "#6b7285"; ctx.strokeRect(0, -3, 22, 6);
+      ctx.beginPath(); for (let k = 0; k < 22; k += 5) { ctx.moveTo(k, -3); ctx.lineTo(k + 5, 3); } ctx.stroke();
+      ctx.restore();
+      if (!reduce && rnd() < 0.05) { spark(134, 73); }
+
+      // Dish B (cracked, slumped on its mount)
+      px(182, 92, 4, HULL - 92, "#4d5363"); px(176, HULL - 4, 16, 4, "#2f333f");
+      dish(184, 92, 16, 0.9, true, t);
+      if (!reduce && rnd() < 0.025) { spark(188, 86); }
+
+      // Mast 3 (short, intact) with a beacon
+      lattice(232, 70, HULL, 5);
+      px(234, 58, 1, 12, "#b6bccb"); beacon(234, 57, t, 1.4);
+
+      // sparks
+      sparks.forEach(function (sp) { sp.life++; sp.x += sp.vx; sp.y += sp.vy; sp.vy += 0.05;
+        px(sp.x, sp.y, 1, 1, "rgba(255," + (200 - sp.life * 6) + ",80," + (1 - sp.life / sp.max) + ")"); });
+      sparks = sparks.filter(function (sp) { return sp.life < sp.max; });
+
+      // a piece of debris tumbling past
+      const dx = (t * 6) % (W + 40) - 20, dy = 60 + Math.sin(t * 0.4) * 6;
+      ctx.save(); ctx.translate(dx, dy); ctx.rotate(t * 0.8); px(-3, -1, 6, 2, "#6b7080"); px(-1, -3, 2, 6, "#4d5160"); ctx.restore();
+
+      ctx.font = "7px monospace";
+      ctx.fillStyle = "rgba(120,255,170,0.75)"; ctx.fillText("CH.9", 8, 22);
+      frame++;
+      if (!reduce) { raf = requestAnimationFrame(draw); }
+    }
+    draw();
+    return wrap;
+  }
+
   window.ShipAreas = {
     bridge: bridge,
     reactor: reactor,
     deck4: deck4,
     cargo: cargoBay,
     engines: engines,
-    life: lifeSupport
+    life: lifeSupport,
+    vox: voxArray
   };
 })();
