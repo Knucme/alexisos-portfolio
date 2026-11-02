@@ -1456,3 +1456,34 @@ body.theme-retrowave:not(.red-alert):not(.green-mode) .emblem { filter: none; }
   padding: 4px 18px 6px;
 }
 #statusbar .tb-sub { border-top: 1px solid var(--amber-faint); }
+
+/* ---------- REACTOR scene (areas.js) ---------- */
+.rx { max-width: 980px; margin: 6px auto 10px; }
+.rx-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  border: 2px solid var(--amber-dim);
+  background: #0b0405;
+  box-shadow: 0 0 24px rgba(255, 90, 30, 0.25);
+}
+.rx-reads {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px 14px;
+  margin-top: 10px;
+}
+.rx-read {
+  display: flex;
+  justify-content: space-between;
+  border: 1px solid var(--amber-faint);
+  padding: 2px 8px;
+  font-size: 0.95em;
+}
+.rx-l { color: var(--amber-dim); }
+.rx-read.crit .rx-v { color: var(--alert); animation: blink 1s steps(1) infinite; }
+.rx-read.warn .rx-v { color: var(--alert); }
+@media (max-width: 700px) { .rx-reads { grid-template-columns: 1fr 1fr; } }
+@media (prefers-reduced-motion: reduce) { .rx-read.crit .rx-v { animation: none; } }
