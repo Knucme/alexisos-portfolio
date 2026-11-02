@@ -775,11 +775,164 @@
     return wrap;
   }
 
+  /* ---------- LIFE SUPPORT: cryo-stasis bay ----------
+     Pixel-art wall of stasis pods in two tiers, lit by cold blue light,
+     with low cryo fog drifting across the floor. Life support is on
+     reserve power, so most pods are dark and empty, two have failed
+     (flashing red, frost cracked), and one is still sealed: its monitor
+     flatlines, then every so often shows a single heartbeat. */
+  function lifeSupport(sys) {
+    const wrap = el("div", "rx");
+    const W = 256, H = 144;
+    const canvas = el("canvas", "rx-canvas cryo");
+    canvas.width = W;
+    canvas.height = H;
+    canvas.setAttribute("role", "img");
+    canvas.setAttribute("aria-label", "Cryo bay: a wall of stasis pods, most empty, two failed, one still sealed");
+    wrap.appendChild(canvas);
+
+    const reads = el("div", "rx-reads");
+    [["STASIS PODS", "12", ""], ["EMPTY", "9", ""], ["FAILED", "2", "crit"],
+     ["SEALED", "1  //  POD 07", "warn"], ["POD 07 VITALS", "INTERMITTENT", "crit"], ["BAY POWER", "RESERVE 37%", "warn"]].forEach(function (r) {
+      const d = el("div", "rx-read " + r[2]);
+      d.appendChild(el("span", "rx-l", r[0]));
+      d.appendChild(el("span", "rx-v", r[1]));
+      reads.appendChild(d);
+    });
+    wrap.appendChild(reads);
+
+    const ctx = canvas.getContext && canvas.getContext("2d");
+    if (!ctx) { return wrap; }
+    ctx.imageSmoothingEnabled = false;
+    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const rnd = seeded(41);
+
+    // 6 columns x 2 tiers. state: empty | failed | sealed
+    const PODS = [];
+    for (let row = 0; row < 2; row++) {
+      for (let col = 0; col < 6; col++) {
+        const n = row * 6 + col + 1;
+        PODS.push({ n: n, x: 22 + col * 38, y: row === 0 ? 14 : 66,
+                    state: n === 7 ? "sealed" : (n === 3 || n === 10) ? "failed" : "empty" });
+      }
+    }
+    const PW = 28, PH = 46;
+    let fog = [];
+
+    function px(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); }
+
+    function room(t) {
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, "#0a1018"); g.addColorStop(0.7, "#101a26"); g.addColorStop(1, "#06090e");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      // ceiling light strip, flickering on reserve power
+      const on = Math.sin(t * 7) > -0.85 ? 1 : 0.3;
+      px(0, 2, W, 3, "rgba(150,200,255," + (0.18 * on) + ")");
+      px(0, 2, W, 1, "rgba(220,240,255," + (0.35 * on) + ")");
+      // wall racks behind the pods
+      px(0, 10, W, 1, "#1d2a3a"); px(0, 62, W, 2, "#1d2a3a"); px(0, 114, W, 2, "#1d2a3a");
+      for (let x = 16; x < W; x += 38) { px(x, 10, 2, 106, "#151f2c"); }
+      // floor grating
+      px(0, 116, W, H - 116, "#080c12");
+      for (let x = 0; x < W; x += 6) { px(x, 118, 1, H - 118, "#0f1620"); }
+      px(0, 116, W, 1, "#2a3a50");
+    }
+
+    function heartbeat(t) {
+      // flat most of the time; a single beat roughly every 5 seconds
+      const c = t % 5;
+      return c > 4.6 && c < 4.9;
+    }
+
+    function pod(P, t) {
+      const x = P.x, y = P.y;
+      const failFlash = Math.sin(t * 8 + P.n) > 0;
+      // shell
+      px(x, y + 3, PW, PH - 6, "#c9d2dc");
+      px(x + 2, y, PW - 4, 3, "#c9d2dc"); px(x + 2, y + PH - 3, PW - 4, 3, "#c9d2dc");
+      px(x, y + 3, 2, PH - 6, "#e8eef5"); px(x + PW - 3, y + 3, 3, PH - 6, "#8a96a6");
+      for (let k = 0; k < 5; k++) { px(x + 6 + k * 4, y + 26, 1, 14, "#a7b2bf"); }       // body ribs
+      px(x + 4, y + PH - 6, PW - 8, 2, "#6e7a8a");                                         // foot plate
+      // round window
+      const wx = x + PW / 2, wy = y + 13, wr = 8;
+      ctx.beginPath(); ctx.arc(wx, wy, wr + 2, 0, Math.PI * 2); ctx.fillStyle = "#2b3442"; ctx.fill();
+      ctx.beginPath(); ctx.arc(wx, wy, wr, 0, Math.PI * 2);
+      if (P.state === "sealed") {
+        const breath = 0.55 + 0.15 * Math.sin(t * 1.2) + (heartbeat(t) ? 0.3 : 0);
+        const wg = ctx.createRadialGradient(wx, wy, 1, wx, wy, wr);
+        wg.addColorStop(0, "rgba(235,248,255," + breath + ")"); wg.addColorStop(1, "rgba(80,160,255," + (breath * 0.7) + ")");
+        ctx.fillStyle = wg; ctx.fill();
+        px(wx - 2, wy - 3, 4, 8, "rgba(60,90,130,0.55)");     // a shape behind the frost
+        px(wx - 3, wy - 6, 6, 4, "rgba(60,90,130,0.45)");
+      } else if (P.state === "failed") {
+        ctx.fillStyle = failFlash ? "rgba(255,70,50,0.75)" : "rgba(90,20,20,0.8)"; ctx.fill();
+        ctx.strokeStyle = "rgba(255,230,230,0.7)"; ctx.beginPath();             // frost crack
+        ctx.moveTo(wx - 5, wy - 4); ctx.lineTo(wx, wy); ctx.lineTo(wx - 2, wy + 5); ctx.moveTo(wx, wy); ctx.lineTo(wx + 5, wy - 2); ctx.stroke();
+      } else {
+        ctx.fillStyle = "#0b1119"; ctx.fill();
+        px(wx - 5, wy - 5, 3, 2, "rgba(150,190,230,0.15)");                       // glint on empty glass
+      }
+      // side status screen
+      const sx = x + PW - 2, sy = y + 24;
+      px(sx, sy, 8, 6, "#05080c"); px(sx, sy, 8, 1, "#3a4658");
+      if (P.state === "sealed") {
+        const beat = heartbeat(t);
+        px(sx + 1, sy + 3, 6, 1, "rgba(120,255,170,0.8)");
+        if (beat) { px(sx + 3, sy + 1, 1, 2, "rgba(120,255,170,1)"); px(sx + 4, sy + 4, 1, 1, "rgba(120,255,170,1)"); }
+      } else if (P.state === "failed") {
+        px(sx + 1, sy + 1, 6, 4, failFlash ? "rgba(255,60,40,0.9)" : "rgba(80,10,10,0.9)");
+      } else {
+        px(sx + 1, sy + 3, 6, 1, "rgba(70,100,140,0.5)");
+      }
+      // status lamp and pod number
+      px(x + 3, y + PH - 10, 2, 2, P.state === "sealed" ? "#7dffb0" : P.state === "failed" ? (failFlash ? "#ff3a2a" : "#4a1010") : "#30404f");
+      ctx.font = "6px monospace";
+      ctx.fillStyle = "#3b4757";
+      ctx.fillText(String(P.n).padStart(2, "0"), x + 9, y + PH - 8);
+      // cold light spill under the sealed pod
+      if (P.state === "sealed") {
+        const sp = ctx.createRadialGradient(wx, wy, 2, wx, wy, 34);
+        sp.addColorStop(0, "rgba(120,190,255,0.22)"); sp.addColorStop(1, "rgba(120,190,255,0)");
+        ctx.fillStyle = sp; ctx.fillRect(wx - 34, wy - 34, 68, 68);
+      }
+    }
+
+    function spawnFog(init) {
+      fog.push({ x: init ? rnd() * W : -10 - rnd() * 20, y: 108 + rnd() * 32, vx: 0.12 + rnd() * 0.2,
+                 r: 3 + rnd() * 4, a: 0.08 + rnd() * 0.12, wob: rnd() * 6.28 });
+    }
+    function drawFog(t) {
+      fog.forEach(function (f) {
+        f.x += f.vx; const y = f.y + Math.sin(t * 0.8 + f.wob) * 1.5; const s = Math.round(f.r);
+        ctx.fillStyle = "rgba(190,220,255," + f.a + ")";
+        ctx.fillRect(Math.round(f.x - s * 1.5), Math.round(y - s / 2), s * 3, s);
+        ctx.fillRect(Math.round(f.x - s / 2), Math.round(y - s), s, s * 2);
+      });
+      fog = fog.filter(function (f) { return f.x < W + 20; });
+    }
+
+    let frame = 0, raf = 0;
+    for (let i = 0; i < 70; i++) { spawnFog(true); }
+    function draw() {
+      if (!canvas.isConnected && frame > 0) { cancelAnimationFrame(raf); return; }
+      const t = frame / 60;
+      room(t);
+      PODS.forEach(function (P) { pod(P, t); });
+      if (!reduce && frame % 4 === 0) { spawnFog(false); }
+      drawFog(t);
+      frame++;
+      if (!reduce) { raf = requestAnimationFrame(draw); }
+    }
+    draw();
+    return wrap;
+  }
+
   window.ShipAreas = {
     bridge: bridge,
     reactor: reactor,
     deck4: deck4,
     cargo: cargoBay,
-    engines: engines
+    engines: engines,
+    life: lifeSupport
   };
 })();
