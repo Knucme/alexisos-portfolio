@@ -28,6 +28,9 @@
     return e;
   }
 
+  /* Display text without hyphens (links keep the real names). */
+  function plain(t) { return String(t).replace(/(\w)-(?=\w)/g, "$1 "); }
+
   function ago(iso) {
     const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
     if (s < 3600) { return Math.max(1, Math.round(s / 60)) + "M AGO"; }
@@ -119,7 +122,7 @@
     if (data && data.repos.length) {
       data.repos.forEach(function (r) {
         const row = el("div", "gh-row");
-        const a = el("a", "gh-name", r.name);
+        const a = el("a", "gh-name", plain(r.name));
         a.href = r.url; a.target = "_blank"; a.rel = "noopener";
         row.appendChild(a);
         row.appendChild(el("span", "gh-meta", (r.lang ? r.lang.toUpperCase() + "  " : "") + "★" + r.stars));
@@ -133,14 +136,14 @@
 
     // Latest commits on the most recently pushed repo
     const comCol = el("div", "gh-col");
-    comCol.appendChild(el("div", "gh-h", "LATEST COMMITS" + (data && data.commitsRepo ? "  //  " + data.commitsRepo.toUpperCase() : "")));
+    comCol.appendChild(el("div", "gh-h", "LATEST COMMITS" + (data && data.commitsRepo ? "  //  " + plain(data.commitsRepo).toUpperCase() : "")));
     if (data && data.commits.length) {
       data.commits.forEach(function (c) {
         const row = el("div", "gh-row");
         const a = el("a", "gh-sha", c.sha);
         a.href = c.url; a.target = "_blank"; a.rel = "noopener";
         row.appendChild(a);
-        row.appendChild(el("span", "gh-msg", c.msg));
+        row.appendChild(el("span", "gh-msg", plain(c.msg)));
         row.appendChild(el("span", "gh-when", c.at ? ago(c.at) : ""));
         comCol.appendChild(row);
       });
@@ -164,7 +167,7 @@
       });
       actCol.appendChild(chart);
       const axis = el("div", "gh-axis dim");
-      axis.appendChild(el("span", null, "-14D"));
+      axis.appendChild(el("span", null, "14D AGO"));
       axis.appendChild(el("span", null, "TODAY"));
       actCol.appendChild(axis);
       const last = data.events[0];

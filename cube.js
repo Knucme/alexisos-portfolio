@@ -390,7 +390,7 @@
     /* Status line only (the timer refreshes this without redrawing squares). */
     function drawStat() {
       const center = model.face("F")[1][1];
-      let time = "--";
+      let time = "0:00";
       if (model.startedAt) {
         time = clock((model.solvedAt && model.solvedAt > model.startedAt ? model.solvedAt : Date.now()) - model.startedAt);
       }

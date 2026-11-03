@@ -121,7 +121,7 @@
   function blank()          { enqueue(el("div", "line", " ")); }
   function rule()           { enqueue(el("div", "rule")); }
   function sect(text)       { enqueue(el("div", "sect", "== " + text.toUpperCase() + " ==")); }
-  function item(text)       { enqueue(el("div", "li", "- " + text)); }
+  function item(text)       { enqueue(el("div", "li", "+ " + text)); }
 
   /* Starts a framed page: a bordered panel with the title cut into the
      top edge (like a flight console window). Everything printed after
@@ -278,11 +278,11 @@
      ---------------------------------------------------------------- */
   const LOAD_LINES = [
     "QUERYING COGITATOR ARCHIVE",
-    "DECRYPTING DATA-STACK",
+    "DECRYPTING DATA STACK",
     "ROUTING THROUGH NOOSPHERE RELAY",
     "SCRUBBING CORRUPTED SECTORS",
     "SPINNING UP MEMORY DRUMS",
-    "RE-SEATING DATA CABLES",
+    "RE SEATING DATA CABLES",
     "AWAITING MACHINE SPIRIT CONSENT"
   ];
 
@@ -302,19 +302,19 @@
       case dossier:   return "OPERATOR DOSSIER";
       case projects:  return "FABRICATION RECORDS";
       case project:   return "RECORD: " + PROJECTS[args[0]].name;
-      case logs:      return "DATA-LOGS";
-      case logIndex:  return "DATA-LOGS // " + BLOGS[args[0]].name;
+      case logs:      return "DATA LOGS";
+      case logIndex:  return "DATA LOGS // " + BLOGS[args[0]].name;
       case readLog:   return "LOG " + (args[1] + 1) + ": " + BLOGS[args[0]].posts[args[1]].title;
-      case videos:    return "PICT-RECORDINGS";
-      case videoList: return "PICT-FEED // " + VIDEOS[args[0]].name;
+      case videos:    return "PICT RECORDINGS";
+      case videoList: return "PICT FEED // " + VIDEOS[args[0]].name;
       case games:     return "SIMULATIONS";
       case game:      return "SIMULATION: " + GAMES[args[0]].name;
       case service:   return "SERVICE RECORD";
-      case vox:       return "VOX-CHANNELS";
+      case vox:       return "VOX CHANNELS";
       case status:    return "VESSEL STATUS";
       case shipArea:  return "SECTION: " + (Ship.systems.find(function (s) { return s.id === args[0]; }) || { name: "" }).name;
       case help:      return "COMMAND LITANY";
-      default:        return "DATA-STACK";
+      default:        return "DATA STACK";
     }
   }
 
@@ -584,7 +584,7 @@
     const t = telemetry();
     tele.body.appendChild(t.el);
 
-    const stacks = panelBox("DATA-STACKS", "m-menu");
+    const stacks = panelBox("DATA STACKS", "m-menu");
 
     const cw = panelBox("CAUTION & WARNING", "m-cw");
     const faults = window.Ship ? Ship.systems.filter(function (x) { return x.status !== "ok"; }) : [];
@@ -599,9 +599,9 @@
     const newest = BLOGS.tech && BLOGS.tech.posts.length ? BLOGS.tech.posts[BLOGS.tech.posts.length - 1].date : "";
     const vids = Object.keys(VIDEOS).reduce(function (n, k) { return n + VIDEOS[k].videos.length; }, 0);
     src.body.appendChild(kv("ARCHIVE", "ONLINE", "[LIVE]"));
-    src.body.appendChild(kv("DATA-LOGS", posts + " ENTRIES", newest ? "[" + newest.toUpperCase() + "]" : ""));
+    src.body.appendChild(kv("DATA LOGS", posts + " ENTRIES", newest ? "[" + newest.toUpperCase() + "]" : ""));
     src.body.appendChild(kv("RECORDS", Object.keys(PROJECTS).length + " FILED", ""));
-    src.body.appendChild(kv("PICT-FEEDS", vids ? vids + " FEEDS" : "NONE", vids ? "" : "[PENDING]", vids ? "" : "dim"));
+    src.body.appendChild(kv("PICT FEEDS", vids ? vids + " FEEDS" : "NONE", vids ? "" : "[PENDING]", vids ? "" : "dim"));
     src.body.appendChild(kv("SIMULATIONS", GAMES.length + " LOADED", ""));
     src.body.appendChild(kv("VOX CH.9", "NO DATA", "[UNK]", "alert"));
 
@@ -638,14 +638,14 @@
     enqueue(function () { t.start(); }, 0);
 
     into(stacks.body, function () {
-      para("Personal data-stacks of " + PROFILE.name + ". The crew is gone. The archive is intact.", "dim");
+      para("Personal data stacks of " + PROFILE.name + ". The crew is gone. The archive is intact.", "dim");
       option(1, "OPERATOR DOSSIER",    function () { go(dossier); },  "about me");
       option(2, "FABRICATION RECORDS", function () { go(projects); }, "projects");
-      option(3, "DATA-LOGS",           function () { go(logs); },     "blog");
-      option(4, "PICT-RECORDINGS",     function () { go(videos); },   "videos");
+      option(3, "DATA LOGS",           function () { go(logs); },     "blog");
+      option(4, "PICT RECORDINGS",     function () { go(videos); },   "videos");
       option(5, "SIMULATIONS",         function () { go(games); },    "games");
       option(6, "SERVICE RECORD",      function () { go(service); },  "resume");
-      option(7, "VOX-CHANNELS",        function () { go(vox); },      "contact");
+      option(7, "VOX CHANNELS",        function () { go(vox); },      "contact");
       blank();
       line("Click an option or type its number. HELP lists all commands.", "dim");
     });
@@ -656,14 +656,14 @@
     line(dots("DESIGNATION") + PROFILE.name);
     line(dots("FUNCTION") + PROFILE.title);
     line(dots("LAST KNOWN LOC") + PROFILE.location);
-    line(dots("PRIOR SERVICE") + "US Navy, Master-at-Arms, 8 years");
+    line(dots("PRIOR SERVICE") + "US Navy, Master at Arms, 8 years");
     blank();
     PROFILE.intro.forEach(function (p) { para(p); });
     blank();
     option(1, "FABRICATION RECORDS", function () { go(projects); }, "projects");
-    option(2, "DATA-LOGS",           function () { go(logs); },     "blog");
+    option(2, "DATA LOGS",           function () { go(logs); },     "blog");
     option(3, "SERVICE RECORD",      function () { go(service); },  "resume");
-    option(4, "VOX-CHANNELS",        function () { go(vox); },      "contact");
+    option(4, "VOX CHANNELS",        function () { go(vox); },      "contact");
     backOption();
   }
 
@@ -718,7 +718,7 @@
 
   /* ---------- Blog (data-logs) ---------- */
   function logs() {
-    header("Data-Logs // Blog");
+    header("Data Logs // Blog");
     para("Writeups on real tech problems I've solved, and LeetCode problems worth explaining.");
     blank();
     Object.keys(BLOGS).forEach(function (c, i) {
@@ -732,7 +732,7 @@
 
   function logIndex(c) {
     const cat = BLOGS[c];
-    header("Data-Logs // " + cat.name);
+    header("Data Logs // " + cat.name);
     if (cat.description) { para(cat.description, "dim"); }
     if (!cat.posts.length) {
       line("NO ENTRIES RECOVERED FROM THIS SECTOR. CHECK BACK LATER.", "alert");
@@ -750,7 +750,7 @@
   function readLog(c, i) {
     const cat = BLOGS[c];
     const p = cat.posts[i];
-    header("Data-Logs // " + cat.name + " // " + (i + 1) + " of " + cat.posts.length);
+    header("Data Logs // " + cat.name + " // " + (i + 1) + " of " + cat.posts.length);
     enqueue(el("div", "line title", p.title));
     if (p.subtitle) { line(p.subtitle, "dim"); }
     line([p.date].concat(p.tags || []).join("  |  "), "dim");
@@ -781,7 +781,7 @@
 
   /* ---------- Videos (pict-recordings) ---------- */
   function videos() {
-    header("Pict-Recordings // Videos");
+    header("Pict Recordings // Videos");
     Object.keys(VIDEOS).forEach(function (c, i) {
       const n = VIDEOS[c].videos.length;
       option(i + 1, VIDEOS[c].name.toUpperCase(), function () { go(videoList, [c]); },
@@ -793,10 +793,10 @@
 
   function videoList(c) {
     const cat = VIDEOS[c];
-    header("Pict-Recordings // " + cat.name);
+    header("Pict Recordings // " + cat.name);
     if (cat.description) { para(cat.description, "dim"); }
     if (!cat.videos.length) {
-      line("NO PICT-RECORDINGS FOUND. TRANSMISSIONS PENDING.", "alert");
+      line("NO PICT RECORDINGS FOUND. TRANSMISSIONS PENDING.", "alert");
     }
     cat.videos.forEach(function (v) {
       enqueue(el("div", "line title", v.title));
@@ -942,7 +942,7 @@
   }
 
   function vox() {
-    header("Vox-Channels // Contact");
+    header("Vox Channels // Contact");
     para("Vox relay is functional. Messages will reach the operator.");
     blank();
     linkLine(dots("EMAIL"), "mailto:" + PROFILE.email, PROFILE.email);
@@ -1004,7 +1004,7 @@
       }
       enqueue(scene(sys, Ship.systems));
     } else {
-      line("NO PICT-FEED FROM THIS SECTION YET. AREA SURVEY PENDING.", "dim");
+      line("NO PICT FEED FROM THIS SECTION YET. AREA SURVEY PENDING.", "dim");
     }
     blank();
     const next = list[(i + 1) % list.length];
@@ -1020,11 +1020,11 @@
     ["BACK  or 0",  "previous screen (ESC also works)"],
     ["ABOUT",       "operator dossier"],
     ["PROJECTS",    "fabrication records"],
-    ["BLOG",        "data-logs (also: BLOG TECH, BLOG LEETCODE)"],
-    ["VIDEOS",      "pict-recordings"],
+    ["BLOG",        "data logs (also: BLOG TECH, BLOG LEETCODE)"],
+    ["VIDEOS",      "pict recordings"],
     ["GAMES",       "simulations (DOOM, CUBE, HANGMAN launch directly)"],
     ["RESUME",      "service record"],
-    ["CONTACT",     "vox-channels"],
+    ["CONTACT",     "vox channels"],
     ["STATUS",      "vessel status"],
     ["CLEAR",       "purge the screen"],
     ["THEME",       "cycle display colors (THEME LIST for names)"],
@@ -1054,8 +1054,8 @@
     ["(C) FORGE SHIPWRIGHTS. LICENSED TO: VIGIL OF ASH", "dim", 120],
     [" ", "", 80],
     ["MEMORY TEST ..................... 0065536K OK", "", 260],
-    ["DETECTING DATA-STACKS ........... 4 FOUND, 1 CORRUPTED", "", 260],
-    ["PICT-FEED ARRAY ................. 2 CHANNELS", "", 140],
+    ["DETECTING DATA STACKS ........... 4 FOUND, 1 CORRUPTED", "", 260],
+    ["PICT FEED ARRAY ................. 2 CHANNELS", "", 140],
     [" ", "", 60],
     ["INVOKING RITE OF AWAKENING", "", 220],
     ["  + ANOINTING POWER COUPLINGS ... DONE", "dim", 200],
@@ -1064,7 +1064,7 @@
     [" ", "", 60],
     ["HULL INTEGRITY .................. 31%", "", 140],
     ["LIFE SIGNS ...................... 1 (UNKNOWN BOARDER)", "", 180],
-    ["WARNING: NON-STANDARD SIGNAL ON VOX CHANNEL 9. ORIGIN UNKNOWN.", "alert glitch", 420],
+    ["WARNING: NON STANDARD SIGNAL ON VOX CHANNEL 9. ORIGIN UNKNOWN.", "alert glitch", 420],
     [" ", "", 60],
     ["COGITATOR ONLINE. PRAISE BE.", "", 600]
   ];
@@ -1078,7 +1078,7 @@
     cancel();
     out.innerHTML = "";
     sink = null;
-    setPageTitle("BOOT // POWER-ON SELF TEST");
+    setPageTitle("BOOT // POWER ON SELF TEST");
     lightKey(null);
     autoScroll = true;
     menu = {};
@@ -1403,11 +1403,11 @@
      ---------------------------------------------------------------- */
   const TICKER = [
     ["DECK 4: PRESSURE SEAL FAILING", true],
-    ["SERVITOR 3-KAPPA: NO RESPONSE", false],
+    ["SERVITOR 3 KAPPA: NO RESPONSE", false],
     ["AUSPEX: UNKNOWN BIOSIGNS, AFT CARGO", true],
     ["REACTOR: STANDBY 4%", false],
     ["LAST CREW LOG: 1,207 DAYS AGO", false],
-    ["VOX CH.9: NON-STANDARD SIGNAL", true],
+    ["VOX CH.9: NON STANDARD SIGNAL", true],
     ["MACHINE SPIRIT: RESTLESS", false],
     ["GELLER FIELD: OFFLINE", true],
     ["INCENSE RESERVES: DEPLETED", false],

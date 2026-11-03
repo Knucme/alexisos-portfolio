@@ -24,7 +24,7 @@
       OS.say("rm: cannot remove: permission denied. The machine spirit protects its own.", "alert");
       return;
     }
-    ["/deck4", "/reactor", "/life-support", "/crew-logs", "/servitors", "/chapel", "/bridge"].forEach(function (d) {
+    ["/deck4", "/reactor", "/life_support", "/crew_logs", "/servitors", "/chapel", "/bridge"].forEach(function (d) {
       out("removing " + d + " ...", "dim", 170);
     });
     out("removing /home/alexis ...", "alert", 600);
@@ -41,9 +41,9 @@
       [
         "root:x:0:0:Captain Varro:/bridge:/bin/false          [DECEASED]",
         "navigator:x:1001:100:Lt. Okonkwo:/bridge:/bin/false   [DECEASED]",
-        "enginseer:x:1002:100:Magos Tel-9:/reactor:/bin/false  [DECEASED]",
+        "enginseer:x:1002:100:Magos Tel 9:/reactor:/bin/false  [DECEASED]",
         "medicae:x:1003:100:Sister Ilsa:/apothecarion:/bin/false [DECEASED]",
-        "servitor:x:1004:100:3-Kappa:/deck4:/bin/false         [NO RESPONSE]",
+        "servitor:x:1004:100:3 Kappa:/deck4:/bin/false         [NO RESPONSE]",
         "visitor:x:1337:1337:You:/home/visitor:/bin/cogitator  [ACTIVE]"
       ].forEach(function (l, i) { out(l, i === 5 ? "" : "dim", 90); });
       return;
@@ -133,7 +133,7 @@
   /* ---------------- vim (the trap) ---------------- */
   function vim(raw) {
     OS.echo(raw);
-    out("~", "dim"); out("~", "dim"); out("~        VIM - Vi IMproved (cogitator edition)", "dim");
+    out("~", "dim"); out("~", "dim"); out("~        VIM, Vi IMproved (cogitator edition)", "dim");
     out("~        type  :q!  to exit", "dim"); out("~", "dim");
     out("-- NORMAL --", "", 60);
     OS.trap({
@@ -168,7 +168,7 @@
      Password prompt. Input is masked, never echoed, and never saved. */
   OS.register("ssh", function (raw) {
     OS.echo(raw);
-    const target = args(raw)[0] || "visitor@vigil-7";
+    const target = args(raw)[0] || "visitor@vigil7";
     let tries = 0;
     out(target + "'s password:", "");
     OS.input.type = "password";
@@ -267,7 +267,7 @@
     out("SUBJECT ........ ALEXIS GONZALEZ", "", 120);
     out("BILLET ......... BACKEND / FULLSTACK DEVELOPER", "", 120);
     out("STATUS ......... APPROVED", "", 120);
-    out("ROUTING TO VOX-CHANNELS ...", "dim", 700);
+    out("ROUTING TO VOX CHANNELS ...", "dim", 700);
     OS.enqueue(function () { OS.goContact(); });
   }
   OS.register("hire", hire);
@@ -367,7 +367,7 @@
       img.alt = "";
       img.src = GM.image;
       img.onerror = function () {
-        img.replaceWith(el("div", "god-img-missing", "[ PICT-FEED OFFLINE: add " + GM.image + " ]"));
+        img.replaceWith(el("div", "god-img-missing", "[ PICT FEED OFFLINE: add " + GM.image + " ]"));
       };
       frame.appendChild(img);
     }

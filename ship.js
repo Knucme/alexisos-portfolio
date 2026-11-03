@@ -15,7 +15,7 @@
   const SHIP_SYSTEMS = [
     // Listed bow to stern; each area's number is its position in this list.
     { id: "bridge",  name: "BRIDGE",       status: "ok",      pct: 88, note: "COGITATOR ONLINE" },
-    { id: "vox",     name: "VOX ARRAY",    status: "damaged", pct: 23, note: "NON-STANDARD SIGNAL CH.9" },
+    { id: "vox",     name: "VOX ARRAY",    status: "damaged", pct: 23, note: "NON STANDARD SIGNAL CH.9" },
     { id: "prow",    name: "PROW ARMOR",   status: "ok",      pct: 66, note: "INTACT" },
     { id: "life",    name: "LIFE SUPPORT", status: "damaged", pct: 37, note: "ON RESERVE POWER" },
     { id: "deck4",   name: "DECK 4",       status: "damaged", pct: 12, note: "PRESSURE SEAL FAILING" },
@@ -262,7 +262,7 @@
     grid.appendChild(right);
     wrap.appendChild(grid);
 
-    wrap.appendChild(el("div", "ship-foot", "RECEIVING: AUSPEX SWEEP 4471-K  //  " + bad.length + " FAULTS ACTIVE"));
+    wrap.appendChild(el("div", "ship-foot", "RECEIVING: AUSPEX SWEEP 4471K  //  " + bad.length + " FAULTS ACTIVE"));
     return wrap;
   }
 
