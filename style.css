@@ -1,4 +1,32 @@
 /* ===================================================================
+   DISPLAY FONTS (in /fonts)
+     PROCIRCUIT  - headings: page titles, panel titles, section heads, page keys
+     Orbitronio  - the brand: ALEXIS OS and the ship name
+     Nightcore   - one gritty accent: the operator name on MASTER
+   Body text stays VT323 so the terminal stays readable.
+   unicode-range limits each font to the characters it draws well;
+   anything else (slashes, digits in Nightcore, %) falls back to VT323.
+   =================================================================== */
+@font-face {
+  font-family: "Procircuit";
+  src: url("fonts/procircuit.woff2") format("woff2");
+  font-display: swap;
+  unicode-range: U+0020-0024, U+0026-002E, U+0030-007E;   /* no % or / */
+}
+@font-face {
+  font-family: "Orbitronio";
+  src: url("fonts/orbitronio.woff2") format("woff2");
+  font-display: swap;
+  unicode-range: U+0020, U+0030-0039, U+0041-005A, U+0061-007A;
+}
+@font-face {
+  font-family: "Nightcore";
+  src: url("fonts/nightcore.woff2") format("woff2");
+  font-display: swap;
+  unicode-range: U+0020, U+0041-005A, U+0061-007A;
+}
+
+/* ===================================================================
    AlexisOS // Cogitator Terminal - style.css
    Amber phosphor CRT: scanlines, glow, vignette, slight flicker.
    Inspired by DEC VT-series and IBM 3270 terminals, dressed up as a
@@ -15,6 +43,9 @@
   --alert:       #ff5a2a;   /* warnings, errors, xenos signals */
   --glow:        0 0 2px rgba(255, 176, 0, 0.75), 0 0 9px rgba(255, 140, 0, 0.32);
   --font:        "VT323", "IBM Plex Mono", "Courier New", monospace;
+  --font-head:   "Procircuit", "VT323", monospace;
+  --font-brand:  "Orbitronio", "VT323", monospace;
+  --font-grunge: "Nightcore", "VT323", monospace;
 }
 
 * { box-sizing: border-box; }
@@ -1538,3 +1569,35 @@ body.theme-retrowave:not(.red-alert):not(.green-mode) .emblem { filter: none; }
 .ship-sec.static { cursor: default; }
 .sp-row.static { cursor: default; }
 .sp-row.static:hover { outline: none; }
+
+
+/* ---------- Display fonts applied ---------- */
+.tb-title, .page-title, .panel-title, .sp-title, .sect, .bp-bay-title,
+.dash-title, .gh-h, #fkeys button {
+  font-family: var(--font-head);
+  letter-spacing: 0.06em;
+}
+/* PROCIRCUIT draws small for its size, so these run larger than VT323 */
+.tb-title { font-size: 1.6em; letter-spacing: 0.12em; }
+.page-title.line.h { font-size: 1.3em; }
+.panel-title, .sp-title { font-size: 1.1em; }
+.sect { font-size: 1.2em; }
+.gh-h { font-size: 1.05em; }
+#fkeys button { font-size: 19px; letter-spacing: 0.04em; }
+#fkeys button b { font-family: var(--font); font-size: 16px; }
+
+.brand, .ship-name {
+  font-family: var(--font-brand);
+  letter-spacing: 0.04em;
+}
+.brand { font-size: 1.05em; }
+.brand-sep { margin: 0 2px; }
+
+.op-name {
+  font-family: var(--font-grunge);
+  font-size: 1.7em;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+}
+@media (max-width: 1150px) and (min-width: 701px) { #fkeys button { font-size: 16px; } }
+@media (max-width: 700px) { #fkeys button { font-size: 15px; } .tb-title { font-size: 1.2em; } }
