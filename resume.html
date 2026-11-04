@@ -14,10 +14,13 @@
   <link rel="icon" href="images/robot-icon.svg" type="image/svg+xml" />
   <link rel="icon" href="images/robot-icon.png" type="image/png" sizes="64x64" />
   <link rel="apple-touch-icon" href="images/apple-touch-icon.png" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet" />
   <style>
+    @font-face {
+      font-family: "IBM Plex Mono";
+      src: url("fonts/ibm-plex-mono-400.woff2") format("woff2");
+      font-weight: 400;
+      font-display: swap;
+    }
     :root {
       --amber: #ffb000;
       --amber-dim: #a86f00;
@@ -32,7 +35,7 @@
       flex-direction: column;
       background: var(--bg);
       color: var(--amber);
-      font-family: "VT323", "Courier New", monospace;
+      font-family: "IBM Plex Mono", "Menlo", "Consolas", monospace;
       text-shadow: var(--glow);
     }
     header {
@@ -43,7 +46,7 @@
       padding: 8px 18px;
       border-bottom: 1px solid var(--amber-faint);
       background: rgba(255, 176, 0, 0.05);
-      font-size: 20px;
+      font-size: 15px;
       letter-spacing: 0.05em;
     }
     header a {
@@ -59,8 +62,8 @@
       margin: 48px auto;
       padding: 18px 24px;
       border: 3px double var(--amber-dim);
-      font-size: 21px;
-      line-height: 1.35;
+      font-size: 15px;
+      line-height: 1.45;
     }
     .missing h2 { margin-top: 0; font-weight: normal; letter-spacing: 0.06em; }
     .missing code { color: var(--bg); background: var(--amber-dim); padding: 0 6px; text-shadow: none; font-family: inherit; }

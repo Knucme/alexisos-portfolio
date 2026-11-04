@@ -764,7 +764,7 @@
       drawSmoke();
 
       // labels
-      ctx.font = "7px monospace";
+      ctx.font = "6px \"IBM Plex Mono\", monospace";
       ctx.fillStyle = "rgba(120,190,255,0.8)"; ctx.fillText("PORT // STALLED", 70, 20);
       ctx.fillStyle = "rgba(255,90,60," + (Math.sin(t * 6) > 0 ? 0.9 : 0.4) + ")"; ctx.fillText("STBD // OFFLINE", 70, 80);
       frame++;
@@ -894,7 +894,7 @@
       }
       // status lamp and pod number
       px(x + 3, y + PH - 10, 2, 2, P.state === "sealed" ? "#7dffb0" : P.state === "failed" ? (failFlash ? "#ff3a2a" : "#4a1010") : "#30404f");
-      ctx.font = "6px monospace";
+      ctx.font = "5px \"IBM Plex Mono\", monospace";
       ctx.fillStyle = "#3b4757";
       ctx.fillText(String(P.n).padStart(2, "0"), x + 9, y + PH - 8);
       // cold light spill under the sealed pod
@@ -1106,7 +1106,7 @@
       const dx = (t * 6) % (W + 40) - 20, dy = 60 + Math.sin(t * 0.4) * 6;
       ctx.save(); ctx.translate(dx, dy); ctx.rotate(t * 0.8); px(-3, -1, 6, 2, "#6b7080"); px(-1, -3, 2, 6, "#4d5160"); ctx.restore();
 
-      ctx.font = "7px monospace";
+      ctx.font = "6px \"IBM Plex Mono\", monospace";
       ctx.fillStyle = "rgba(120,255,170,0.75)"; ctx.fillText("CH.9", 8, 22);
       frame++;
       if (!reduce) { raf = requestAnimationFrame(draw); }

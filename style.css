@@ -3,10 +3,23 @@
      PROCIRCUIT  - headings: page titles, panel titles, section heads, page keys
      Orbitronio  - the brand: ALEXIS OS and the ship name
      Nightcore   - one gritty accent: the operator name on MASTER
-   Body text stays VT323 so the terminal stays readable.
+     IBM Plex Mono - all body text (OFL license, self-hosted)
    unicode-range limits each font to the characters it draws well;
-   anything else (slashes, digits in Nightcore, %) falls back to VT323.
+   anything else (slashes, digits in Nightcore, %) falls back to Plex Mono.
+   Block and arrow symbols Plex lacks fall back to the system monospace.
    =================================================================== */
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("fonts/ibm-plex-mono-400.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("fonts/ibm-plex-mono-600.woff2") format("woff2");
+  font-weight: 600;
+  font-display: swap;
+}
 @font-face {
   font-family: "Procircuit";
   src: url("fonts/procircuit.woff2") format("woff2");
@@ -42,10 +55,10 @@
   --bg:          #0a0703;   /* screen background */
   --alert:       #ff5a2a;   /* warnings, errors, xenos signals */
   --glow:        0 0 2px rgba(255, 176, 0, 0.75), 0 0 9px rgba(255, 140, 0, 0.32);
-  --font:        "VT323", "IBM Plex Mono", "Courier New", monospace;
-  --font-head:   "Procircuit", "VT323", monospace;
-  --font-brand:  "Orbitronio", "VT323", monospace;
-  --font-grunge: "Nightcore", "VT323", monospace;
+  --font:        "IBM Plex Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
+  --font-head:   "Procircuit", "IBM Plex Mono", monospace;
+  --font-brand:  "Orbitronio", "IBM Plex Mono", monospace;
+  --font-grunge: "Nightcore", "IBM Plex Mono", monospace;
 }
 
 * { box-sizing: border-box; }
@@ -112,7 +125,7 @@ body {
   align-items: center;
   gap: 18px;
   padding: 6px 18px;
-  font-size: 19px;
+  font-size: 14px;
   letter-spacing: 0.05em;
   border-bottom: 1px solid var(--amber-faint);
   background: rgba(255, 176, 0, 0.05);
@@ -152,7 +165,7 @@ body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  font-size: 22px;
+  font-size: 15px;
   line-height: 1.25;
   padding-right: 8px;
   scrollbar-color: var(--amber-dim) transparent;
@@ -558,7 +571,7 @@ a:focus-visible {
   gap: 1ch;
   padding-top: 10px;
   border-top: 1px solid var(--amber-faint);
-  font-size: 22px;
+  font-size: 15px;
 }
 
 #prompt { white-space: nowrap; }
@@ -636,13 +649,13 @@ a:focus-visible {
 
 /* ---------- Phones / narrow screens ---------- */
 @media (max-width: 700px) {
-  #statusbar { font-size: 16px; padding: 5px 12px; }
+  #statusbar { font-size: 12px; padding: 5px 12px; }
   .sb-ticker { display: none; }
   #statusbar { justify-content: space-between; }
   #screen    { padding: 10px 12px 8px; border: 0; box-shadow: none; }
-  #output    { font-size: 18px; }
-  #prompt-line { font-size: 18px; }
-  #prompt    { font-size: 15px; }
+  #output    { font-size: 13px; }
+  #prompt-line { font-size: 13px; }
+  #prompt    { font-size: 12px; }
   .emblem    { display: none; }
   .dash      { padding: 8px 10px 6px; }
   .dash-mid  { grid-template-columns: 1fr; justify-items: center; }
@@ -720,7 +733,7 @@ body.red-alert .cc     { background: rgba(255, 40, 30, 0.05); }
 }
 
 @media (max-width: 700px) {
-  .sb-condition { font-size: 14px; }
+  .sb-condition { font-size: 11px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -868,8 +881,8 @@ body.green-mode .emblem { filter: hue-rotate(90deg) saturate(1.3) drop-shadow(0 
 .ship-label text {
   fill: var(--amber);
   font-family: var(--font);
-  font-size: 12.5px;
-  letter-spacing: 0.06em;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
 }
 .ship-label.damaged text, .ship-label.offline text { fill: var(--alert); }
 .ship-label .leader { stroke: var(--amber-dim); stroke-width: 1; stroke-dasharray: 2 3; }
@@ -1356,7 +1369,7 @@ body.green-mode .emblem { filter: hue-rotate(90deg) saturate(1.3) drop-shadow(0 
   text-align: center;
   padding: 3px 18px;
   border-top: 2px solid var(--amber-dim);
-  font-size: 18px;
+  font-size: 13px;
   letter-spacing: 0.08em;
   white-space: nowrap;
   overflow: hidden;
@@ -1395,7 +1408,7 @@ body.green-mode .emblem { filter: hue-rotate(90deg) saturate(1.3) drop-shadow(0 
   #statusbar .sb-left .dim { display: none; }
   #screen { padding: 8px 10px 6px; }
   .page { padding: 16px 10px 10px; }
-  #statusline { font-size: 14px; }
+  #statusline { font-size: 11px; }
   #fkeys { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   #fkeys button { font-size: 14px; border-bottom: 1px solid var(--amber-faint); }
   .m-tele .wire-robot { width: 200px; height: 200px; }
@@ -1533,16 +1546,16 @@ body.theme-retrowave:not(.red-alert):not(.green-mode) .emblem { filter: none; }
 .dp-furn { fill: none; stroke: var(--amber-dim); stroke-width: 1; }
 .dp-x { opacity: 0.5; }
 .dp-missing { stroke: var(--alert); stroke-dasharray: 3 3; animation: dp-flash 1s steps(2) infinite; }
-.dp-label { fill: var(--amber); font-family: var(--font); font-size: 15px; letter-spacing: 0.08em; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
-.dp-tag { fill: var(--alert); font-family: var(--font); font-size: 12px; letter-spacing: 0.08em; text-anchor: middle; pointer-events: none; }
+.dp-label { fill: var(--amber); font-family: var(--font); font-size: 12px; letter-spacing: 0.08em; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.dp-tag { fill: var(--alert); font-family: var(--font); font-size: 10px; letter-spacing: 0.08em; text-anchor: middle; pointer-events: none; }
 .dp-room.dmg .dp-wall { stroke: var(--alert); fill: rgba(255, 60, 40, 0.08); animation: dp-flash 1.1s steps(2) infinite; animation-delay: inherit; }
 .dp-room.sealed .dp-wall { stroke: var(--amber-dim); stroke-dasharray: 8 5; fill: rgba(0, 0, 0, 0.35); }
 .dp-room.sealed .dp-label { fill: var(--amber-dim); }
 .dp-door { stroke: var(--bg); stroke-width: 5; }
 .dp-breach { fill: none; stroke: var(--alert); stroke-width: 2.5; animation: dp-flash 0.7s steps(2) infinite; }
-.dp-callout { fill: var(--alert); font-family: var(--font); font-size: 13px; text-anchor: middle; letter-spacing: 0.08em; }
+.dp-callout { fill: var(--alert); font-family: var(--font); font-size: 11px; text-anchor: middle; letter-spacing: 0.08em; }
 .dp-bio { fill: var(--alert); filter: drop-shadow(0 0 4px var(--alert)); animation: dp-bio 3.2s ease-in-out infinite alternate; }
-.dp-legend text { fill: var(--amber-dim); font-family: var(--font); font-size: 12px; letter-spacing: 0.1em; }
+.dp-legend text { fill: var(--amber-dim); font-family: var(--font); font-size: 10px; letter-spacing: 0.1em; }
 .dp-info { margin-top: 8px; }
 .dp-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 14px; margin-top: 8px; font-size: 0.9em; }
 .dp-row { display: flex; justify-content: space-between; border-bottom: 1px dashed var(--amber-faint); }
@@ -1577,14 +1590,14 @@ body.theme-retrowave:not(.red-alert):not(.green-mode) .emblem { filter: none; }
   font-family: var(--font-head);
   letter-spacing: 0.06em;
 }
-/* PROCIRCUIT draws small for its size, so these run larger than VT323 */
+/* PROCIRCUIT draws small for its size, so these run larger than body text */
 .tb-title { font-size: 1.6em; letter-spacing: 0.12em; }
 .page-title.line.h { font-size: 1.3em; }
 .panel-title, .sp-title { font-size: 1.1em; }
 .sect { font-size: 1.2em; }
 .gh-h { font-size: 1.05em; }
 #fkeys button { font-size: 19px; letter-spacing: 0.04em; }
-#fkeys button b { font-family: var(--font); font-size: 16px; }
+#fkeys button b { font-family: var(--font); font-size: 12px; }
 
 .brand, .ship-name {
   font-family: var(--font-brand);

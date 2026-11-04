@@ -296,7 +296,7 @@
       ctx.fillStyle = "rgba(0, 0, 0, 0.12)";
       ctx.fillRect(0, 0, c.width, c.height);
       ctx.fillStyle = color;
-      ctx.font = size + "px VT323, monospace";
+      ctx.font = size + "px \"IBM Plex Mono\", monospace";
       for (let i = 0; i < cols; i++) {
         ctx.fillText(glyphs[Math.floor(Math.random() * glyphs.length)], i * size, drops[i] * size);
         if (drops[i] * size > c.height && Math.random() > 0.97) { drops[i] = 0; }
@@ -415,7 +415,7 @@
       ctx.beginPath();
       ctx.rect(0, top, W, bottom - top);
       ctx.clip();
-      ctx.font = size + "px VT323, monospace";
+      ctx.font = size + "px \"IBM Plex Mono\", monospace";
       for (let i = 0; i < cols; i++) {
         const x = i * size;
         if (x + size > left && x < right) { continue; }     // keep the terminal clear
