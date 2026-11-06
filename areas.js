@@ -117,7 +117,8 @@
      Top: the auspex screen across the full width, like a windshield.
      Under it: the master caution lights, then the control deck:
      mostly knobs and switches, very few buttons. */
-  function bridge(sys, all) {
+  function bridge(sys, all, opts) {
+    const done = (opts && opts.done) || function () {};
     const rand = seeded(7);
     const panel = el("div", "bp");
     panel.setAttribute("aria-label", "Bridge main control console");
@@ -143,6 +144,12 @@
     const ann = el("div", "bp-anns row");
     all.forEach(function (s) { ann.appendChild(annunciator(s)); });
     cautionWrap.appendChild(ann);
+    const gmsg = el("div", "bp-gmsg", "");
+    cautionWrap.appendChild(gmsg);
+    function gellerMsg(text, kind) {
+      gmsg.className = "bp-gmsg " + (kind || "");
+      gmsg.textContent = text;
+    }
     panel.appendChild(cautionWrap);
 
     // Control deck
@@ -175,11 +182,38 @@
     center.appendChild(kC);
     const tg2 = el("div", "bp-row");
     ["SHLD 1", "SHLD 2", "GELLER", "LIGHTS", "GRAV", "DOORS"].forEach(function (t, i) {
-      const sw = toggle(t, i === 3 || i === 4);
+      let sw = toggle(t, i === 3 || i === 4);
       if (t === "GELLER") {                       // the Geller field is run from here
         const gf = all.find(function (x) { return x.id === "geller"; });
-        if (gf && gf.status !== "ok") { sw.classList.add("fault"); }
+        const online = gf && gf.status === "ok";
+        if (!online) { sw.classList.add("fault"); } else { sw.classList.add("up"); }
         sw.title = "Geller field: " + (gf ? gf.note : "");
+        sw.dataset.ctl = "geller";
+        // Replace the plain flip with the interlock check
+        const fresh = sw.cloneNode(true);
+        fresh.addEventListener("click", function (e) {
+          e.stopPropagation();
+          if (online) { gellerMsg("GELLER FIELD ALREADY STABLE.", "ok"); return; }
+          const missing = window.Ship ? Ship.missingFor("geller") : ["vox", "reactor"];
+          if (missing.length) {
+            // flick up, then snap back down: the interlock refuses
+            fresh.classList.add("up");
+            setTimeout(function () { fresh.classList.remove("up"); }, 350);
+            const names = missing.map(function (r) {
+              const x = all.find(function (s) { return s.id === r; });
+              return x ? x.name : r.toUpperCase();
+            });
+            gellerMsg("INTERLOCK: " + names.join(" AND ") + " MUST BE ONLINE FIRST.", "bad");
+            return;
+          }
+          fresh.classList.add("up");
+          fresh.classList.remove("fault");
+          if (window.Ship) { Ship.repair("geller"); }
+          gellerMsg("GELLER FIELD RISING... FIELD STABLE. THE WARP CAN'T TOUCH US NOW.", "ok");
+          panel.classList.add("bp-won");
+          setTimeout(done, 2600);
+        });
+        sw = fresh;
       }
       tg2.appendChild(sw);
     });
@@ -952,7 +986,7 @@
     wrap.appendChild(canvas);
 
     const reads = el("div", "rx-reads");
-    [["DISH A", "TRACKING", "warn"], ["DISH B", "CRACKED", "crit"], ["MAST 2", "SEVERED", "crit"],
+    [["DISH A", sys && sys.status === "ok" ? "LOCKED" : "TRACKING", sys && sys.status === "ok" ? "" : "warn"], ["DISH B", "CRACKED", "crit"], ["MAST 2", "SEVERED", "crit"],
      ["MASTS 1, 3", "NOMINAL", ""], ["CH.9 SIGNAL", "-87 DB", "warn"], ["ORIGIN", "UNKNOWN", "crit"]].forEach(function (r) {
       const d = el("div", "rx-read " + r[2]);
       d.appendChild(el("span", "rx-l", r[0]));

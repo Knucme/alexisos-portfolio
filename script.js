@@ -1015,10 +1015,24 @@
         if (gf) {
           line(dots("GELLER FIELD", 14) + (gf.status === "ok" ? "ONLINE" : "OFFLINE") + ", " + gf.pct + "%. CONTROLLED FROM THIS CONSOLE",
                gf.status === "ok" ? "" : "alert");
+          if (gf.status !== "ok") {
+            // Interlock: what has to be fixed before the GELLER switch works
+            const req = Ship.requires.geller || [];
+            const parts = req.map(function (r) {
+              const x = Ship.systems.find(function (s) { return s.id === r; });
+              return (x ? x.name : r.toUpperCase()) + (Ship.isRepaired(r) ? " [ONLINE]" : " [OFFLINE]");
+            });
+            line(dots("INTERLOCK", 14) + parts.join("   "), Ship.missingFor("geller").length ? "dim" : "");
+          }
         }
         blank();
       }
-      enqueue(scene(sys, Ship.systems));
+      enqueue(scene(sys, Ship.systems, { done: function () { render(); } }));
+      // Repair puzzles live under their area's scene
+      if (window.Repairs && Repairs[id]) {
+        blank();
+        enqueue(Repairs[id](sys, { done: function () { render(); } }));
+      }
     } else {
       line("NO PICT FEED FROM THIS SECTION YET. AREA SURVEY PENDING.", "dim");
     }
@@ -1226,6 +1240,12 @@
     "cls":      function () { COMMANDS.clear(); },
     "reboot":   function () { boot(true); },
     "theme":    function (raw) { themeCommand(raw); },
+    // Hidden: undo all ship repairs (handy for testing the puzzles)
+    "reset repairs": function (raw) {
+      echo(raw);
+      if (window.Ship) { Ship.resetRepairs(); }
+      say("REPAIR LOG WIPED. THE SHIP IS BROKEN AGAIN.", "alert");
+    },
     "themes":   function (raw) { themeCommand("theme list"); },
     "boot":     function () { boot(true); },
 

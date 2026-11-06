@@ -268,5 +268,52 @@
     return wrap;
   }
 
-  window.Ship = { systems: SHIP_SYSTEMS, render: render, hull: hull };
+  /* ---------- Repairs (the easter egg hunt) ----------
+     A repaired system is saved in this browser, so the ship stays fixed
+     between visits. REPAIRS lists what each fix sets the system to. */
+  const REPAIRS = {
+    vox:     { status: "ok", pct: 100, note: "LOCK HOLDING. SIGNAL CLEAR" },
+    reactor: { status: "ok", pct: 100, note: "CORES STABLE. FULL OUTPUT" },
+    geller:  { status: "ok", pct: 100, note: "FIELD STABLE" }
+  };
+  /* Some repairs depend on others. The Geller field can only be raised
+     from the bridge once the vox array and the reactor are online. */
+  const REQUIRES = {
+    geller: ["vox", "reactor"]
+  };
+  const ORIGINAL = {};
+  SHIP_SYSTEMS.forEach(function (s) { ORIGINAL[s.id] = { status: s.status, pct: s.pct, note: s.note }; });
+  const KEY = "alexisos-repairs";
+
+  function saved() {
+    try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { return {}; }
+  }
+  function applyRepairs() {
+    const done = saved();
+    SHIP_SYSTEMS.forEach(function (s) {
+      const src = done[s.id] && REPAIRS[s.id] ? REPAIRS[s.id] : ORIGINAL[s.id];
+      s.status = src.status; s.pct = src.pct; s.note = src.note;
+    });
+  }
+  function repair(id) {
+    if (!REPAIRS[id]) { return; }
+    const done = saved();
+    done[id] = true;
+    try { localStorage.setItem(KEY, JSON.stringify(done)); } catch (e) { /* storage blocked */ }
+    applyRepairs();
+  }
+  function isRepaired(id) { return !!saved()[id]; }
+  /* Which prerequisites are still missing for a repair (empty = ready). */
+  function missingFor(id) {
+    return (REQUIRES[id] || []).filter(function (r) { return !isRepaired(r); });
+  }
+  function resetRepairs() {
+    try { localStorage.removeItem(KEY); } catch (e) { /* storage blocked */ }
+    applyRepairs();
+  }
+  applyRepairs();
+
+  window.Ship = { systems: SHIP_SYSTEMS, render: render, hull: hull,
+                  repair: repair, isRepaired: isRepaired, resetRepairs: resetRepairs,
+                  missingFor: missingFor, requires: REQUIRES };
 })();

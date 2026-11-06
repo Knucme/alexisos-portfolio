@@ -12,6 +12,7 @@
   - wireframe.js: rotating 3D wireframe robot on the main menu
   - ship.js     : STATUS screen ship schematic (damage map)
   - areas.js    : scenes for each ship area (bridge console, ...)
+  - repair.js   : ship repair puzzles (vox array: power + calibration)
   - cube.js     : Hex Cube puzzle (one side at a time, clickable squares)
   - hangman.js  : Hangman with a robot (words in content.js)
   - github.js   : live GitHub feed on the MASTER page (cached 10 min)
@@ -19,7 +20,7 @@
   - resume.html : full resume PDF viewer
   - legacy-xp/  : backup of the previous Windows XP-style site
 
-  CACHE NOTE: the ?v=53 on the CSS/JS links below forces browsers to
+  CACHE NOTE: the ?v=56 on the CSS/JS links below forces browsers to
   load fresh copies. Bump the number whenever you change those files.
 -->
 <html lang="en">
@@ -31,7 +32,7 @@
   <link rel="icon" href="images/robot-icon.svg" type="image/svg+xml" />
   <link rel="icon" href="images/robot-icon.png" type="image/png" sizes="64x64" />
   <link rel="apple-touch-icon" href="images/apple-touch-icon.png" />
-  <link rel="stylesheet" href="style.css?v=53" />
+  <link rel="stylesheet" href="style.css?v=56" />
 </head>
 <body>
   <div id="crt">
@@ -89,14 +90,15 @@
     </p>
   </noscript>
 
-  <script src="content.js?v=53"></script>
-  <script src="wireframe.js?v=53"></script>
-  <script src="ship.js?v=53"></script>
-  <script src="areas.js?v=53"></script>
-  <script src="cube.js?v=53"></script>
-  <script src="hangman.js?v=53"></script>
-  <script src="github.js?v=53"></script>
-  <script src="script.js?v=53"></script>
-  <script src="eggs.js?v=53"></script>
+  <script src="content.js?v=56"></script>
+  <script src="wireframe.js?v=56"></script>
+  <script src="ship.js?v=56"></script>
+  <script src="areas.js?v=56"></script>
+  <script src="repair.js?v=56"></script>
+  <script src="cube.js?v=56"></script>
+  <script src="hangman.js?v=56"></script>
+  <script src="github.js?v=56"></script>
+  <script src="script.js?v=56"></script>
+  <script src="eggs.js?v=56"></script>
 </body>
 </html>

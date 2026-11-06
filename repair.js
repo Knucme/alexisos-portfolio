@@ -1,0 +1,320 @@
+/* ===================================================================
+   AlexisOS - repair.js
+   Repair puzzles for the ship (the easter egg hunt). Each entry in
+   window.Repairs is function(system, { done }) that returns a panel.
+   Call done() after a successful repair so the page can redraw.
+
+   VOX ARRAY (area 2)
+   The warp storm wrecked most of the array. Two steps:
+     1. POWER: pull power cells out of the broken units (Dish B, Mast 2)
+        into the relay buffer, then feed them into Dish A until it has
+        the 6 cells it needs.
+     2. CALIBRATE: steer Dish A (azimuth, elevation, feed rate) until
+        the received signal matches the clean carrier wave, cos(x).
+        The signal bar climbs as the two waves line up; a full match
+        locks the channel and the Vox Array is repaired.
+   =================================================================== */
+(function () {
+  "use strict";
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) { e.className = cls; }
+    if (text != null) { e.textContent = text; }
+    return e;
+  }
+
+  function btn(text, cls, fn) {
+    const b = el("button", "opt rp-btn" + (cls ? " " + cls : ""), text);
+    b.type = "button";
+    b.addEventListener("click", function (e) { e.stopPropagation(); fn(); });
+    return b;
+  }
+
+  function cells(n, of) {
+    let s = "";
+    for (let i = 0; i < of; i++) { s += i < n ? "■" : "□"; }
+    return s;
+  }
+
+  /* ---------- VOX ARRAY ---------- */
+  function vox(sys, opts) {
+    const done = (opts && opts.done) || function () {};
+    const wrap = el("section", "panel rp");
+    wrap.appendChild(el("div", "panel-title", "VOX REPAIR PROTOCOL"));
+    const body = el("div", "panel-body");
+    wrap.appendChild(body);
+
+    // Already fixed: show the locked carrier and stop.
+    if (window.Ship && Ship.isRepaired("vox")) {
+      body.appendChild(el("div", "line rp-ok", "+++ CHANNEL LOCKED. VOX ARRAY RESTORED. +++"));
+      body.appendChild(el("div", "line dim", "Dish A is holding the carrier. The array can send and receive again."));
+      const mon = monitor();
+      body.appendChild(mon.el);
+      mon.set({ amp: 1, freq: 1, phase: 0 }, true);
+      return wrap;
+    }
+
+    body.appendChild(el("div", "para dim",
+      "The warp storm burned out most of the array. Dish A still turns, but it's starved for power. " +
+      "Pull cells from the dead units into the relay buffer, feed Dish A, then calibrate it to the carrier wave."));
+
+    /* ----- step 1: power diversion ----- */
+    const units = [
+      { id: "dishA", name: "DISH A", ok: true,  cells: 2, max: 6, need: 6 },
+      { id: "mast1", name: "MAST 1", ok: true,  cells: 3, max: 3 },
+      { id: "mast3", name: "MAST 3", ok: true,  cells: 2, max: 2 },
+      { id: "dishB", name: "DISH B", ok: false, cells: 3, max: 3 },
+      { id: "mast2", name: "MAST 2", ok: false, cells: 2, max: 2 }
+    ];
+    const BUFFER_MAX = 3;
+    let buffer = 0;
+
+    const powerBox = el("div", "rp-step");
+    powerBox.appendChild(el("div", "rp-h", "STEP 1  POWER DIVERSION"));
+    const grid = el("div", "rp-units");
+    powerBox.appendChild(grid);
+    const bufLine = el("div", "line rp-buffer");
+    powerBox.appendChild(bufLine);
+    const powerMsg = el("div", "line dim rp-msg", "Draw from a dead unit, then feed an operational one.");
+    powerBox.appendChild(powerMsg);
+    body.appendChild(powerBox);
+
+    /* ----- step 2: calibration ----- */
+    const calBox = el("div", "rp-step rp-cal locked");
+    calBox.appendChild(el("div", "rp-h", "STEP 2  CALIBRATE DISH A"));
+    const lockNote = el("div", "line alert rp-locknote", "LOCKED. DISH A NEEDS 6 POWER CELLS.");
+    calBox.appendChild(lockNote);
+    const mon = monitor();
+    calBox.appendChild(mon.el);
+
+    const ctrls = el("div", "rp-ctrls");
+    // Start well off target. Steps are chosen so the exact match is reachable.
+    const state = { amp: 1.7, freq: 1.75, phase: 105 };
+    const SPEC = [
+      { key: "phase", label: "AZIMUTH",   unit: "°", min: -180, max: 180, step: 15,   fmt: function (v) { return (v > 0 ? "+" : "") + v + "°"; } },
+      { key: "amp",   label: "ELEVATION", unit: "",       min: 0.2,  max: 2.0, step: 0.1,  fmt: function (v) { return v.toFixed(1); } },
+      { key: "freq",  label: "FEED RATE", unit: "",       min: 0.5,  max: 2.0, step: 0.25, fmt: function (v) { return v.toFixed(2); } }
+    ];
+    const sliders = [];
+    SPEC.forEach(function (sp) {
+      const row = el("label", "rp-ctrl");
+      row.appendChild(el("span", "rp-ctrl-l", sp.label));
+      const input = document.createElement("input");
+      input.type = "range"; input.min = sp.min; input.max = sp.max; input.step = sp.step;
+      input.value = state[sp.key];
+      input.disabled = true;
+      input.setAttribute("aria-label", sp.label);
+      const val = el("span", "rp-ctrl-v", sp.fmt(state[sp.key]));
+      input.addEventListener("input", function () {
+        state[sp.key] = parseFloat(input.value);
+        val.textContent = sp.fmt(state[sp.key]);
+        update();
+      });
+      input.addEventListener("click", function (e) { e.stopPropagation(); });
+      row.appendChild(input);
+      row.appendChild(val);
+      ctrls.appendChild(row);
+      sliders.push(input);
+    });
+    calBox.appendChild(ctrls);
+    const calMsg = el("div", "line dim rp-msg", "Match the live signal to the dashed carrier wave.");
+    calBox.appendChild(calMsg);
+    body.appendChild(calBox);
+
+    function powered() { return units[0].cells >= units[0].need; }
+
+    function drawUnits() {
+      grid.innerHTML = "";
+      units.forEach(function (u) {
+        const row = el("div", "rp-unit " + (u.ok ? "ok" : "dead"));
+        row.appendChild(el("span", "rp-name", u.name));
+        row.appendChild(el("span", "rp-state", u.ok ? "OPERATIONAL" : "BROKEN"));
+        row.appendChild(el("span", "rp-cells", cells(u.cells, u.max)));
+        if (u.ok) {
+          const full = u.cells >= u.max;
+          const b = btn(full ? "FULL" : "◂ FEED", "", function () {
+            if (buffer < 1 || u.cells >= u.max) { return; }
+            buffer--; u.cells++;
+            powerMsg.textContent = "1 CELL FED INTO " + u.name + ".";
+            if (u.id === "dishA" && powered()) { powerMsg.textContent = "DISH A FULLY POWERED. CALIBRATION UNLOCKED."; }
+            drawUnits(); unlock();
+          });
+          b.disabled = full || buffer < 1;
+          row.appendChild(b);
+        } else {
+          const b = btn(u.cells ? "DRAW ▸" : "DRAINED", "", function () {
+            if (u.cells < 1 || buffer >= BUFFER_MAX) {
+              if (buffer >= BUFFER_MAX) { powerMsg.textContent = "RELAY BUFFER FULL. FEED A UNIT FIRST."; }
+              return;
+            }
+            u.cells--; buffer++;
+            powerMsg.textContent = "1 CELL DRAWN FROM " + u.name + ".";
+            drawUnits();
+          });
+          b.disabled = u.cells < 1;
+          row.appendChild(b);
+        }
+        grid.appendChild(row);
+      });
+      bufLine.textContent = "RELAY BUFFER  " + cells(buffer, BUFFER_MAX) + "  " + buffer + "/" + BUFFER_MAX;
+    }
+
+    function unlock() {
+      const on = powered();
+      calBox.classList.toggle("locked", !on);
+      lockNote.style.display = on ? "none" : "";
+      sliders.forEach(function (s) { s.disabled = !on || locked; });
+      lockNote.textContent = "LOCKED. DISH A NEEDS 6 POWER CELLS (HAS " + units[0].cells + ").";
+      update();
+    }
+
+    let locked = false;
+    function update() {
+      const q = mon.set(state, false, !powered());
+      if (!powered() || locked) { return; }
+      if (q >= 0.98) {
+        locked = true;
+        sliders.forEach(function (s) { s.disabled = true; });
+        calMsg.className = "line rp-ok rp-msg";
+        calMsg.textContent = "+++ CARRIER LOCKED. VOX ARRAY RESTORED. +++";
+        wrap.classList.add("rp-won");
+        if (window.Ship) { Ship.repair("vox"); }
+        setTimeout(done, 2600);
+      } else if (q >= 0.8) {
+        calMsg.className = "line rp-msg"; calMsg.textContent = "CLOSE. FINE TUNE THE DISH.";
+      } else {
+        calMsg.className = "line dim rp-msg"; calMsg.textContent = "Match the live signal to the dashed carrier wave.";
+      }
+    }
+
+    drawUnits();
+    unlock();
+    return wrap;
+  }
+
+  /* ---------- Signal monitor (vitals-monitor style) ----------
+     Big readouts on the left, a scrolling scope on the right showing
+     the carrier wave cos(x) (dashed) and the live signal, and a
+     segmented signal bar underneath. set(state) returns quality 0..1. */
+  function monitor() {
+    const m = el("div", "rp-mon");
+    const top = el("div", "rp-mon-top");
+    const warn = el("div", "rp-mon-banner", "SIGNAL LOST. CARRIER NOT ACQUIRED.");
+    m.appendChild(warn);
+
+    const left = el("div", "rp-mon-left");
+    const big = el("div", "rp-big");
+    const bigVal = el("span", "rp-big-v", "0");
+    big.appendChild(el("span", "rp-big-l", "SIGNAL"));
+    big.appendChild(bigVal);
+    big.appendChild(el("span", "rp-big-u", "%"));
+    left.appendChild(big);
+    const snr = el("div", "rp-small", "SNR  0.0 DB");
+    const lock = el("div", "rp-small", "LOCK  SEARCHING");
+    left.appendChild(snr);
+    left.appendChild(lock);
+    top.appendChild(left);
+
+    const canvas = el("canvas", "rp-scope");
+    canvas.width = 480; canvas.height = 150;
+    canvas.setAttribute("role", "img");
+    canvas.setAttribute("aria-label", "Scope: dashed carrier wave cos x and the live signal");
+    top.appendChild(canvas);
+    m.appendChild(top);
+
+    const bar = el("div", "rp-bar");
+    const segs = [];
+    for (let i = 0; i < 24; i++) { const s = el("span", "rp-seg"); bar.appendChild(s); segs.push(s); }
+    m.appendChild(bar);
+
+    const ctx = canvas.getContext && canvas.getContext("2d");
+    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let cur = { amp: 1, freq: 1, phase: 0 }, quality = 0, dead = false, t0 = performance.now(), raf = 0, shown = false;
+
+    function qualityOf(s) {
+      // RMS difference between the live wave and cos(x) over two periods
+      let sum = 0; const N = 200;
+      for (let i = 0; i < N; i++) {
+        const x = i / N * 4 * Math.PI;
+        const d = s.amp * Math.cos(s.freq * x + s.phase * Math.PI / 180) - Math.cos(x);
+        sum += d * d;
+      }
+      const rms = Math.sqrt(sum / N);
+      return Math.max(0, Math.min(1, 1 - rms / 1.3));
+    }
+
+    function color(q) { return q >= 0.98 ? "#38ff7a" : q >= 0.6 ? "#ffcc33" : "#ff5a3c"; }
+
+    function draw(now) {
+      if (!ctx) { return; }
+      // Wait until the panel is on the page; stop once it has been removed.
+      if (!canvas.isConnected) {
+        if (shown) { return; }
+        raf = requestAnimationFrame(draw);
+        return;
+      }
+      shown = true;
+      const W = canvas.width, H = canvas.height, mid = H / 2, sy = H * 0.34;
+      const shift = reduce ? 0 : (now - t0) / 1000 * 1.6;      // the flow scrolls left to right
+      ctx.fillStyle = "#06120a"; ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = "rgba(80,160,110,0.18)"; ctx.lineWidth = 1;
+      for (let x = 0; x <= W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+      for (let y = 0; y <= H; y += 25) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+      ctx.strokeStyle = "rgba(120,200,150,0.35)"; ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(W, mid); ctx.stroke();
+
+      function wave(fn, style, width, dash) {
+        ctx.save(); ctx.strokeStyle = style; ctx.lineWidth = width; ctx.setLineDash(dash || []);
+        ctx.beginPath();
+        for (let px = 0; px <= W; px += 2) {
+          const x = px / W * 4 * Math.PI - shift;
+          const y = mid - fn(x) * sy;
+          if (px === 0) { ctx.moveTo(px, y); } else { ctx.lineTo(px, y); }
+        }
+        ctx.stroke(); ctx.restore();
+      }
+      // carrier wave: cos(x)
+      wave(Math.cos, "rgba(160,255,200,0.55)", 1.5, [6, 6]);
+      if (!dead) {
+        const noise = (1 - quality) * 0.22;
+        const c = color(quality);
+        ctx.shadowColor = c; ctx.shadowBlur = 6;
+        wave(function (x) {
+          return cur.amp * Math.cos(cur.freq * x + cur.phase * Math.PI / 180) + (Math.random() - 0.5) * noise;
+        }, c, 2);
+        ctx.shadowBlur = 0;
+      } else {
+        ctx.fillStyle = "rgba(255,90,60,0.8)"; ctx.font = "13px \"IBM Plex Mono\", monospace";
+        ctx.fillText("NO POWER", W / 2 - 34, mid - 8);
+      }
+      ctx.fillStyle = "rgba(160,255,200,0.6)"; ctx.font = "11px \"IBM Plex Mono\", monospace";
+      ctx.fillText("CARRIER  y = cos x", 8, 14);
+      if (!reduce) { raf = requestAnimationFrame(draw); }
+    }
+
+    function set(s, perfect, noPower) {
+      cur = { amp: s.amp, freq: s.freq, phase: s.phase };
+      dead = !!noPower;
+      quality = perfect ? 1 : dead ? 0 : qualityOf(cur);
+      const pct = Math.round(quality * 100);
+      bigVal.textContent = String(pct);
+      const c = color(quality);
+      big.style.color = c;
+      const on = Math.round(quality * segs.length);
+      segs.forEach(function (sg, i) { sg.style.background = i < on ? c : ""; sg.classList.toggle("on", i < on); });
+      snr.textContent = "SNR  " + (quality * 24).toFixed(1) + " DB";
+      lock.textContent = "LOCK  " + (quality >= 0.98 ? "ACQUIRED" : dead ? "NO POWER" : quality >= 0.8 ? "MARGINAL" : "SEARCHING");
+      warn.className = "rp-mon-banner " + (quality >= 0.98 ? "good" : quality >= 0.6 ? "mid" : "bad");
+      warn.textContent = quality >= 0.98 ? "CARRIER LOCKED. CHANNEL OPEN."
+                        : dead ? "DISH UNPOWERED. CARRIER NOT ACQUIRED."
+                        : quality >= 0.6 ? "WEAK CARRIER. KEEP TUNING." : "SIGNAL LOST. CARRIER NOT ACQUIRED.";
+      if (reduce && shown) { draw(performance.now()); }
+      return quality;
+    }
+
+    if (ctx) { raf = requestAnimationFrame(draw); }
+    return { el: m, set: set };
+  }
+
+  window.Repairs = { vox: vox };
+})();
