@@ -272,7 +272,7 @@
      turning slowly (the ribs sweep around each cylinder), pulsing with
      heat, and venting pixelated steam from the top. The center tank is
      the failing one: it flashes red. */
-  function reactor(sys) {
+  function reactor(sys, all, opts) {
     const wrap = el("div", "rx");
     const W = 256, H = 144;
     const canvas = el("canvas", "rx-canvas");
@@ -280,11 +280,31 @@
     canvas.height = H;
     canvas.setAttribute("role", "img");
     canvas.setAttribute("aria-label", "Reactor hall: three glowing containment tanks venting steam");
-    wrap.appendChild(canvas);
+    const isFixed = sys && sys.status === "ok";
+    // A wall terminal beside the reactor hall: clicking it opens the
+    // control board in its own window (see openWindow in script.js).
+    const row = el("div", "rx-row");
+    row.appendChild(canvas);
+    const term = el("button", "rx-term" + (isFixed ? " ok" : ""));
+    term.type = "button";
+    term.setAttribute("aria-label", "Open the reactor control terminal");
+    term.appendChild(el("span", "rx-term-h", "CONTROL TERMINAL"));
+    term.appendChild(el("span", "rx-term-s" + (isFixed ? "" : " blink"), isFixed ? "CORES STABLE" : "CORE B CRITICAL"));
+    term.appendChild(el("span", "rx-term-c", isFixed ? "[ VIEW STATUS ]" : "[ CLICK TO ACCESS ]"));
+    term.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (opts && opts.open) { opts.open("reactor"); }
+    });
+    row.appendChild(term);
+    wrap.appendChild(row);
 
     const reads = el("div", "rx-reads");
-    [["CORE A", "612 C", ""], ["CORE B", "1,184 C", "crit"], ["CORE C", "598 C", ""],
-     ["CONTAINMENT", "41%", "crit"], ["OUTPUT", "STANDBY 4%", ""], ["COOLANT", "VENTING", "warn"]].forEach(function (r) {
+    const fixed = sys && sys.status === "ok";      // repaired via the control board
+    (fixed
+      ? [["CORE A", "455 C", ""], ["CORE B", "574 C", ""], ["CORE C", "455 C", ""],
+         ["CONTAINMENT", "100%", ""], ["OUTPUT", "FULL", ""], ["COOLANT", "NOMINAL", ""]]
+      : [["CORE A", "612 C", ""], ["CORE B", "1,184 C", "crit"], ["CORE C", "598 C", ""],
+         ["CONTAINMENT", "41%", "crit"], ["OUTPUT", "STANDBY 4%", ""], ["COOLANT", "VENTING", "warn"]]).forEach(function (r) {
       const d = el("div", "rx-read " + r[2]);
       d.appendChild(el("span", "rx-l", r[0]));
       d.appendChild(el("span", "rx-v", r[1]));
@@ -299,7 +319,7 @@
 
     const TANKS = [
       { x: 62,  hot: "#ffb12a", core: "#ff6a00", crit: false, phase: 0 },
-      { x: 128, hot: "#ffd24a", core: "#ff3a10", crit: true,  phase: 1.7 },
+      { x: 128, hot: "#ffd24a", core: fixed ? "#ff6a00" : "#ff3a10", crit: !fixed, phase: 1.7 },
       { x: 194, hot: "#ffb12a", core: "#ff6a00", crit: false, phase: 3.1 }
     ];
     const TW = 40, TOP = 46, BOT = 112;      // tank width, glass top, glass bottom
@@ -411,7 +431,7 @@
       }
       drawSmoke();
       // warning stripe on the critical tank's pedestal
-      if (Math.sin(t * 9) > 0) { ctx.fillStyle = "#ff2a10"; ctx.fillRect(TANKS[1].x - 10, BOT + 2, 20, 2); }
+      if (!fixed && Math.sin(t * 9) > 0) { ctx.fillStyle = "#ff2a10"; ctx.fillRect(TANKS[1].x - 10, BOT + 2, 20, 2); }
       frame++;
       if (!reduce) { raf = requestAnimationFrame(draw); }
     }

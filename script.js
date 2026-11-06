@@ -243,6 +243,7 @@
   }
 
   function render() {
+    if (closeWindow) { closeWindow(); }
     notifyCommand("");
     cancel();
     out.innerHTML = "";
@@ -993,6 +994,51 @@
     backOption();
   }
 
+  /* ---------- Pop-up windows (repair terminals) ----------
+     A window floats over the terminal; ESC, the CLOSE button, or
+     changing screens closes it. Closing a repair mid-way resets it. */
+  const WINDOWED_REPAIRS = { reactor: true };
+  let closeWindow = null;
+
+  function openWindow(title, content) {
+    if (closeWindow) { closeWindow(); }
+    const crt = document.getElementById("crt");
+    const shade = el("div", "win-shade");
+    const win = el("div", "win");
+    win.setAttribute("role", "dialog");
+    win.setAttribute("aria-label", title);
+    const bar = el("div", "win-bar");
+    bar.appendChild(el("span", "win-title", title));
+    const x = el("button", "opt win-close", "[X] CLOSE");
+    x.type = "button";
+    bar.appendChild(x);
+    win.appendChild(bar);
+    const bodyEl = el("div", "win-body");
+    bodyEl.appendChild(content);
+    win.appendChild(bodyEl);
+    shade.appendChild(win);
+    crt.appendChild(shade);
+    function close() {
+      shade.remove();
+      closeWindow = null;
+      if (finePointer) { input.focus(); }
+    }
+    x.addEventListener("click", function (e) { e.stopPropagation(); close(); });
+    shade.addEventListener("click", function (e) { if (e.target === shade) { close(); } });
+    closeWindow = close;
+    x.focus();
+    return close;
+  }
+
+  function openRepairWindow(which, sys) {
+    if (!window.Repairs || !Repairs[which]) { return; }
+    let close = null;
+    const panel = Repairs[which](sys, {
+      done: function () { if (close) { close(); } render(); }
+    });
+    close = openWindow(sys.name + " CONTROL TERMINAL", panel);
+  }
+
   /* ---------- Ship areas (opened from STATUS) ---------- */
   function shipArea(id) {
     const list = Ship.systems.filter(function (x) { return x.area !== false; });
@@ -1027,9 +1073,12 @@
         }
         blank();
       }
-      enqueue(scene(sys, Ship.systems, { done: function () { render(); } }));
-      // Repair puzzles live under their area's scene
-      if (window.Repairs && Repairs[id]) {
+      enqueue(scene(sys, Ship.systems, {
+        done: function () { render(); },
+        open: function (which) { openRepairWindow(which, sys); }
+      }));
+      // Repair puzzles: the reactor opens from its wall terminal; the rest sit under the scene
+      if (window.Repairs && Repairs[id] && !WINDOWED_REPAIRS[id]) {
         blank();
         enqueue(Repairs[id](sys, { done: function () { render(); } }));
       }
@@ -1404,6 +1453,7 @@
     }
     if (e.key === "Escape") {
       e.preventDefault();
+      if (closeWindow) { closeWindow(); return; }
       if (inputTrap) {
         if (inputTrap.esc) { inputTrap.esc(); }
         return;

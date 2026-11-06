@@ -316,5 +316,225 @@
     return { el: m, set: set };
   }
 
-  window.Repairs = { vox: vox };
+  /* ---------- REACTOR (area 5) ----------
+     Core B is overheating and its pressure is climbing. A live control
+     board, updated 10 times a second:
+       COOLANT A / B / C  the pump's flow is shared between open lines
+       CROSSFEED          moves heat from Core B into Cores A and C
+       VENT B             bleeds Core B pressure into the vent header
+       PURGE HEADER       empties the header to space, but costs the
+                          pump pressure (less cooling while it's open)
+     Goal: Core B at or under 650 C, pressure at or under 40%, Cores A
+     and C at or under 750 C, all held for 10 seconds. Then restart.
+     Fail states: header full (rupture: pressure and heat spike) and
+     pressure at 100% (scram: the board resets). */
+  function reactor(sys, opts) {
+    const done = (opts && opts.done) || function () {};
+    const wrap = el("section", "panel rp rx-board");
+    wrap.appendChild(el("div", "panel-title", "REACTOR CONTROL BOARD"));
+    const body = el("div", "panel-body");
+    wrap.appendChild(body);
+
+    if (window.Ship && Ship.isRepaired("reactor")) {
+      body.appendChild(el("div", "line rp-ok", "+++ REACTOR ONLINE. ALL CORES STABLE. +++"));
+      body.appendChild(el("div", "line dim", "Core B is holding at a safe temperature. Full output restored."));
+      return wrap;
+    }
+
+    body.appendChild(el("div", "para dim",
+      "Core B is overheating and building pressure. Open its coolant line, spread its heat into the other " +
+      "cores, and bleed off pressure without letting the vent header burst. Hold everything in the safe zone " +
+      "for 10 seconds, then restart the reactor."));
+
+    // Model constants (tuned so only full coolant + crossfeed settles Core B)
+    const GEN = [4.4, 6, 4.4], PASSIVE = 2.0, COOL = 8, XFER = 2, AMB = 150, K = 400;
+    const LIMIT_B = 650, LIMIT_AC = 750, LIMIT_P = 40, HOLD_TICKS = 100;
+    const START = function () {
+      return { T: [612, 1184, 598], P: 72, H: 55, valve: [true, false, true], cross: false, vent: false, purge: false, hold: 0 };
+    };
+    let st = START(), finished = false, history = [];
+
+    // ----- layout -----
+    const board = el("div", "rxb");
+    const cores = el("div", "rxb-cores");
+    const coreEls = ["A", "B", "C"].map(function (n, i) {
+      const c = el("div", "rxb-core" + (i === 1 ? " main" : ""));
+      c.appendChild(el("div", "rxb-name", "CORE " + n));
+      const gauge = el("div", "rxb-gauge");
+      const fill = el("div", "rxb-fill");
+      gauge.appendChild(fill);
+      const mark = el("div", "rxb-limit");
+      mark.style.bottom = ((i === 1 ? LIMIT_B : LIMIT_AC) / 1300 * 100) + "%";
+      gauge.appendChild(mark);
+      c.appendChild(gauge);
+      const temp = el("div", "rxb-temp", "0 C");
+      c.appendChild(temp);
+      const v = btn("", "rxb-valve", function () {
+        if (finished) { return; }
+        st.valve[i] = !st.valve[i]; paint();
+        say((st.valve[i] ? "COOLANT LINE " + n + " OPENED." : "COOLANT LINE " + n + " CLOSED."), "");
+      });
+      c.appendChild(v);
+      cores.appendChild(c);
+      return { fill: fill, temp: temp, valve: v, box: c };
+    });
+    board.appendChild(cores);
+
+    const cross = btn("", "rxb-cross", function () {
+      if (finished) { return; }
+      st.cross = !st.cross; paint();
+      say(st.cross ? "CROSSFEED ENGAGED. CORE B HEAT SPREADING INTO A AND C." : "CROSSFEED DISENGAGED.", "");
+    });
+    board.appendChild(cross);
+
+    const side = el("div", "rxb-side");
+    function meter(label) {
+      const m = el("div", "rxb-meter");
+      m.appendChild(el("div", "rxb-mlabel", label));
+      const bar = el("div", "rxb-mbar");
+      const f = el("div", "rxb-mfill");
+      bar.appendChild(f);
+      m.appendChild(bar);
+      const v = el("div", "rxb-mval", "");
+      m.appendChild(v);
+      side.appendChild(m);
+      return { box: m, fill: f, val: v, bar: bar };
+    }
+    const pMeter = meter("CORE B PRESSURE");
+    const pMark = el("div", "rxb-mlimit"); pMark.style.left = LIMIT_P + "%"; pMeter.bar.appendChild(pMark);
+    const vent = btn("", "rxb-btn", function () {
+      if (finished) { return; }
+      st.vent = !st.vent; paint();
+    });
+    side.appendChild(vent);
+    const hMeter = meter("VENT HEADER");
+    const purge = btn("", "rxb-btn", function () {
+      if (finished) { return; }
+      st.purge = !st.purge; paint();
+    });
+    side.appendChild(purge);
+    const holdMeter = meter("STABILITY HOLD");
+    board.appendChild(side);
+    body.appendChild(board);
+
+    const trend = el("canvas", "rxb-trend");
+    trend.width = 600; trend.height = 70;
+    trend.setAttribute("aria-label", "Core B temperature trend");
+    body.appendChild(trend);
+    const msg = el("div", "line rp-msg dim", "BOARD LIVE. CORE B CRITICAL.");
+    body.appendChild(msg);
+    const restart = btn("RESTART REACTOR", "rxb-restart", function () {
+      if (window.Ship) { Ship.repair("reactor"); }
+      msg.className = "line rp-ok rp-msg";
+      msg.textContent = "+++ REACTOR RESTARTED. CORES STABLE. FULL OUTPUT. +++";
+      restart.disabled = true;
+      wrap.classList.add("rp-won");
+      setTimeout(done, 2600);
+    });
+    restart.style.display = "none";
+    body.appendChild(restart);
+
+    function say(text, kind) { msg.className = "line rp-msg " + (kind || "dim"); msg.textContent = text; }
+
+    function heatClass(t, limit) { return t > limit + 200 ? "crit" : t > limit ? "warn" : "ok"; }
+
+    function paint() {
+      st.T.forEach(function (t, i) {
+        const c = coreEls[i];
+        const limit = i === 1 ? LIMIT_B : LIMIT_AC;
+        c.fill.style.height = Math.min(100, t / 1300 * 100) + "%";
+        c.fill.className = "rxb-fill " + heatClass(t, limit);
+        c.temp.textContent = Math.round(t) + " C";
+        c.temp.className = "rxb-temp " + heatClass(t, limit);
+        c.valve.textContent = "COOLANT " + (st.valve[i] ? "OPEN" : "SHUT");
+        c.valve.classList.toggle("on", st.valve[i]);
+      });
+      cross.textContent = st.cross ? "← CROSSFEED ON →" : "CROSSFEED OFF";
+      cross.classList.toggle("on", st.cross);
+      pMeter.fill.style.width = Math.min(100, st.P) + "%";
+      pMeter.fill.className = "rxb-mfill " + (st.P > 85 ? "crit" : st.P > LIMIT_P ? "warn" : "ok");
+      pMeter.val.textContent = Math.round(st.P) + "%";
+      hMeter.fill.style.width = Math.min(100, st.H) + "%";
+      hMeter.fill.className = "rxb-mfill " + (st.H > 85 ? "crit" : st.H > 60 ? "warn" : "ok");
+      hMeter.val.textContent = Math.round(st.H) + "%";
+      holdMeter.fill.style.width = (st.hold / HOLD_TICKS * 100) + "%";
+      holdMeter.fill.className = "rxb-mfill ok";
+      holdMeter.val.textContent = (st.hold / 10).toFixed(1) + " / 10 S";
+      vent.textContent = "VENT B " + (st.vent ? "OPEN" : "SHUT");
+      vent.classList.toggle("on", st.vent);
+      purge.textContent = "PURGE HEADER " + (st.purge ? "OPEN" : "SHUT");
+      purge.classList.toggle("on", st.purge);
+      drawTrend();
+    }
+
+    function drawTrend() {
+      const ctx = trend.getContext && trend.getContext("2d");
+      if (!ctx) { return; }
+      const W = trend.width, H = trend.height;
+      ctx.fillStyle = "#0b0705"; ctx.fillRect(0, 0, W, H);
+      const y = function (t) { return H - Math.min(1, t / 1300) * H; };
+      ctx.strokeStyle = "rgba(56,255,122,0.6)"; ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(0, y(LIMIT_B)); ctx.lineTo(W, y(LIMIT_B)); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = "#ff8a3c"; ctx.lineWidth = 2; ctx.beginPath();
+      history.forEach(function (t, k) {
+        const x = W - (history.length - 1 - k) * (W / 300);
+        if (k === 0) { ctx.moveTo(x, y(t)); } else { ctx.lineTo(x, y(t)); }
+      });
+      ctx.stroke(); ctx.lineWidth = 1;
+      ctx.fillStyle = "rgba(255,200,160,0.7)"; ctx.font = "11px \"IBM Plex Mono\", monospace";
+      ctx.fillText("CORE B TEMP, 30 S", 6, 12);
+    }
+
+    function step() {
+      const n = st.valve.filter(Boolean).length;
+      const eff = st.purge ? 0.6 : 1;
+      const dT = st.T.map(function (t, i) {
+        const share = st.valve[i] && n ? 1 / n : 0;
+        return GEN[i] * 10 - (PASSIVE + COOL * share * eff) * (t - AMB) / K * 10;
+      });
+      if (st.cross) {
+        [0, 2].forEach(function (i) {
+          const q = XFER * (st.T[1] - st.T[i]) / K * 10;
+          dT[1] -= q; dT[i] += q;
+        });
+      }
+      st.T = st.T.map(function (t, i) { return Math.max(AMB, t + dT[i] * 0.1); });
+      st.P += 0.025 * Math.max(0, (st.T[1] - 550) / 100);
+      if (st.vent) { const d = Math.min(st.P, 0.35); st.P -= d; st.H += d; }
+      if (st.purge) { st.H = Math.max(0, st.H - 0.8); }
+
+      if (st.H >= 100) {
+        st.H = 70; st.P = Math.min(99, st.P + 15); st.T[1] += 120; st.vent = false;
+        say("!! HEADER RUPTURE. PRESSURE BLOWBACK INTO CORE B. PURGE BEFORE YOU VENT. !!", "alert");
+      }
+      if (st.P >= 100) {
+        st = START(); history = [];
+        say("!! SCRAM. CORE B PRESSURE LIMIT. BOARD RESET TO EMERGENCY STATE. !!", "alert");
+      }
+      const safe = st.T[1] <= LIMIT_B && st.P <= LIMIT_P && st.T[0] <= LIMIT_AC && st.T[2] <= LIMIT_AC;
+      st.hold = safe ? st.hold + 1 : 0;
+      history.push(st.T[1]); if (history.length > 300) { history.shift(); }
+      if (st.hold >= HOLD_TICKS) {
+        finished = true;
+        say("+++ ALL CORES IN SAFE RANGE. RESTART AUTHORIZED. +++", "rp-ok");
+        restart.style.display = "";
+      } else if (safe) {
+        say("SAFE RANGE. HOLD IT...", "rp-ok");
+      } else if (st.T[0] > LIMIT_AC || st.T[2] > LIMIT_AC) {
+        if (!/RUPTURE|SCRAM/.test(msg.textContent)) { say("CORES A OR C RUNNING HOT. THEY NEED COOLANT TOO.", ""); }
+      }
+    }
+
+    paint();
+    let shown = false;
+    const timer = setInterval(function () {
+      if (!wrap.isConnected) { if (shown) { clearInterval(timer); } return; }
+      shown = true;
+      if (finished) { return; }
+      step(); paint();
+    }, 100);
+    return wrap;
+  }
+
+  window.Repairs = { vox: vox, reactor: reactor };
 })();
