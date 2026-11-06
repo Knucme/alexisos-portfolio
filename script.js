@@ -549,7 +549,15 @@
     mid.appendChild(right);
     dash.appendChild(mid);
     dash.appendChild(el("div", "dash-rule"));
-    dash.appendChild(el("div", "dash-bottom", "OPERATOR ON RECORD   " + PROFILE.name.toUpperCase()));
+    // The robot's own status line, cycling through a few readouts
+    const ROBOT_STATUS = [
+      "UNIT 7 ALPHA  //  COGITATOR SERVITOR  //  AWAITING ORDERS",
+      "UNIT 7 ALPHA  //  SCANNING HULL  //  7 FAULTS LOGGED",
+      "UNIT 7 ALPHA  //  LISTENING ON VOX CH.9",
+      "UNIT 7 ALPHA  //  MACHINE SPIRIT RESTLESS"
+    ];
+    const botLine = el("div", "dash-bottom", ROBOT_STATUS[0]);
+    dash.appendChild(botLine);
 
     const upVal = up.querySelector(".ro-value");
     return {
@@ -559,6 +567,8 @@
         const t = setInterval(function () {
           if (!upVal.isConnected) { clearInterval(t); return; }
           upVal.textContent = uptimeText();
+          const s = Math.floor((Date.now() - loadedAt) / 1000);
+          botLine.textContent = ROBOT_STATUS[Math.floor(s / 6) % ROBOT_STATUS.length];
         }, 1000);
       }
     };
@@ -580,7 +590,7 @@
     setPageTitle("MASTER");
     const grid = el("div", "master");
 
-    const tele = panelBox("VIGIL OF ASH  //  TELEMETRY", "m-tele");
+    const tele = panelBox("VIGIL OF ASH", "m-tele");
     const t = telemetry();
     tele.body.appendChild(t.el);
 
