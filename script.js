@@ -533,11 +533,14 @@
     const mid = el("div", "dash-mid");
     const left = el("div", "dash-col");
     const hullPct = window.Ship ? Ship.hull() + "%" : "31%";
+    const fixedR = window.Ship && Ship.isRepaired("reactor");
+    const fixedV = window.Ship && Ship.isRepaired("vox");
+    const prog = window.Ship ? Ship.progress() : { done: 0, total: 1, complete: false };
     left.appendChild(readout("HULL INTEGRITY", hullPct));
-    left.appendChild(readout("REACTOR", "STANDBY 4%"));
+    left.appendChild(readout("REACTOR", fixedR ? "ONLINE 100%" : "STANDBY 4%"));
     left.appendChild(readout("CREW / VISITORS", "0 / 1"));
     const right = el("div", "dash-col right");
-    right.appendChild(readout("VOX CH.9 SIGNAL", "UNKNOWN", "alert"));
+    right.appendChild(readout("VOX CH.9 SIGNAL", fixedV ? "LOCKED" : "UNKNOWN", fixedV ? "" : "alert"));
     right.appendChild(readout("LIFE SIGNS", "1 (YOU)"));
     const up = readout("UPTIME", uptimeText());
     right.appendChild(up);
@@ -550,13 +553,23 @@
     mid.appendChild(right);
     dash.appendChild(mid);
     dash.appendChild(el("div", "dash-rule"));
-    // The robot's own status line, cycling through a few readouts
-    const ROBOT_STATUS = [
+    // The robot's own status line. While repairs remain it cycles through
+    // readouts (including repair progress); once every repair is done it
+    // announces the ship is ready for a warp jump.
+    const ROBOT_STATUS = prog.complete ? [
+      "UNIT 7 ALPHA: ALL SYSTEMS OPERATIONAL",
+      "UNIT 7 ALPHA: VIGIL OF ASH READY FOR WARP JUMP"
+    ] : [
       "UNIT 7 ALPHA: AWAITING ORDERS",
+      "UNIT 7 ALPHA: REPAIRS " + prog.done + " OF " + prog.total + " COMPLETE",
       "UNIT 7 ALPHA: SCANNING HULL",
-      "UNIT 7 ALPHA: LISTENING ON VOX CH.9",
+      fixedV ? "UNIT 7 ALPHA: VOX CHANNEL OPEN" : "UNIT 7 ALPHA: LISTENING ON VOX CH.9",
       "UNIT 7 ALPHA: MACHINE SPIRIT RESTLESS"
     ];
+    if (prog.complete) {
+      dash.classList.add("ready");
+      dash.appendChild(el("div", "dash-ready", "+++ SHIP OPERATIONAL. READY FOR WARP JUMP. +++"));
+    }
     const botLine = el("div", "dash-bottom", ROBOT_STATUS[0]);
     dash.appendChild(botLine);
 
@@ -603,6 +616,7 @@
       cw.body.appendChild(el("div", "line " + (f.status === "offline" ? "alert" : "cw-cau"),
         (f.status === "offline" ? "WRN  " : "CAU  ") + f.name));
     });
+    if (!faults.length) { cw.body.appendChild(el("div", "line rp-ok", "ALL CLEAR. NO ACTIVE FAULTS.")); }
     cw.body.appendChild(el("div", "line dim cw-foot", faults.length + " ACTIVE. TYPE STATUS"));
 
     const src = panelBox("SOURCES", "m-src");

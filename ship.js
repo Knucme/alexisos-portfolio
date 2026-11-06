@@ -336,6 +336,13 @@
     applyRepairs();
   }
   function isRepaired(id) { return !!saved()[id]; }
+  /* Overall repair progress. Every system listed in REPAIRS counts, so
+     new puzzles (deck 4, cargo, life support) join automatically. */
+  function progress() {
+    const ids = Object.keys(REPAIRS);
+    const done = ids.filter(isRepaired).length;
+    return { done: done, total: ids.length, complete: done === ids.length };
+  }
   /* Which prerequisites are still missing for a repair (empty = ready). */
   function missingFor(id) {
     return (REQUIRES[id] || []).filter(function (r) { return !isRepaired(r); });
@@ -362,5 +369,5 @@
 
   window.Ship = { systems: SHIP_SYSTEMS, render: render, hull: hull,
                   repair: repair, isRepaired: isRepaired, resetRepairs: resetRepairs,
-                  missingFor: missingFor, requires: REQUIRES, flag: flag };
+                  missingFor: missingFor, requires: REQUIRES, flag: flag, progress: progress };
 })();

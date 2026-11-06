@@ -1902,3 +1902,14 @@ body.theme-retrowave:not(.red-alert):not(.green-mode) .emblem { filter: none; }
 .bp-biglever.pulled .bp-biglever-handle { top: 48px; }
 .bp-biglever.locked .bp-biglever-handle { background: linear-gradient(180deg, #4cd36d, #1f7a38); border-color: #0c3a18; box-shadow: 0 0 10px rgba(56, 255, 122, 0.5); }
 .bp-biglever .bp-tag { position: absolute; bottom: 0; white-space: nowrap; }
+
+/* MASTER: ship fully repaired */
+.dash-ready {
+  text-align: center; margin: 2px 0 6px;
+  color: #38ff7a; font-weight: 600; letter-spacing: 0.1em;
+  text-shadow: 0 0 10px rgba(56, 255, 122, 0.8);
+  animation: blink 1.4s steps(1) infinite;
+}
+.dash.ready .dash-bottom { color: #38ff7a; text-shadow: 0 0 8px rgba(56, 255, 122, 0.6); }
+.dash.ready .dash-rule { background: #38ff7a; box-shadow: 0 0 8px #38ff7a; }
+@media (prefers-reduced-motion: reduce) { .dash-ready { animation: none; } }
