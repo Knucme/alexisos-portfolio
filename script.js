@@ -255,7 +255,10 @@
     activeGame = null;
     lightKey(current.fn);
     current.fn.apply(null, current.args);
-    if (window.Ship && Ship.consumeStormNotice()) { enqueue(stormNotice, 0); }
+    // The storm damage notice waits until the visitor opens a ship screen
+    if ((current.fn === status || current.fn === shipArea) && window.Ship && Ship.consumeStormNotice()) {
+      enqueue(stormNotice, 0);
+    }
   }
 
   /* Open a screen and remember the one we came from. */
@@ -535,14 +538,11 @@
     const mid = el("div", "dash-mid");
     const left = el("div", "dash-col");
     const hullPct = window.Ship ? Ship.hull() + "%" : "31%";
-    const fixedR = window.Ship && Ship.isRepaired("reactor");
-    const fixedV = window.Ship && Ship.isRepaired("vox");
-    const prog = window.Ship ? Ship.progress() : { done: 0, total: 1, complete: false };
     left.appendChild(readout("HULL INTEGRITY", hullPct));
-    left.appendChild(readout("REACTOR", fixedR ? "ONLINE 100%" : "STANDBY 4%"));
+    left.appendChild(readout("REACTOR", "STANDBY 4%"));
     left.appendChild(readout("CREW / VISITORS", "0 / 1"));
     const right = el("div", "dash-col right");
-    right.appendChild(readout("VOX CH.9 SIGNAL", fixedV ? "LOCKED" : "UNKNOWN", fixedV ? "" : "alert"));
+    right.appendChild(readout("VOX CH.9 SIGNAL", "UNKNOWN", "alert"));
     right.appendChild(readout("LIFE SIGNS", "1 (YOU)"));
     const up = readout("UPTIME", uptimeText());
     right.appendChild(up);
@@ -555,27 +555,14 @@
     mid.appendChild(right);
     dash.appendChild(mid);
     dash.appendChild(el("div", "dash-rule"));
-    // The robot's own status line. While repairs remain it cycles through
-    // readouts (including repair progress); once every repair is done it
-    // announces the ship is ready for a warp jump.
-    const ROBOT_STATUS = prog.complete ? [
-      "UNIT 7 ALPHA: ALL SYSTEMS OPERATIONAL",
-      "UNIT 7 ALPHA: VIGIL OF ASH READY FOR WARP JUMP"
-    ] : [
+    // The robot's own status line, cycling through a few readouts.
+    // (Repair progress and the warp jump live on the STATUS screen.)
+    const ROBOT_STATUS = [
       "UNIT 7 ALPHA: AWAITING ORDERS",
-      "UNIT 7 ALPHA: " + prog.done + " OF " + prog.total + " SYSTEMS NOMINAL",
       "UNIT 7 ALPHA: SCANNING HULL",
-      fixedV ? "UNIT 7 ALPHA: VOX CHANNEL OPEN" : "UNIT 7 ALPHA: LISTENING ON VOX CH.9",
+      "UNIT 7 ALPHA: LISTENING ON VOX CH.9",
       "UNIT 7 ALPHA: MACHINE SPIRIT RESTLESS"
     ];
-    if (prog.complete) {
-      dash.classList.add("ready");
-      dash.appendChild(el("div", "dash-ready", "+++ SHIP OPERATIONAL. READY FOR WARP JUMP. +++"));
-      const wj = el("button", "opt warp-btn", "[ INITIATE WARP JUMP ]");
-      wj.type = "button";
-      wj.addEventListener("click", function (e) { e.stopPropagation(); warpJump(); });
-      dash.appendChild(wj);
-    }
     const botLine = el("div", "dash-bottom", ROBOT_STATUS[0]);
     dash.appendChild(botLine);
 
@@ -635,7 +622,6 @@
     src.body.appendChild(kv("PICT FEEDS", vids ? vids + " FEEDS" : "NONE", vids ? "" : "[PENDING]", vids ? "" : "dim"));
     src.body.appendChild(kv("SIMULATIONS", GAMES.length + " LOADED", ""));
     src.body.appendChild(kv("VOX CH.9", "NO DATA", "[UNK]", "alert"));
-    if (window.Ship && Ship.jumps()) { src.body.appendChild(kv("WARP JUMPS", String(Ship.jumps()), "[LOG]")); }
 
     const op = panelBox("OPERATOR", "m-op");
     op.body.appendChild(el("div", "line op-name", PROFILE.name.toUpperCase()));
@@ -990,6 +976,27 @@
   function status() {
     header("Vessel Status");
     if (window.Ship) {
+      // Ship readiness: progress toward a warp jump (the end of the repair game)
+      const prog = Ship.progress();
+      const ready = el("div", "readiness" + (prog.complete ? " ready" : ""));
+      const pct = Math.round(prog.done / prog.total * 100);
+      const bar = el("div", "readiness-bar");
+      const fillEl = el("div", "readiness-fill");
+      fillEl.style.width = pct + "%";
+      bar.appendChild(fillEl);
+      ready.appendChild(el("div", "readiness-l", prog.done + " OF " + prog.total + " SYSTEMS NOMINAL" +
+        (Ship.jumps() ? "   WARP JUMPS " + Ship.jumps() : "")));
+      ready.appendChild(bar);
+      if (prog.complete) {
+        ready.appendChild(el("div", "dash-ready", "+++ SHIP OPERATIONAL. READY FOR WARP JUMP. +++"));
+        const wj = el("button", "opt warp-btn", "[ INITIATE WARP JUMP ]");
+        wj.type = "button";
+        wj.addEventListener("click", function (e) { e.stopPropagation(); warpJump(); });
+        ready.appendChild(wj);
+      } else {
+        ready.appendChild(el("div", "line dim", "Repair every area to make the Vigil ready for a warp jump."));
+      }
+      enqueue(ready);
       // Clicking a system opens its area (the Geller field is display-only).
       enqueue(Ship.render({ enter: function (sys) { run(function () { go(shipArea, [sys.id]); }); } }));
       // A numbered option for every area, so they can be clicked or typed
@@ -1081,6 +1088,10 @@
   function warpReady() { return window.Ship && Ship.progress().complete; }
 
   function warpJump() {
+    if (!current || (current.fn !== status && current.fn !== shipArea)) {
+      say("WARP CONTROLS ARE ON THE STATUS SCREEN. TYPE STATUS.", "dim");
+      return;
+    }
     if (!warpReady()) {
       const p = window.Ship ? Ship.progress() : { done: 0, total: 0 };
       say("WARP DRIVE UNAVAILABLE. ONLY " + p.done + " OF " + p.total + " SYSTEMS NOMINAL. EVERY AREA MUST BE REPAIRED. TYPE STATUS.", "alert");
@@ -1133,7 +1144,9 @@
       cancelAnimationFrame(raf);
       fx.remove();
       if (window.Ship) { Ship.jumps(1); Ship.resetRepairs(); }
-      home();
+      stack = [];
+      current = { fn: status, args: [] };
+      render();
       say("WARP JUMP " + (window.Ship ? Ship.jumps() : 1) + " COMPLETE. THE STORM HIT ON EXIT. EVERY SYSTEM NEEDS REPAIR AGAIN.", "alert");
     }
     if (reduceMotion) {

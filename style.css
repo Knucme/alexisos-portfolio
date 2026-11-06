@@ -1935,3 +1935,11 @@ body.theme-retrowave:not(.red-alert):not(.green-mode) .emblem { filter: none; }
 .storm-ok { margin-top: 12px; border: 1px solid var(--amber-dim); padding: 3px 14px; }
 @media (max-width: 700px) { .warp-text { font-size: 1.4em; } }
 @media (prefers-reduced-motion: reduce) { .warp.storm-shake, .warp-text.bad, .storm-h { animation: none; } }
+
+/* STATUS: ship readiness (progress toward a warp jump) */
+.readiness { margin: 4px 0 16px; text-align: center; }
+.readiness-l { letter-spacing: 0.1em; margin-bottom: 4px; }
+.readiness-bar { height: 10px; border: 1px solid var(--amber-dim); background: rgba(0, 0, 0, 0.4); margin: 0 auto 6px; max-width: 520px; }
+.readiness-fill { height: 100%; background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+.readiness.ready .readiness-fill { background: #38ff7a; box-shadow: 0 0 8px #38ff7a; }
+.readiness.ready .readiness-l { color: #38ff7a; }
