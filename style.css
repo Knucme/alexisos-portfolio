@@ -1599,7 +1599,7 @@ body.theme-retrowave:not(.red-alert):not(.green-mode) .emblem { filter: none; }
 #fkeys button { font-size: 19px; letter-spacing: 0.04em; }
 #fkeys button b { font-family: var(--font); font-size: 12px; }
 
-.brand, .ship-name {
+.brand {
   font-family: var(--font-brand);
   letter-spacing: 0.04em;
 }
@@ -1614,3 +1614,20 @@ body.theme-retrowave:not(.red-alert):not(.green-mode) .emblem { filter: none; }
 }
 @media (max-width: 1150px) and (min-width: 701px) { #fkeys button { font-size: 16px; } }
 @media (max-width: 700px) { #fkeys button { font-size: 15px; } .tb-title { font-size: 1.2em; } }
+
+/* Ship name on STATUS: truly centered (equal side columns) and in the
+   heading font, which reads much more clearly than the brand font */
+.ship-head {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+}
+.ship-head > :last-child { text-align: right; }
+.ship-name {
+  font-family: var(--font-head);
+  font-size: 1.9em;
+  letter-spacing: 0.16em;
+  text-align: center;
+}
+@media (max-width: 700px) { .ship-name { font-size: 1.3em; letter-spacing: 0.08em; } }
