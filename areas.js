@@ -77,6 +77,7 @@
   /* Annunciator light for a ship system: off / amber flashing / red. */
   function annunciator(s) {
     const a = el("div", "bp-ann " + s.status, s.name.replace(" ", "\n"));
+    a.dataset.sys = s.id;
     a.title = "[" + s.num + "] " + s.name + ": " + s.note;
     return a;
   }
@@ -150,6 +151,50 @@
       gmsg.className = "bp-gmsg " + (kind || "");
       gmsg.textContent = text;
     }
+
+    /* Shown when the GELLER switch is flipped too early: a warning box on
+       the console listing what has to be fixed first, with buttons that
+       go straight to each area. The matching caution lights pulse. */
+    const HOW = {
+      vox:     "Divert power to Dish A and calibrate it to the carrier wave.",
+      reactor: "Use the control terminal to cool Core B and vent its pressure."
+    };
+    function showInterlock() {
+      const old = panel.querySelector(".bp-alert");
+      if (old) { old.remove(); }
+      const req = (window.Ship && Ship.requires.geller) || ["vox", "reactor"];
+      const box = el("div", "bp-alert");
+      box.setAttribute("role", "alertdialog");
+      box.appendChild(el("div", "bp-alert-h", "!! GELLER FIELD INTERLOCK !!"));
+      box.appendChild(el("div", "bp-alert-sub", "The field can't be raised until these systems are back online:"));
+      req.forEach(function (r) {
+        const s = all.find(function (x) { return x.id === r; });
+        const fixed = window.Ship ? Ship.isRepaired(r) : false;
+        const row = el("div", "bp-alert-row " + (fixed ? "ok" : "bad"));
+        row.appendChild(el("span", "bp-alert-mark", fixed ? "\u2713 ONLINE" : "\u2717 OFFLINE"));
+        const info = el("span", "bp-alert-info");
+        info.appendChild(el("span", "bp-alert-name", (s ? "[" + s.num + "] " + s.name : r.toUpperCase()) + (r === "vox" ? " (ANTENNAS)" : "")));
+        if (!fixed) { info.appendChild(el("span", "bp-alert-how", HOW[r] || "")); }
+        row.appendChild(info);
+        if (!fixed && opts && opts.go) {
+          const goBtn = el("button", "bp-alert-go", "GO FIX \u25B8");
+          goBtn.type = "button";
+          goBtn.addEventListener("click", function (e) { e.stopPropagation(); opts.go(r); });
+          row.appendChild(goBtn);
+        }
+        box.appendChild(row);
+        // pulse that system's caution light
+        const lamp = panel.querySelector('.bp-ann[data-sys="' + r + '"]');
+        if (lamp && !fixed) { lamp.classList.remove("need"); void lamp.offsetWidth; lamp.classList.add("need"); }
+      });
+      const ok = el("button", "bp-alert-ok", "ACKNOWLEDGE");
+      ok.type = "button";
+      ok.addEventListener("click", function (e) { e.stopPropagation(); box.remove(); });
+      box.appendChild(ok);
+      panel.appendChild(box);
+      if (box.scrollIntoView) { box.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
+      ok.focus({ preventScroll: true });
+    }
     panel.appendChild(cautionWrap);
 
     // Control deck
@@ -204,6 +249,7 @@
               return x ? x.name : r.toUpperCase();
             });
             gellerMsg("INTERLOCK: " + names.join(" AND ") + " MUST BE ONLINE FIRST.", "bad");
+            showInterlock();
             return;
           }
           fresh.classList.add("up");

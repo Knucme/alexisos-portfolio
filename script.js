@@ -1075,7 +1075,8 @@
       }
       enqueue(scene(sys, Ship.systems, {
         done: function () { render(); },
-        open: function (which) { openRepairWindow(which, sys); }
+        open: function (which) { openRepairWindow(which, sys); },
+        go: function (areaId) { go(shipArea, [areaId]); }
       }));
       // Repair puzzles: the reactor opens from its wall terminal; the rest sit under the scene
       if (window.Repairs && Repairs[id] && !WINDOWED_REPAIRS[id]) {

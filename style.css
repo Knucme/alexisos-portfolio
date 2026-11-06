@@ -1785,3 +1785,29 @@ body.theme-retrowave:not(.red-alert):not(.green-mode) .emblem { filter: none; }
 .win-body .rp { margin: 0; }
 @keyframes win-in { from { transform: scaleY(0.05); } to { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .win { animation: none; } }
+
+/* Bridge: Geller interlock warning box */
+.bp { position: relative; }
+.bp-alert {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  z-index: 3; width: min(92%, 560px);
+  background: #12070a; border: 3px solid #ff5a3c; border-radius: 6px;
+  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.6), 0 0 40px rgba(255, 90, 60, 0.45);
+  padding: 14px 16px; color: #ffd9cf; font-family: var(--font); text-shadow: none;
+  animation: win-in 0.18s steps(3);
+}
+.bp-alert-h { font-family: var(--font-head); font-size: 1.3em; letter-spacing: 0.1em; color: #ff5a3c; text-align: center; animation: bp-warn 0.7s steps(2) 4; }
+.bp-alert-sub { margin: 6px 0 10px; font-size: 0.9em; text-align: center; }
+.bp-alert-row { display: grid; grid-template-columns: 11ch 1fr auto; gap: 10px; align-items: center; padding: 6px 8px; margin: 4px 0; border: 1px solid #4a1a14; }
+.bp-alert-row.ok { border-color: #1e5a33; }
+.bp-alert-mark { font-weight: 600; }
+.bp-alert-row.bad .bp-alert-mark { color: #ff5a3c; }
+.bp-alert-row.ok .bp-alert-mark { color: #38ff7a; }
+.bp-alert-info { display: flex; flex-direction: column; gap: 2px; }
+.bp-alert-name { font-weight: 600; letter-spacing: 0.04em; }
+.bp-alert-how { font-size: 0.8em; color: #c9a39a; }
+.bp-alert-go, .bp-alert-ok { font: inherit; cursor: pointer; background: transparent; color: #ffcc33; border: 1px solid #ffcc33; padding: 3px 10px; }
+.bp-alert-go:hover, .bp-alert-ok:hover { background: #ffcc33; color: #12070a; }
+.bp-alert-ok { display: block; margin: 10px auto 0; }
+.bp-ann.need { outline: 3px solid #ffcc33; outline-offset: 2px; animation: bp-warn 0.5s steps(2) 8; }
+@media (max-width: 700px) { .bp-alert-row { grid-template-columns: 1fr; } }
