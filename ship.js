@@ -207,7 +207,7 @@
     const wrap = el("div", "ship");
 
     const head = el("div", "ship-head");
-    head.appendChild(el("span", "dim", "AUSPEX // HULL SCHEMATIC"));
+    head.appendChild(el("span", "dim", "HULL SCHEMATIC"));
     head.appendChild(el("span", "ship-name", "VIGIL OF ASH"));
     head.appendChild(el("span", "dim", "HULL " + hull() + "%"));
     wrap.appendChild(head);
@@ -215,11 +215,11 @@
     const grid = el("div", "ship-grid");
 
     // Left: schematic
-    const left = panel("SIDE ELEVATION  //  DAMAGE REPORT", "sp-schematic");
+    const left = panel("DAMAGE REPORT", "sp-schematic");
     const picked = el("div", "line sp-picked dim", "HOVER A SECTION FOR DETAIL. CLICK IT, OR TYPE ITS NUMBER, TO GO THERE.");
     left.appendChild(schematic(function (s) {
       picked.className = "line sp-picked" + (s.status === "ok" ? "" : " alert");
-      picked.textContent = tagOf(s) + s.name + " .... " + s.pct + "%  //  " + s.note;
+      picked.textContent = tagOf(s) + s.name + " .... " + s.pct + "%. " + s.note;
       wrap.querySelectorAll(".sp-row").forEach(function (r) {
         r.classList.toggle("on", r.dataset.id === s.id);
       });
@@ -264,7 +264,7 @@
     grid.appendChild(right);
     wrap.appendChild(grid);
 
-    wrap.appendChild(el("div", "ship-foot", "RECEIVING: AUSPEX SWEEP 4471K  //  " + bad.length + " FAULTS ACTIVE"));
+    wrap.appendChild(el("div", "ship-foot", bad.length + " FAULTS ACTIVE"));
     return wrap;
   }
 

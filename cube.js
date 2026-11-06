@@ -396,8 +396,8 @@
       }
       const state = model.isSolved() ? "SOLVED" : (model.scrambled ? "SCRAMBLED" : "UNSOLVED");
       stat.textContent = "FACING #" + center + " " + WORD[center] +
-        "  //  SIDES DONE " + model.doneColors().length + "/6" +
-        "  //  MOVES " + model.moves + "  //  TIME " + time + "  //  " + state;
+        "   SIDES " + model.doneColors().length + "/6" +
+        "   MOVES " + model.moves + "   TIME " + time + "   " + state;
       stat.classList.toggle("alert", state === "SCRAMBLED");
     }
 

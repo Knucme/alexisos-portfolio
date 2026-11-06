@@ -303,10 +303,10 @@
       case projects:  return "FABRICATION RECORDS";
       case project:   return "RECORD: " + PROJECTS[args[0]].name;
       case logs:      return "DATA LOGS";
-      case logIndex:  return "DATA LOGS // " + BLOGS[args[0]].name;
+      case logIndex:  return BLOGS[args[0]].name;
       case readLog:   return "LOG " + (args[1] + 1) + ": " + BLOGS[args[0]].posts[args[1]].title;
       case videos:    return "PICT RECORDINGS";
-      case videoList: return "PICT FEED // " + VIDEOS[args[0]].name;
+      case videoList: return VIDEOS[args[0]].name;
       case games:     return "SIMULATIONS";
       case game:      return "SIMULATION: " + GAMES[args[0]].name;
       case service:   return "SERVICE RECORD";
@@ -551,10 +551,10 @@
     dash.appendChild(el("div", "dash-rule"));
     // The robot's own status line, cycling through a few readouts
     const ROBOT_STATUS = [
-      "UNIT 7 ALPHA  //  COGITATOR SERVITOR  //  AWAITING ORDERS",
-      "UNIT 7 ALPHA  //  SCANNING HULL  //  7 FAULTS LOGGED",
-      "UNIT 7 ALPHA  //  LISTENING ON VOX CH.9",
-      "UNIT 7 ALPHA  //  MACHINE SPIRIT RESTLESS"
+      "UNIT 7 ALPHA: AWAITING ORDERS",
+      "UNIT 7 ALPHA: SCANNING HULL",
+      "UNIT 7 ALPHA: LISTENING ON VOX CH.9",
+      "UNIT 7 ALPHA: MACHINE SPIRIT RESTLESS"
     ];
     const botLine = el("div", "dash-bottom", ROBOT_STATUS[0]);
     dash.appendChild(botLine);
@@ -602,9 +602,9 @@
       cw.body.appendChild(el("div", "line " + (f.status === "offline" ? "alert" : "cw-cau"),
         (f.status === "offline" ? "WRN  " : "CAU  ") + f.name));
     });
-    cw.body.appendChild(el("div", "line dim cw-foot", faults.length + " ACTIVE  //  TYPE STATUS"));
+    cw.body.appendChild(el("div", "line dim cw-foot", faults.length + " ACTIVE. TYPE STATUS"));
 
-    const src = panelBox("SOURCES  //  HEALTH", "m-src");
+    const src = panelBox("SOURCES", "m-src");
     const posts = Object.keys(BLOGS).reduce(function (n, k) { return n + BLOGS[k].posts.length; }, 0);
     const newest = BLOGS.tech && BLOGS.tech.posts.length ? BLOGS.tech.posts[BLOGS.tech.posts.length - 1].date : "";
     const vids = Object.keys(VIDEOS).reduce(function (n, k) { return n + VIDEOS[k].videos.length; }, 0);
@@ -637,7 +637,7 @@
 
     // Live GitHub feed across the bottom (github.js)
     if (window.GitFeed) {
-      const gh = panelBox("GITHUB  //  " + GitFeed.USER.toUpperCase() + "  //  LIVE FEED  ", "m-gh");
+      const gh = panelBox("GITHUB LIVE FEED  ", "m-gh");
       const flag = el("span", "gh-flag", "[SYNC]");
       gh.el.querySelector(".panel-title").appendChild(flag);
       GitFeed.fill(gh.body, flag);
@@ -662,7 +662,7 @@
   }
 
   function dossier() {
-    header("Operator Dossier // About");
+    header("Operator Dossier");
     line(dots("DESIGNATION") + PROFILE.name);
     line(dots("FUNCTION") + PROFILE.title);
     line(dots("LAST KNOWN LOC") + PROFILE.location);
@@ -679,7 +679,7 @@
 
   /* ---------- Projects ---------- */
   function projects() {
-    header("Fabrication Records // Projects");
+    header("Fabrication Records");
     Object.keys(PROJECTS).forEach(function (id, i) {
       option(i + 1, PROJECTS[id].name, function () { go(project, [id]); }, PROJECTS[id].tech);
     });
@@ -689,7 +689,7 @@
 
   function project(id) {
     const p = PROJECTS[id];
-    header("Fabrication Records // " + p.name);
+    header(p.name);
     line(dots("TECH") + p.tech);
     if (p.github) {
       linkLine(dots("REPOSITORY"), "https://github.com/" + p.github, "github.com/" + p.github);
@@ -728,7 +728,7 @@
 
   /* ---------- Blog (data-logs) ---------- */
   function logs() {
-    header("Data Logs // Blog");
+    header("Data Logs");
     para("Writeups on real tech problems I've solved, and LeetCode problems worth explaining.");
     blank();
     Object.keys(BLOGS).forEach(function (c, i) {
@@ -742,7 +742,7 @@
 
   function logIndex(c) {
     const cat = BLOGS[c];
-    header("Data Logs // " + cat.name);
+    header(cat.name);
     if (cat.description) { para(cat.description, "dim"); }
     if (!cat.posts.length) {
       line("NO ENTRIES RECOVERED FROM THIS SECTOR. CHECK BACK LATER.", "alert");
@@ -760,7 +760,7 @@
   function readLog(c, i) {
     const cat = BLOGS[c];
     const p = cat.posts[i];
-    header("Data Logs // " + cat.name + " // " + (i + 1) + " of " + cat.posts.length);
+    header(cat.name + ", log " + (i + 1) + " of " + cat.posts.length);
     enqueue(el("div", "line title", p.title));
     if (p.subtitle) { line(p.subtitle, "dim"); }
     line([p.date].concat(p.tags || []).join("  |  "), "dim");
@@ -791,7 +791,7 @@
 
   /* ---------- Videos (pict-recordings) ---------- */
   function videos() {
-    header("Pict Recordings // Videos");
+    header("Pict Recordings");
     Object.keys(VIDEOS).forEach(function (c, i) {
       const n = VIDEOS[c].videos.length;
       option(i + 1, VIDEOS[c].name.toUpperCase(), function () { go(videoList, [c]); },
@@ -803,7 +803,7 @@
 
   function videoList(c) {
     const cat = VIDEOS[c];
-    header("Pict Recordings // " + cat.name);
+    header(cat.name);
     if (cat.description) { para(cat.description, "dim"); }
     if (!cat.videos.length) {
       line("NO PICT RECORDINGS FOUND. TRANSMISSIONS PENDING.", "alert");
@@ -819,7 +819,7 @@
 
   /* ---------- Games (simulations) ---------- */
   function games() {
-    header("Simulations // Games");
+    header("Simulations");
     GAMES.forEach(function (g, i) {
       option(i + 1, g.name.toUpperCase(), function () { go(game, [i]); },
              GAME_HINTS[g.type] || "");
@@ -829,9 +829,9 @@
   }
 
   const GAME_HINTS = {
-    doom:    "combat // shareware episode",
-    cube:    "puzzle // 3x3 cube in hex",
-    hangman: "word game // guess my skills"
+    doom:    "shareware combat",
+    cube:    "3x3 puzzle cube",
+    hangman: "guess my skills"
   };
 
   function hangmanScreen() {
@@ -886,7 +886,7 @@
 
   function game(i) {
     const g = GAMES[i];
-    header("Simulations // " + g.name);
+    header(g.name);
     if (g.type === "doom") {
       para("Combat simulation loaded from the Internet Archive (shareware episode). " +
            "Click into the feed to start. Arrow keys move, Ctrl fires. " +
@@ -905,7 +905,7 @@
 
   /* ---------- Resume (service record) ---------- */
   function service() {
-    header("Service Record // Resume");
+    header("Service Record");
     enqueue(el("div", "line title", PROFILE.name));
     line(SERVICE.headline || PROFILE.title, "dim");
     blank();
@@ -952,7 +952,7 @@
   }
 
   function vox() {
-    header("Vox Channels // Contact");
+    header("Vox Channels");
     para("Vox relay is functional. Messages will reach the operator.");
     blank();
     linkLine(dots("EMAIL"), "mailto:" + PROFILE.email, PROFILE.email);
@@ -998,9 +998,9 @@
     const list = Ship.systems.filter(function (x) { return x.area !== false; });
     const i = list.findIndex(function (s) { return s.id === id; });
     const sys = list[i];
-    header("Vigil of Ash // [" + sys.num + "] " + sys.name);
+    header("[" + sys.num + "] " + sys.name);
     line(dots("CONDITION", 14) + (sys.status === "ok" ? "NOMINAL" : sys.status === "damaged" ? "DAMAGED" : "OFFLINE") +
-         "  //  " + sys.pct + "%  //  " + sys.note, sys.status === "ok" ? "" : "alert");
+         ", " + sys.pct + "%. " + sys.note, sys.status === "ok" ? "" : "alert");
     blank();
     const scene = window.ShipAreas && ShipAreas[id];
     if (scene) {
@@ -1008,12 +1008,12 @@
         // Systems that are monitored from the bridge rather than visited
         const pa = Ship.systems.find(function (x) { return x.id === "prow"; });
         if (pa) {
-          line(dots("PROW ARMOR", 14) + "HULL INTEGRITY " + pa.pct + "%  //  " + (pa.status === "ok" ? "HOLDING" : "COMPROMISED"),
+          line(dots("PROW ARMOR", 14) + "HULL INTEGRITY " + pa.pct + "%, " + (pa.status === "ok" ? "HOLDING" : "COMPROMISED"),
                pa.status === "ok" ? "" : "alert");
         }
         const gf = Ship.systems.find(function (x) { return x.id === "geller"; });
         if (gf) {
-          line(dots("GELLER FIELD", 14) + (gf.status === "ok" ? "ONLINE" : "OFFLINE") + "  //  " + gf.pct + "%  //  CONTROLLED FROM THIS CONSOLE",
+          line(dots("GELLER FIELD", 14) + (gf.status === "ok" ? "ONLINE" : "OFFLINE") + ", " + gf.pct + "%. CONTROLLED FROM THIS CONSOLE",
                gf.status === "ok" ? "" : "alert");
         }
         blank();
@@ -1048,7 +1048,7 @@
   ];
 
   function help() {
-    header("Help // Command Litany");
+    header("Command Litany");
     HELP.forEach(function (h) {
       let name = h[0];
       while (name.length < 14) { name += " "; }
@@ -1094,7 +1094,7 @@
     cancel();
     out.innerHTML = "";
     sink = null;
-    setPageTitle("BOOT // POWER ON SELF TEST");
+    setPageTitle("POWER ON SELF TEST");
     lightKey(null);
     autoScroll = true;
     menu = {};

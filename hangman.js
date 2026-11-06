@@ -164,15 +164,15 @@
 
     function draw() {
       const over = game.status !== "playing";
-      stat.textContent = "ROUND " + game.round + "  //  WINS " + game.wins + "  //  LOSSES " + game.losses +
-        "  //  WORDS LEFT IN BANK " + game.deck.length;
+      stat.textContent = "ROUND " + game.round + "   WINS " + game.wins + "   LOSSES " + game.losses +
+        "   WORDS LEFT " + game.deck.length;
       art.textContent = robot(game.misses, game.status === "lost");
       art.classList.toggle("lost", game.status === "lost");
       hint.textContent = "HINT: " + game.entry.category;
       word.textContent = game.masked(over);
       word.classList.toggle("revealed", game.status === "lost");
       const wrong = Object.keys(game.guessed).filter(function (l) { return game.word().indexOf(l) < 0; });
-      misses.textContent = "MISSES " + game.misses + "/" + MAX_MISSES + (wrong.length ? "  //  " + wrong.join(" ") : "");
+      misses.textContent = "MISSES " + game.misses + "/" + MAX_MISSES + (wrong.length ? "   " + wrong.join(" ") : "");
 
       keys.innerHTML = "";
       ALPHABET.forEach(function (L) {

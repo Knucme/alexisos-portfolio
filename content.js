@@ -21,7 +21,7 @@
    ---------------------------------------------------------------- */
 const PROFILE = {
   name: "Alexis Gonzalez",
-  title: "Junior Software Engineer // Backend Focus",
+  title: "Junior Software Engineer, Backend Focus",
   location: "Menifee, California",
   intro: [
     "Navy veteran turning a long standing interest in problem solving into a software engineering career, with a focus on backend development.",

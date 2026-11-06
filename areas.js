@@ -133,7 +133,7 @@
       blip.style.animationDelay = (rand() * 4).toFixed(2) + "s";
       radar.appendChild(blip);
     }
-    radar.appendChild(el("div", "bp-crt-label", "AUSPEX // FORWARD ARC // 1 CONTACT UNIDENTIFIED"));
+    radar.appendChild(el("div", "bp-crt-label", "1 CONTACT UNIDENTIFIED"));
     shield.appendChild(radar);
     panel.appendChild(shield);
 
@@ -148,7 +148,7 @@
     // Control deck
     const deck = el("div", "bp-top");
 
-    const left = bay("FLIGHT // POWER");
+    const left = bay("POWER");
     const gauges = el("div", "bp-row");
     [["THRUST", 0.02], ["PWR BUS", 0.18], ["O2 PRESS", 0.41], ["HULL", 0.31]].forEach(function (g) {
       gauges.appendChild(gauge(g[0], g[1]));
@@ -186,11 +186,11 @@
     center.appendChild(tg2);
     const strip = el("div", "bp-led");
     strip.appendChild(el("span", "bp-led-text",
-      "VIGIL OF ASH  //  HULL " + (window.Ship ? Ship.hull() : 31) + "%  //  REACTOR STANDBY  //  VOX CH.9 SIGNAL UNKNOWN  //  AWAITING ENGINSEER  //  "));
+      "VIGIL OF ASH    HULL " + (window.Ship ? Ship.hull() : 31) + "%    REACTOR STANDBY    VOX CH.9 SIGNAL UNKNOWN    AWAITING ENGINSEER    "));
     center.appendChild(strip);
     deck.appendChild(center);
 
-    const right = bay("HELM // VOX");
+    const right = bay("HELM");
     const kR = el("div", "bp-row");
     kR.appendChild(knobT("GAIN", -40));
     kR.appendChild(knobT("FREQ", 110, true));
@@ -228,7 +228,7 @@
     ["ENGAGE", "RESET"].forEach(function (t) { rail.appendChild(key(t, "fnkey")); });
     panel.appendChild(rail);
 
-    panel.appendChild(el("div", "bp-plate", "COGITATOR MAIN CONSOLE  //  MK IV  //  DO NOT ANOINT WHILE POWERED"));
+    panel.appendChild(el("div", "bp-plate", "COGITATOR MAIN CONSOLE MK IV. DO NOT ANOINT WHILE POWERED"));
     return panel;
   }
 
@@ -417,7 +417,7 @@
     let pinned = null;
     function report(r) {
       info.className = "line dp-info" + (r.status === "ok" ? "" : " alert");
-      info.textContent = r.name + "  //  " + (r.status === "ok" ? "NOMINAL" : r.status === "dmg" ? "DAMAGED" : "SEALED") + "  //  " + r.note;
+      info.textContent = r.name + ": " + (r.status === "ok" ? "NOMINAL" : r.status === "dmg" ? "DAMAGED" : "SEALED") + ". " + r.note;
     }
 
     spec.rooms.forEach(function (r, i) {
@@ -516,7 +516,7 @@
   function deck4() {
     return deckPlan({
       id: "deck4",
-      title: "DECK 4  //  CREW QUARTERS",
+      title: "CREW QUARTERS",
       hull: "40,60 690,60 770,150 770,270 690,360 40,360 20,330 20,90",
       rooms: [
         { name: "BUNKS A", x: 50, y: 70, w: 150, h: 120, status: "ok", note: "12 RACKS. ALL EMPTY.", furn: bunks(4) },
@@ -547,7 +547,7 @@
   function cargoBay() {
     return deckPlan({
       id: "cargo",
-      title: "AFT CARGO  //  HOLDS 1 AND 2",
+      title: "CARGO HOLDS",
       hull: "60,40 720,40 790,110 790,310 720,380 60,380 30,340 30,80",
       rooms: [
         { name: "HOLD 1", x: 50, y: 50, w: 250, h: 320, status: "ok", note: "24 CONTAINERS. MANIFEST MATCHES.", furn: crates(4, 4), labelY: 20 },
@@ -765,8 +765,8 @@
 
       // labels
       ctx.font = "6px \"IBM Plex Mono\", monospace";
-      ctx.fillStyle = "rgba(120,190,255,0.8)"; ctx.fillText("PORT // STALLED", 70, 20);
-      ctx.fillStyle = "rgba(255,90,60," + (Math.sin(t * 6) > 0 ? 0.9 : 0.4) + ")"; ctx.fillText("STBD // OFFLINE", 70, 80);
+      ctx.fillStyle = "rgba(120,190,255,0.8)"; ctx.fillText("PORT STALLED", 70, 20);
+      ctx.fillStyle = "rgba(255,90,60," + (Math.sin(t * 6) > 0 ? 0.9 : 0.4) + ")"; ctx.fillText("STBD OFFLINE", 70, 80);
       frame++;
       if (!reduce) { raf = requestAnimationFrame(draw); }
     }
@@ -801,7 +801,7 @@
 
     const reads = el("div", "rx-reads");
     [["STASIS PODS", "12", ""], ["EMPTY", "9", ""], ["FAILED", "2", "crit"],
-     ["SEALED", "1  //  POD 07", "warn"], ["POD 07 VITALS", "INTERMITTENT", "crit"], ["BAY POWER", "RESERVE 37%", "warn"]].forEach(function (r) {
+     ["SEALED", "POD 07", "warn"], ["POD 07 VITALS", "INTERMITTENT", "crit"], ["BAY POWER", "RESERVE 37%", "warn"]].forEach(function (r) {
       const d = el("div", "rx-read " + r[2]);
       d.appendChild(el("span", "rx-l", r[0]));
       d.appendChild(el("span", "rx-v", r[1]));

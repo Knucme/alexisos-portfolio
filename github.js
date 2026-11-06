@@ -118,7 +118,7 @@
 
     // Repositories
     const repoCol = el("div", "gh-col");
-    repoCol.appendChild(el("div", "gh-h", "REPOSITORIES  //  BY LAST PUSH"));
+    repoCol.appendChild(el("div", "gh-h", "REPOSITORIES"));
     if (data && data.repos.length) {
       data.repos.forEach(function (r) {
         const row = el("div", "gh-row");
@@ -136,7 +136,7 @@
 
     // Latest commits on the most recently pushed repo
     const comCol = el("div", "gh-col");
-    comCol.appendChild(el("div", "gh-h", "LATEST COMMITS" + (data && data.commitsRepo ? "  //  " + plain(data.commitsRepo).toUpperCase() : "")));
+    comCol.appendChild(el("div", "gh-h", "LATEST COMMITS"));
     if (data && data.commits.length) {
       data.commits.forEach(function (c) {
         const row = el("div", "gh-row");
@@ -154,7 +154,7 @@
 
     // Activity
     const actCol = el("div", "gh-col");
-    actCol.appendChild(el("div", "gh-h", "PUSH ACTIVITY  //  14 DAYS"));
+    actCol.appendChild(el("div", "gh-h", "PUSH ACTIVITY, 14 DAYS"));
     if (data) {
       const sp = sparkline(data.events);
       // Bar chart: one bar per day, height = pushes that day
