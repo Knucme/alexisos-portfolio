@@ -16,7 +16,9 @@
     // Listed bow to stern; each area's number is its position in this list.
     { id: "bridge",  name: "BRIDGE",       status: "ok",      pct: 88, note: "COGITATOR ONLINE" },
     { id: "vox",     name: "VOX ARRAY",    status: "damaged", pct: 23, note: "NON STANDARD SIGNAL CH.9" },
-    { id: "prow",    name: "PROW ARMOR",   status: "ok",      pct: 66, note: "INTACT" },
+    // Like the Geller field, the prow armor is display-only: its hull
+    // integrity is reported on the bridge, not visited.
+    { id: "prow",    name: "PROW ARMOR",   status: "ok",      pct: 66, note: "HULL INTEGRITY 66%", area: false, measure: "INTEGRITY" },
     { id: "life",    name: "LIFE SUPPORT", status: "damaged", pct: 37, note: "ON RESERVE POWER" },
     { id: "deck4",   name: "DECK 4",       status: "damaged", pct: 12, note: "PRESSURE SEAL FAILING" },
     { id: "reactor", name: "REACTOR",      status: "damaged", pct: 4,  note: "STANDBY 4%" },
@@ -239,7 +241,7 @@
         r.classList.add("static");
       }
       r.appendChild(el("span", "sp-pct", String(s.pct).padStart(3, " ") + "%"));
-      r.appendChild(el("span", "sp-state", s.status === "ok" ? "NOM" : s.status === "damaged" ? "DMG" : "OFF"));
+      r.appendChild(el("span", "sp-state", s.measure === "INTEGRITY" ? "INT" : s.status === "ok" ? "NOM" : s.status === "damaged" ? "DMG" : "OFF"));
       sys.appendChild(r);
     });
     right.appendChild(sys);

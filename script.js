@@ -1005,12 +1005,18 @@
     const scene = window.ShipAreas && ShipAreas[id];
     if (scene) {
       if (id === "bridge") {
+        // Systems that are monitored from the bridge rather than visited
+        const pa = Ship.systems.find(function (x) { return x.id === "prow"; });
+        if (pa) {
+          line(dots("PROW ARMOR", 14) + "HULL INTEGRITY " + pa.pct + "%  //  " + (pa.status === "ok" ? "HOLDING" : "COMPROMISED"),
+               pa.status === "ok" ? "" : "alert");
+        }
         const gf = Ship.systems.find(function (x) { return x.id === "geller"; });
         if (gf) {
           line(dots("GELLER FIELD", 14) + (gf.status === "ok" ? "ONLINE" : "OFFLINE") + "  //  " + gf.pct + "%  //  CONTROLLED FROM THIS CONSOLE",
                gf.status === "ok" ? "" : "alert");
-          blank();
         }
+        blank();
       }
       enqueue(scene(sys, Ship.systems));
     } else {
