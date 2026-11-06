@@ -151,6 +151,18 @@
     geller:  { x: 40,  y: 22,  tx: 120, ty: 48 }
   };
 
+  /* Generous invisible click zones around each section, so you don't
+     have to hit the thin lines exactly: [x, y, width, height]. */
+  const HIT = {
+    engines: [20, 68, 110, 164],
+    cargo:   [128, 86, 122, 116],
+    reactor: [250, 104, 84, 92],
+    deck4:   [334, 102, 100, 96],
+    life:    [434, 106, 52, 88],
+    bridge:  [532, 62, 70, 36],
+    vox:     [542, 2, 54, 62]
+  };
+
   function schematic(onPick, onEnter) {
     const root = svg("svg", { viewBox: "0 0 640 270", class: "ship-svg", role: "img",
                               "aria-label": "Schematic of the Vigil of Ash with damaged sections flashing" });
@@ -163,6 +175,10 @@
       if (nav) { g.setAttribute("tabindex", 0); }
       g.style.animationDelay = (i * 0.37 % 1.3).toFixed(2) + "s";
       svg("title", {}, g).textContent = s.name + ": " + s.note + " (" + s.pct + "%)";
+      if (nav && HIT[s.id]) {
+        const h = HIT[s.id];
+        svg("rect", { x: h[0], y: h[1], width: h[2], height: h[3], rx: 4, class: "hit" }, g);
+      }
       SHAPES[s.id](g);
       g.addEventListener("mouseenter", function () { onPick(s); });
       g.addEventListener("focus", function () { onPick(s); });
@@ -174,10 +190,26 @@
     // Labels with leader lines
     SHIP_SYSTEMS.forEach(function (s) {
       const L = LABELS[s.id];
-      const g = svg("g", { class: "ship-label " + s.status }, root);
+      const nav = s.area !== false;
+      const g = svg("g", { class: "ship-label " + s.status + (nav ? " nav" : ""), "data-id": s.id }, root);
       line(L.x + 20, L.y + (L.y < L.ty ? 4 : -12), L.tx, L.ty, g, "leader");
       const t = svg("text", { x: L.x, y: L.y }, g);
       t.textContent = tagOf(s) + s.name + (s.status === "ok" ? "" : " !");
+      // The label is a click target too (with a padded box behind the text)
+      if (nav) {
+        const w = t.textContent.length * 7.2 + 12;
+        g.insertBefore(svg("rect", { x: L.x - 6, y: L.y - 15, width: w, height: 22, rx: 3, class: "label-hit" }), t);
+        g.addEventListener("mouseenter", function () {
+          onPick(s);
+          const sec = root.querySelector('.ship-sec[data-id="' + s.id + '"]');
+          if (sec) { sec.classList.add("hover"); }
+        });
+        g.addEventListener("mouseleave", function () {
+          const sec = root.querySelector('.ship-sec[data-id="' + s.id + '"]');
+          if (sec) { sec.classList.remove("hover"); }
+        });
+        g.addEventListener("click", function (e) { e.stopPropagation(); onEnter(s); });
+      }
     });
     return root;
   }

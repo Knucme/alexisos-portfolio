@@ -1811,3 +1811,22 @@ body.theme-retrowave:not(.red-alert):not(.green-mode) .emblem { filter: none; }
 .bp-alert-ok { display: block; margin: 10px auto 0; }
 .bp-ann.need { outline: 3px solid #ffcc33; outline-offset: 2px; animation: bp-warn 0.5s steps(2) 8; }
 @media (max-width: 700px) { .bp-alert-row { grid-template-columns: 1fr; } }
+
+/* STATUS ship diagram: bigger click targets */
+.ship-sec rect.hit {
+  fill: rgba(255, 255, 255, 0) !important;
+  stroke: none !important;
+  filter: none !important;
+  animation: none !important;
+  pointer-events: all;
+}
+.ship-sec:hover rect.hit, .ship-sec:focus rect.hit, .ship-sec.hover rect.hit {
+  fill: rgba(255, 255, 255, 0.06) !important;
+  stroke: var(--amber-dim) !important;
+  stroke-dasharray: 4 4;
+  stroke-width: 1;
+}
+.ship-label.nav { cursor: pointer; }
+.ship-label .label-hit { fill: transparent; stroke: none; pointer-events: all; }
+.ship-label.nav:hover .label-hit { fill: rgba(255, 255, 255, 0.08); stroke: var(--amber-dim); stroke-width: 1; }
+.ship-label.nav:hover text { text-decoration: underline; }
