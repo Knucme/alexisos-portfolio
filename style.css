@@ -1830,3 +1830,75 @@ body.theme-retrowave:not(.red-alert):not(.green-mode) .emblem { filter: none; }
 .ship-label .label-hit { fill: transparent; stroke: none; pointer-events: all; }
 .ship-label.nav:hover .label-hit { fill: rgba(255, 255, 255, 0.08); stroke: var(--amber-dim); stroke-width: 1; }
 .ship-label.nav:hover text { text-decoration: underline; }
+
+/* ---------- Engines: two panel screens beside the engines ---------- */
+.rx-terms { display: flex; flex-direction: column; gap: 10px; }
+.rx-term.small { flex: 1; padding: 8px 6px; gap: 6px; }
+
+/* ---------- Engine nozzle shutdown panel (industrial style) ---------- */
+.ep {
+  background: linear-gradient(180deg, #8d9196, #74787d);
+  border: 4px solid #4c5055;
+  border-radius: 6px;
+  padding: 14px;
+  color: #ecefe8;
+  text-shadow: none;
+  font-family: var(--font);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.25), 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+.ep.fault { animation: ep-shake 0.35s steps(4) 2; }
+.ep-plate { background: #3d4146; border: 2px solid #2a2d31; padding: 8px 12px; margin-bottom: 12px; }
+.ep-title { font-family: var(--font-head); letter-spacing: 0.1em; font-size: 1.15em; color: #ffd24a; }
+.ep-order { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.ep-order-l { font-size: 0.85em; letter-spacing: 0.08em; color: #c8ccd1; margin-right: 6px; }
+.ep-step { min-width: 2ch; text-align: center; padding: 1px 6px; border: 1px solid #c8ccd1; font-weight: 600; }
+.ep-step.done { background: #3bbf5c; border-color: #3bbf5c; color: #102010; }
+.ep-arrow { color: #c8ccd1; }
+.ep-note { font-size: 0.8em; color: #c8ccd1; margin-top: 4px; }
+.ep-grid { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 2px solid #d6d9dc; border-left: 2px solid #d6d9dc; }
+.ep-col {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 12px 8px 16px;
+  border-right: 2px solid #d6d9dc; border-bottom: 2px solid #d6d9dc;
+}
+.ep-col.next { background: rgba(255, 210, 74, 0.12); }
+.ep-label { font-size: 0.85em; letter-spacing: 0.1em; color: #f4f5f2; }
+.ep-win {
+  width: 80%; padding: 6px 4px; text-align: center; font-weight: 600; font-size: 1.05em;
+  border: 4px solid #2b2e32; box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.6);
+}
+.ep-win.live { background: #5a1810; color: #ff8a70; }
+.ep-win.isolated { background: #e2c52b; color: #2a2405; }
+.ep-win.safed { background: #3bbf5c; color: #0c2a14; }
+.ep-cap { font-size: 0.85em; color: #eef0ec; }
+.ep-push {
+  width: 64px; height: 64px; border-radius: 50%; cursor: pointer;
+  background: radial-gradient(circle at 40% 35%, #ffef7a, #e7c62c 55%, #a88d12);
+  border: 4px solid #5a5e63; box-shadow: 0 4px 0 #3b3e42, inset 0 -4px 6px rgba(0, 0, 0, 0.25);
+}
+.ep-push:active, .ep-push.down { transform: translateY(3px); box-shadow: 0 1px 0 #3b3e42, inset 0 3px 6px rgba(0, 0, 0, 0.35); filter: brightness(0.9); }
+.ep-lever { position: relative; width: 44px; height: 80px; background: none; border: 0; cursor: pointer; padding: 0; }
+.ep-slot { position: absolute; left: 50%; top: 4px; bottom: 4px; width: 10px; margin-left: -5px; background: #2b2e32; border-radius: 5px; box-shadow: inset 0 0 4px #000; }
+.ep-handle {
+  position: absolute; left: 50%; top: 0; width: 40px; height: 22px; margin-left: -20px;
+  background: linear-gradient(180deg, #d84a3a, #8f2418); border: 2px solid #3b0f09; border-radius: 6px;
+  transition: top 0.2s ease;
+}
+.ep-lever.pulled .ep-handle { top: 56px; background: linear-gradient(180deg, #4cd36d, #1f7a38); border-color: #0c3a18; }
+.ep-msg { margin-top: 12px; padding: 6px 10px; background: #2b2e32; color: #ffd24a; letter-spacing: 0.05em; font-size: 0.9em; }
+.ep-msg.bad { color: #ff7a5a; }
+.ep-msg.good { color: #6cff96; }
+@keyframes ep-shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+@media (max-width: 700px) { .ep-push { width: 48px; height: 48px; } }
+
+/* ---------- Bridge: big engine restart lever ---------- */
+.bp-biglever { position: relative; width: 56px; height: 96px; background: none; border: 0; cursor: pointer; padding: 0; display: flex; flex-direction: column; align-items: center; }
+.bp-biglever-slot { position: absolute; left: 50%; top: 6px; height: 62px; width: 12px; margin-left: -6px; background: #0a0b0e; border: 2px solid #33363e; border-radius: 6px; }
+.bp-biglever-handle {
+  position: absolute; left: 50%; top: 0; width: 44px; height: 20px; margin-left: -22px;
+  background: linear-gradient(180deg, #ff5a3c, #9a2414); border: 2px solid #3b0f09; border-radius: 6px;
+  box-shadow: 0 0 10px rgba(255, 90, 60, 0.5); transition: top 0.25s ease;
+}
+.bp-biglever.pulled .bp-biglever-handle { top: 48px; }
+.bp-biglever.locked .bp-biglever-handle { background: linear-gradient(180deg, #4cd36d, #1f7a38); border-color: #0c3a18; box-shadow: 0 0 10px rgba(56, 255, 122, 0.5); }
+.bp-biglever .bp-tag { position: absolute; bottom: 0; white-space: nowrap; }

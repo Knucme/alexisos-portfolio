@@ -997,7 +997,7 @@
   /* ---------- Pop-up windows (repair terminals) ----------
      A window floats over the terminal; ESC, the CLOSE button, or
      changing screens closes it. Closing a repair mid-way resets it. */
-  const WINDOWED_REPAIRS = { reactor: true };
+  const WINDOWED_REPAIRS = { reactor: true, engines: true };
   let closeWindow = null;
 
   function openWindow(title, content) {
@@ -1036,7 +1036,7 @@
     const panel = Repairs[which](sys, {
       done: function () { if (close) { close(); } render(); }
     });
-    close = openWindow(sys.name + " CONTROL TERMINAL", panel);
+    close = openWindow(Repairs[which].title || (sys.name + " CONTROL TERMINAL"), panel);
   }
 
   /* ---------- Ship areas (opened from STATUS) ---------- */
@@ -1070,6 +1070,14 @@
             });
             line(dots("INTERLOCK", 14) + parts.join("   "), Ship.missingFor("geller").length ? "dim" : "");
           }
+        }
+        // Engine restart lever status
+        const eng = Ship.systems.find(function (x) { return x.id === "engines"; });
+        if (eng && eng.status !== "ok") {
+          line(dots("ENGINES", 14) + "OFFLINE. RESTART LEVER: PORT PANEL " + (Ship.flag("engine_port_safed") ? "[SAFED]" : "[LIVE]") +
+               "   STBD PANEL " + (Ship.flag("engine_stbd_safed") ? "[SAFED]" : "[LIVE]"), "dim");
+        } else if (eng) {
+          line(dots("ENGINES", 14) + "ONLINE, 100%. THRUST NOMINAL");
         }
         blank();
       }

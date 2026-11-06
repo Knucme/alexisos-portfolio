@@ -306,7 +306,8 @@
   const REPAIRS = {
     vox:     { status: "ok", pct: 100, note: "LOCK HOLDING. SIGNAL CLEAR" },
     reactor: { status: "ok", pct: 100, note: "CORES STABLE. FULL OUTPUT" },
-    geller:  { status: "ok", pct: 100, note: "FIELD STABLE" }
+    geller:  { status: "ok", pct: 100, note: "FIELD STABLE" },
+    engines: { status: "ok", pct: 100, note: "BOTH ENGINES ONLINE. THRUST NOMINAL" }
   };
   /* Some repairs depend on others. The Geller field can only be raised
      from the bridge once the vox array and the reactor are online. */
@@ -340,12 +341,26 @@
     return (REQUIRES[id] || []).filter(function (r) { return !isRepaired(r); });
   }
   function resetRepairs() {
-    try { localStorage.removeItem(KEY); } catch (e) { /* storage blocked */ }
+    try { localStorage.removeItem(KEY); localStorage.removeItem(FLAG_KEY); } catch (e) { /* storage blocked */ }
     applyRepairs();
+  }
+
+  /* Small saved progress markers for multi-step repairs
+     (for example, which engine panels have been safed). */
+  const FLAG_KEY = "alexisos-flags";
+  function flags() {
+    try { return JSON.parse(localStorage.getItem(FLAG_KEY) || "{}"); } catch (e) { return {}; }
+  }
+  function flag(name, value) {
+    const f = flags();
+    if (value === undefined) { return !!f[name]; }
+    f[name] = !!value;
+    try { localStorage.setItem(FLAG_KEY, JSON.stringify(f)); } catch (e) { /* storage blocked */ }
+    return f[name];
   }
   applyRepairs();
 
   window.Ship = { systems: SHIP_SYSTEMS, render: render, hull: hull,
                   repair: repair, isRepaired: isRepaired, resetRepairs: resetRepairs,
-                  missingFor: missingFor, requires: REQUIRES };
+                  missingFor: missingFor, requires: REQUIRES, flag: flag };
 })();

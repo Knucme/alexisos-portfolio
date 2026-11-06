@@ -536,5 +536,129 @@
     return wrap;
   }
 
-  window.Repairs = { vox: vox, reactor: reactor };
+  /* ---------- ENGINES (area 7): nozzle shutdown panels ----------
+     Each engine has three exhaust nozzles. Before the engines can be
+     restarted from the bridge, every nozzle has to be safed, one at a
+     time, in the order printed on the panel:
+       1. PUSH TO ISOLATE (the yellow button)   window turns ISOLATED
+       2. PULL TO SAFE   (the lever under it)   window turns SAFED
+     Anything out of order faults the panel and it resets.
+     When all three are safed, the engine's flag is saved. */
+  const ENGINE_PANELS = {
+    port: { name: "PORT ENGINE", order: [2, 1, 3] },
+    stbd: { name: "STARBOARD ENGINE", order: [3, 1, 2] }
+  };
+
+  function enginePanel(key, opts) {
+    const cfg = ENGINE_PANELS[key];
+    const done = (opts && opts.done) || function () {};
+    const flagName = "engine_" + key + "_safed";
+    const wrap = el("section", "ep");
+
+    const plate = el("div", "ep-plate");
+    plate.appendChild(el("div", "ep-title", cfg.name + "  NOZZLE SHUTDOWN"));
+    const orderLine = el("div", "ep-order");
+    orderLine.appendChild(el("span", "ep-order-l", "SHUTDOWN ORDER"));
+    cfg.order.forEach(function (n, k) {
+      orderLine.appendChild(el("span", "ep-step", String(n)));
+      if (k < cfg.order.length - 1) { orderLine.appendChild(el("span", "ep-arrow", "▸")); }
+    });
+    plate.appendChild(orderLine);
+    plate.appendChild(el("div", "ep-note", "For each nozzle: push to isolate, then pull to safe."));
+    wrap.appendChild(plate);
+
+    const already = window.Ship && Ship.flag(flagName);
+    // nozzle state: live -> isolated -> safed
+    let nz = [1, 2, 3].map(function (n) { return { n: n, state: already ? "safed" : "live" }; });
+    let step = already ? 3 : 0, faulted = false;
+
+    const grid = el("div", "ep-grid");
+    const cells = nz.map(function (z) {
+      const col = el("div", "ep-col");
+      col.appendChild(el("div", "ep-label", "NOZZLE " + z.n));
+      const win = el("div", "ep-win");
+      col.appendChild(win);
+      col.appendChild(el("div", "ep-cap", "Push to Isolate"));
+      const push = el("button", "ep-push");
+      push.type = "button";
+      push.setAttribute("aria-label", "Nozzle " + z.n + ": push to isolate");
+      col.appendChild(push);
+      col.appendChild(el("div", "ep-cap", "Pull to Safe"));
+      const lever = el("button", "ep-lever");
+      lever.type = "button";
+      lever.setAttribute("aria-label", "Nozzle " + z.n + ": pull lever to safe");
+      lever.appendChild(el("span", "ep-slot"));
+      lever.appendChild(el("span", "ep-handle"));
+      col.appendChild(lever);
+      grid.appendChild(col);
+      push.addEventListener("click", function (e) { e.stopPropagation(); act(z, "push"); });
+      lever.addEventListener("click", function (e) { e.stopPropagation(); act(z, "pull"); });
+      return { win: win, push: push, lever: lever, col: col };
+    });
+    wrap.appendChild(grid);
+    const msg = el("div", "ep-msg", already ? "ALL NOZZLES SAFED. RESTART FROM THE BRIDGE." : "AWAITING SHUTDOWN SEQUENCE.");
+    wrap.appendChild(msg);
+
+    function paint() {
+      nz.forEach(function (z, i) {
+        const c = cells[i];
+        c.win.className = "ep-win " + z.state;
+        c.win.textContent = z.state === "live" ? "Live" : z.state === "isolated" ? "Isolated" : "Safed";
+        c.push.classList.toggle("down", z.state !== "live");
+        c.lever.classList.toggle("pulled", z.state === "safed");
+        c.col.classList.toggle("next", !faulted && step < 3 && cfg.order[step] === z.n);
+      });
+      orderLine.querySelectorAll(".ep-step").forEach(function (s, k) { s.classList.toggle("done", k < step); });
+    }
+
+    function fault(text) {
+      faulted = true;
+      wrap.classList.add("fault");
+      msg.className = "ep-msg bad";
+      msg.textContent = text + " PANEL RESETTING.";
+      paint();
+      setTimeout(function () {
+        nz.forEach(function (z) { z.state = "live"; });
+        step = 0; faulted = false;
+        wrap.classList.remove("fault");
+        msg.className = "ep-msg";
+        msg.textContent = "PANEL RESET. START AGAIN FROM THE FIRST NOZZLE IN THE ORDER.";
+        paint();
+      }, 1500);
+    }
+
+    function act(z, kind) {
+      if (faulted || step >= 3) { return; }
+      const expected = cfg.order[step];
+      if (z.n !== expected) { fault("FAULT: NOZZLE " + z.n + " IS OUT OF SEQUENCE."); return; }
+      if (kind === "push") {
+        if (z.state !== "live") { return; }
+        z.state = "isolated";
+        msg.className = "ep-msg"; msg.textContent = "NOZZLE " + z.n + " ISOLATED. PULL ITS LEVER TO SAFE IT.";
+      } else {
+        if (z.state !== "isolated") { fault("FAULT: NOZZLE " + z.n + " WAS NOT ISOLATED FIRST."); return; }
+        z.state = "safed";
+        step++;
+        msg.className = "ep-msg"; msg.textContent = "NOZZLE " + z.n + " SAFED.";
+      }
+      paint();
+      if (step >= 3) {
+        if (window.Ship) { Ship.flag(flagName, true); }
+        msg.className = "ep-msg good";
+        msg.textContent = "+++ " + cfg.name + " SAFED. RESTART BOTH ENGINES FROM THE BRIDGE. +++";
+        wrap.classList.add("rp-won");
+        setTimeout(done, 2400);
+      }
+    }
+
+    paint();
+    return wrap;
+  }
+
+  function enginePort(sys, opts) { return enginePanel("port", opts); }
+  enginePort.title = "PORT ENGINE PANEL";
+  function engineStbd(sys, opts) { return enginePanel("stbd", opts); }
+  engineStbd.title = "STARBOARD ENGINE PANEL";
+
+  window.Repairs = { vox: vox, reactor: reactor, engines: true, enginePort: enginePort, engineStbd: engineStbd };
 })();

@@ -159,33 +159,33 @@
       vox:     "Divert power to Dish A and calibrate it to the carrier wave.",
       reactor: "Use the control terminal to cool Core B and vent its pressure."
     };
-    function showInterlock() {
+    /* Warning box on the console. items: [{ name, ok, how, go, lamp }]
+       Each unfinished item gets a hint and a GO FIX button. */
+    function showAlert(title, sub, items) {
       const old = panel.querySelector(".bp-alert");
       if (old) { old.remove(); }
-      const req = (window.Ship && Ship.requires.geller) || ["vox", "reactor"];
       const box = el("div", "bp-alert");
       box.setAttribute("role", "alertdialog");
-      box.appendChild(el("div", "bp-alert-h", "!! GELLER FIELD INTERLOCK !!"));
-      box.appendChild(el("div", "bp-alert-sub", "The field can't be raised until these systems are back online:"));
-      req.forEach(function (r) {
-        const s = all.find(function (x) { return x.id === r; });
-        const fixed = window.Ship ? Ship.isRepaired(r) : false;
-        const row = el("div", "bp-alert-row " + (fixed ? "ok" : "bad"));
-        row.appendChild(el("span", "bp-alert-mark", fixed ? "\u2713 ONLINE" : "\u2717 OFFLINE"));
+      box.appendChild(el("div", "bp-alert-h", title));
+      box.appendChild(el("div", "bp-alert-sub", sub));
+      items.forEach(function (it) {
+        const row = el("div", "bp-alert-row " + (it.ok ? "ok" : "bad"));
+        row.appendChild(el("span", "bp-alert-mark", it.ok ? "\u2713 " + (it.okText || "ONLINE") : "\u2717 " + (it.badText || "OFFLINE")));
         const info = el("span", "bp-alert-info");
-        info.appendChild(el("span", "bp-alert-name", (s ? "[" + s.num + "] " + s.name : r.toUpperCase()) + (r === "vox" ? " (ANTENNAS)" : "")));
-        if (!fixed) { info.appendChild(el("span", "bp-alert-how", HOW[r] || "")); }
+        info.appendChild(el("span", "bp-alert-name", it.name));
+        if (!it.ok && it.how) { info.appendChild(el("span", "bp-alert-how", it.how)); }
         row.appendChild(info);
-        if (!fixed && opts && opts.go) {
+        if (!it.ok && it.go && opts && opts.go) {
           const goBtn = el("button", "bp-alert-go", "GO FIX \u25B8");
           goBtn.type = "button";
-          goBtn.addEventListener("click", function (e) { e.stopPropagation(); opts.go(r); });
+          goBtn.addEventListener("click", function (e) { e.stopPropagation(); opts.go(it.go); });
           row.appendChild(goBtn);
         }
         box.appendChild(row);
-        // pulse that system's caution light
-        const lamp = panel.querySelector('.bp-ann[data-sys="' + r + '"]');
-        if (lamp && !fixed) { lamp.classList.remove("need"); void lamp.offsetWidth; lamp.classList.add("need"); }
+        if (it.lamp && !it.ok) {
+          const lamp = panel.querySelector('.bp-ann[data-sys="' + it.lamp + '"]');
+          if (lamp) { lamp.classList.remove("need"); void lamp.offsetWidth; lamp.classList.add("need"); }
+        }
       });
       const ok = el("button", "bp-alert-ok", "ACKNOWLEDGE");
       ok.type = "button";
@@ -194,6 +194,43 @@
       panel.appendChild(box);
       if (box.scrollIntoView) { box.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
       ok.focus({ preventScroll: true });
+    }
+
+    function showInterlock() {
+      const req = (window.Ship && Ship.requires.geller) || ["vox", "reactor"];
+      showAlert("!! GELLER FIELD INTERLOCK !!", "The field can't be raised until these systems are back online:",
+        req.map(function (r) {
+          const sx = all.find(function (x) { return x.id === r; });
+          return {
+            name: (sx ? "[" + sx.num + "] " + sx.name : r.toUpperCase()) + (r === "vox" ? " (ANTENNAS)" : ""),
+            ok: window.Ship ? Ship.isRepaired(r) : false,
+            how: HOW[r] || "", go: r, lamp: r
+          };
+        }));
+    }
+
+    /* ENGINE RESTART lever (helm bay): kicks both engines back online,
+       but only after both engine panels have had their nozzles safed. */
+    function engineRestart(leverEl) {
+      if (window.Ship && Ship.isRepaired("engines")) { gellerMsg("ENGINES ALREADY RUNNING.", "ok"); return; }
+      const port = window.Ship && Ship.flag("engine_port_safed");
+      const stbd = window.Ship && Ship.flag("engine_stbd_safed");
+      if (!port || !stbd) {
+        leverEl.classList.add("pulled");
+        setTimeout(function () { leverEl.classList.remove("pulled"); }, 350);
+        gellerMsg("RESTART REFUSED: ENGINE NOZZLES STILL LIVE.", "bad");
+        const how = "Open its panel in the engine room and safe all three nozzles in order.";
+        showAlert("!! ENGINE RESTART LOCKOUT !!", "Both engines must be shut down nozzle by nozzle before a restart:", [
+          { name: "PORT ENGINE PANEL", ok: port, okText: "SAFED", badText: "LIVE", how: how, go: "engines", lamp: "engines" },
+          { name: "STARBOARD ENGINE PANEL", ok: stbd, okText: "SAFED", badText: "LIVE", how: how, go: "engines", lamp: "engines" }
+        ]);
+        return;
+      }
+      leverEl.classList.add("pulled", "locked");
+      if (window.Ship) { Ship.repair("engines"); }
+      gellerMsg("IGNITION... PORT LIT... STARBOARD LIT. BOTH ENGINES ONLINE.", "ok");
+      panel.classList.add("bp-won");
+      setTimeout(done, 2600);
     }
     panel.appendChild(cautionWrap);
 
@@ -292,6 +329,17 @@
     const tgR = el("div", "bp-row");
     ["RCS", "GEAR"].forEach(function (t) { tgR.appendChild(toggle(t, false)); });
     helm.appendChild(tgR);
+    // Big red engine restart lever
+    const engOn = window.Ship && Ship.isRepaired("engines");
+    const rl = el("button", "bp-biglever" + (engOn ? " pulled locked" : ""));
+    rl.type = "button";
+    rl.dataset.ctl = "engine-restart";
+    rl.setAttribute("aria-label", "Engine restart lever");
+    rl.appendChild(el("span", "bp-biglever-slot"));
+    rl.appendChild(el("span", "bp-biglever-handle"));
+    rl.appendChild(el("span", "bp-tag", engOn ? "ENGINES ON" : "ENGINE RESTART"));
+    rl.addEventListener("click", function (e) { e.stopPropagation(); engineRestart(rl); });
+    helm.appendChild(rl);
     right.appendChild(helm);
     deck.appendChild(right);
 
@@ -682,7 +730,7 @@
                   turns slowly, nozzles pulse dim, and it sputters.
        STARBOARD: dead. No light at all, ring still, pixel smoke leaking
                   from the nozzles and the core. */
-  function engines(sys) {
+  function engines(sys, all, opts) {
     const wrap = el("div", "rx");
     const W = 256, H = 144;
     const canvas = el("canvas", "rx-canvas");
@@ -690,11 +738,35 @@
     canvas.height = H;
     canvas.setAttribute("role", "img");
     canvas.setAttribute("aria-label", "Two engines: port stalled with a weak blue glow, starboard dead and smoking");
-    wrap.appendChild(canvas);
+    const running = sys && sys.status === "ok";      // restarted from the bridge
+
+    // Two panel screens beside the engines, one per engine
+    const row = el("div", "rx-row");
+    row.appendChild(canvas);
+    const side = el("div", "rx-terms");
+    [["port", "PORT ENGINE", "enginePort"], ["stbd", "STBD ENGINE", "engineStbd"]].forEach(function (p) {
+      const safed = window.Ship && Ship.flag("engine_" + p[0] + "_safed");
+      const t = el("button", "rx-term small" + (running || safed ? " ok" : ""));
+      t.type = "button";
+      t.appendChild(el("span", "rx-term-h", p[1] + " PANEL"));
+      t.appendChild(el("span", "rx-term-s" + (running || safed ? "" : " blink"),
+        running ? "RUNNING" : safed ? "NOZZLES SAFED" : "NOZZLES LIVE"));
+      t.appendChild(el("span", "rx-term-c", running ? "[ VIEW ]" : safed ? "[ DONE ]" : "[ CLICK TO ACCESS ]"));
+      t.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (opts && opts.open) { opts.open(p[2]); }
+      });
+      side.appendChild(t);
+    });
+    row.appendChild(side);
+    wrap.appendChild(row);
 
     const reads = el("div", "rx-reads");
-    [["PORT ENGINE", "STALLED", "warn"], ["PORT THRUST", "3%", ""], ["PORT CORE", "FLICKER", "warn"],
-     ["STBD ENGINE", "OFFLINE", "crit"], ["STBD THRUST", "0%", "crit"], ["STBD CORE", "VENTING", "crit"]].forEach(function (r) {
+    (running
+      ? [["PORT ENGINE", "ONLINE", ""], ["PORT THRUST", "100%", ""], ["PORT CORE", "STABLE", ""],
+         ["STBD ENGINE", "ONLINE", ""], ["STBD THRUST", "100%", ""], ["STBD CORE", "STABLE", ""]]
+      : [["PORT ENGINE", "STALLED", "warn"], ["PORT THRUST", "3%", ""], ["PORT CORE", "FLICKER", "warn"],
+         ["STBD ENGINE", "OFFLINE", "crit"], ["STBD THRUST", "0%", "crit"], ["STBD CORE", "VENTING", "crit"]]).forEach(function (r) {
       const d = el("div", "rx-read " + r[2]);
       d.appendChild(el("span", "rx-l", r[0]));
       d.appendChild(el("span", "rx-v", r[1]));
@@ -713,8 +785,8 @@
 
     // y = engine centerline. ring at x 52, body to x 196, nozzles past that.
     const ENG = [
-      { y: 44,  on: true,  spin: 0 },
-      { y: 104, on: false, spin: 0.9 }
+      { y: 44,  on: true,  spin: 0, full: running },
+      { y: 104, on: running, spin: 0.9, full: running }
     ];
     let smoke = [];
 
@@ -729,8 +801,9 @@
     function engine(E, t) {
       const cy = E.y, ringX = 52, rx = 13, ry = 27;
       // flicker for the stalled engine: mostly dim, with random sputters
-      const sputter = E.on ? (Math.sin(t * 23) > 0.92 || rnd() < 0.03 ? 1 : 0) : 0;
-      const pulse = E.on ? 0.35 + 0.15 * Math.sin(t * 2.4) + sputter * 0.45 : 0;
+      // A running engine glows steady and bright; a stalled one flickers and sputters
+      const sputter = E.on && !E.full ? (Math.sin(t * 23) > 0.92 || rnd() < 0.03 ? 1 : 0) : 0;
+      const pulse = E.full ? 0.9 + 0.08 * Math.sin(t * 3) : E.on ? 0.35 + 0.15 * Math.sin(t * 2.4) + sputter * 0.45 : 0;
 
       // body: ribbed cylinder from the ring to the nozzles
       px(ringX + 6, cy - 15, 138, 30, "#1b1e26");
@@ -857,7 +930,7 @@
       ctx.fillStyle = band; ctx.fillRect(0, 50, W, 50);
 
       ENG.forEach(function (E) { engine(E, t); });
-      if (!reduce) {
+      if (!reduce && !running) {
         if (frame % 3 === 0) { spawn(ENG[1], false); }   // steady stream from the nozzles
         if (frame % 11 === 0) { spawn(ENG[1], true); }   // slower leak from the core
       }
@@ -865,12 +938,16 @@
 
       // labels
       ctx.font = "6px \"IBM Plex Mono\", monospace";
-      ctx.fillStyle = "rgba(120,190,255,0.8)"; ctx.fillText("PORT STALLED", 70, 20);
-      ctx.fillStyle = "rgba(255,90,60," + (Math.sin(t * 6) > 0 ? 0.9 : 0.4) + ")"; ctx.fillText("STBD OFFLINE", 70, 80);
+      if (running) {
+        ctx.fillStyle = "rgba(120,220,255,0.9)"; ctx.fillText("PORT ONLINE", 70, 20); ctx.fillText("STBD ONLINE", 70, 80);
+      } else {
+        ctx.fillStyle = "rgba(120,190,255,0.8)"; ctx.fillText("PORT STALLED", 70, 20);
+        ctx.fillStyle = "rgba(255,90,60," + (Math.sin(t * 6) > 0 ? 0.9 : 0.4) + ")"; ctx.fillText("STBD OFFLINE", 70, 80);
+      }
       frame++;
       if (!reduce) { raf = requestAnimationFrame(draw); }
     }
-    if (!reduce) {
+    if (!reduce && !running) {
       // pre-fill so the plume is already trailing away when the page opens
       for (let i = 0; i < 260; i++) {
         if (i % 3 === 0) { spawn(ENG[1], false); }
