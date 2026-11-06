@@ -27,7 +27,11 @@
   function btn(text, cls, fn) {
     const b = el("button", "opt rp-btn" + (cls ? " " + cls : ""), text);
     b.type = "button";
-    b.addEventListener("click", function (e) { e.stopPropagation(); fn(); });
+    b.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (window.Ship) { Ship.touch(); }     // working a puzzle keeps progress alive
+      fn();
+    });
     return b;
   }
 
@@ -107,6 +111,7 @@
       input.setAttribute("aria-label", sp.label);
       const val = el("span", "rp-ctrl-v", sp.fmt(state[sp.key]));
       input.addEventListener("input", function () {
+        if (window.Ship) { Ship.touch(); }
         state[sp.key] = parseFloat(input.value);
         val.textContent = sp.fmt(state[sp.key]);
         update();
@@ -628,6 +633,7 @@
     }
 
     function act(z, kind) {
+      if (window.Ship) { Ship.touch(); }
       if (faulted || step >= 3) { return; }
       const expected = cfg.order[step];
       if (z.n !== expected) { fault("FAULT: NOZZLE " + z.n + " IS OUT OF SEQUENCE."); return; }

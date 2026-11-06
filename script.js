@@ -244,6 +244,7 @@
 
   function render() {
     if (closeWindow) { closeWindow(); }
+    if (window.Ship) { Ship.checkExpiry(); }    // an hour idle: the storm breaks the ship again
     notifyCommand("");
     cancel();
     out.innerHTML = "";
@@ -254,6 +255,7 @@
     activeGame = null;
     lightKey(current.fn);
     current.fn.apply(null, current.args);
+    if (window.Ship && Ship.consumeStormNotice()) { enqueue(stormNotice, 0); }
   }
 
   /* Open a screen and remember the one we came from. */
@@ -561,7 +563,7 @@
       "UNIT 7 ALPHA: VIGIL OF ASH READY FOR WARP JUMP"
     ] : [
       "UNIT 7 ALPHA: AWAITING ORDERS",
-      "UNIT 7 ALPHA: REPAIRS " + prog.done + " OF " + prog.total + " COMPLETE",
+      "UNIT 7 ALPHA: " + prog.done + " OF " + prog.total + " SYSTEMS NOMINAL",
       "UNIT 7 ALPHA: SCANNING HULL",
       fixedV ? "UNIT 7 ALPHA: VOX CHANNEL OPEN" : "UNIT 7 ALPHA: LISTENING ON VOX CH.9",
       "UNIT 7 ALPHA: MACHINE SPIRIT RESTLESS"
@@ -569,6 +571,10 @@
     if (prog.complete) {
       dash.classList.add("ready");
       dash.appendChild(el("div", "dash-ready", "+++ SHIP OPERATIONAL. READY FOR WARP JUMP. +++"));
+      const wj = el("button", "opt warp-btn", "[ INITIATE WARP JUMP ]");
+      wj.type = "button";
+      wj.addEventListener("click", function (e) { e.stopPropagation(); warpJump(); });
+      dash.appendChild(wj);
     }
     const botLine = el("div", "dash-bottom", ROBOT_STATUS[0]);
     dash.appendChild(botLine);
@@ -629,6 +635,7 @@
     src.body.appendChild(kv("PICT FEEDS", vids ? vids + " FEEDS" : "NONE", vids ? "" : "[PENDING]", vids ? "" : "dim"));
     src.body.appendChild(kv("SIMULATIONS", GAMES.length + " LOADED", ""));
     src.body.appendChild(kv("VOX CH.9", "NO DATA", "[UNK]", "alert"));
+    if (window.Ship && Ship.jumps()) { src.body.appendChild(kv("WARP JUMPS", String(Ship.jumps()), "[LOG]")); }
 
     const op = panelBox("OPERATOR", "m-op");
     op.body.appendChild(el("div", "line op-name", PROFILE.name.toUpperCase()));
@@ -1053,6 +1060,90 @@
     close = openWindow(Repairs[which].title || (sys.name + " CONTROL TERMINAL"), panel);
   }
 
+  /* ---------- Storm damage notice (progress expired) ---------- */
+  function stormNotice() {
+    const box = el("div", "storm");
+    box.appendChild(el("div", "storm-h", "!! WARP STORM DAMAGE DETECTED !!"));
+    box.appendChild(el("div", "para", "The ship drifted for over an hour with no repair crew at the controls. " +
+      "The storm tore through the systems again. Every repair has been lost."));
+    box.appendChild(el("div", "line dim", "Type STATUS to start the repairs again."));
+    const ok = el("button", "opt storm-ok", "[ ACKNOWLEDGE ]");
+    ok.type = "button";
+    box.appendChild(ok);
+    const close = openWindow("SHIP ALERT", box);
+    ok.addEventListener("click", function (e) { e.stopPropagation(); close(); });
+  }
+
+  /* ---------- Warp jump (the ending) ----------
+     Only available once every repair is done. Plays a jump sequence,
+     counts the jump, then the ship drops out into a new warp storm and
+     all the damage comes back, so the hunt starts over. */
+  function warpReady() { return window.Ship && Ship.progress().complete; }
+
+  function warpJump() {
+    if (!warpReady()) {
+      const p = window.Ship ? Ship.progress() : { done: 0, total: 0 };
+      say("WARP DRIVE UNAVAILABLE. ONLY " + p.done + " OF " + p.total + " SYSTEMS NOMINAL. EVERY AREA MUST BE REPAIRED. TYPE STATUS.", "alert");
+      return;
+    }
+    if (closeWindow) { closeWindow(); }
+    const crt = document.getElementById("crt");
+    const fx = el("div", "warp");
+    const canvas = el("canvas", "warp-canvas");
+    const text = el("div", "warp-text", "");
+    fx.appendChild(canvas);
+    fx.appendChild(text);
+    crt.appendChild(fx);
+    const ctx = canvas.getContext && canvas.getContext("2d");
+    const W = canvas.width = crt.clientWidth || 800, H = canvas.height = crt.clientHeight || 600;
+    const stars = [];
+    for (let i = 0; i < 260; i++) { stars.push({ a: Math.random() * Math.PI * 2, r: Math.random() * 40, v: 0.4 + Math.random() * 2.4 }); }
+    const color = getComputedStyle(document.body).getPropertyValue("--amber").trim() || "#ffb000";
+    const start = Date.now();
+    const script = [
+      [0, "WARP DRIVE CHARGING"], [900, "3"], [1700, "2"], [2500, "1"], [3300, "JUMP"],
+      [6200, "TRANSLATION COMPLETE"], [7600, "!! WARP STORM ON EXIT VECTOR !!"], [9200, "HULL BREACHES DETECTED. SYSTEMS FAILING."]
+    ];
+    let shown = -1, raf = 0;
+    function frame() {
+      const t = Date.now() - start;
+      for (let i = script.length - 1; i >= 0; i--) {
+        if (t >= script[i][0]) { if (shown !== i) { shown = i; text.textContent = script[i][1]; text.className = "warp-text" + (i >= 6 ? " bad" : ""); } break; }
+      }
+      if (ctx) {
+        const speed = t < 3300 ? 0.2 + t / 3300 : t < 6200 ? 6 : Math.max(0.2, 6 - (t - 6200) / 300);
+        ctx.fillStyle = "rgba(0,0,0," + (t > 3300 && t < 6200 ? 0.25 : 0.4) + ")";
+        ctx.fillRect(0, 0, W, H);
+        ctx.strokeStyle = t >= 7600 ? "#ff5a3c" : color;
+        stars.forEach(function (s) {
+          const r1 = s.r, r2 = s.r + s.v * speed * 6;
+          ctx.beginPath();
+          ctx.moveTo(W / 2 + Math.cos(s.a) * r1, H / 2 + Math.sin(s.a) * r1);
+          ctx.lineTo(W / 2 + Math.cos(s.a) * r2, H / 2 + Math.sin(s.a) * r2);
+          ctx.stroke();
+          s.r += s.v * speed;
+          if (s.r > Math.max(W, H)) { s.r = Math.random() * 30; }
+        });
+      }
+      if (t > 3250 && t < 3450) { fx.classList.add("flash"); } else { fx.classList.remove("flash"); }
+      if (t >= 7600) { fx.classList.add("storm-shake"); }
+      if (t < 11000) { raf = requestAnimationFrame(frame); } else { finish(); }
+    }
+    function finish() {
+      cancelAnimationFrame(raf);
+      fx.remove();
+      if (window.Ship) { Ship.jumps(1); Ship.resetRepairs(); }
+      home();
+      say("WARP JUMP " + (window.Ship ? Ship.jumps() : 1) + " COMPLETE. THE STORM HIT ON EXIT. EVERY SYSTEM NEEDS REPAIR AGAIN.", "alert");
+    }
+    if (reduceMotion) {
+      text.textContent = "JUMP COMPLETE. WARP STORM ON EXIT. SYSTEMS FAILING.";
+      setTimeout(finish, 2500);
+    } else {
+      raf = requestAnimationFrame(frame);
+    }
+  }
+
   /* ---------- Ship areas (opened from STATUS) ---------- */
   function shipArea(id) {
     const list = Ship.systems.filter(function (x) { return x.area !== false; });
@@ -1312,6 +1403,9 @@
     "cls":      function () { COMMANDS.clear(); },
     "reboot":   function () { boot(true); },
     "theme":    function (raw) { themeCommand(raw); },
+    "warp":     function (raw) { echo(raw); warpJump(); },
+    "jump":     function (raw) { echo(raw); warpJump(); },
+    "warp jump": function (raw) { echo(raw); warpJump(); },
     // Hidden: undo all ship repairs (handy for testing the puzzles)
     "reset repairs": function (raw) {
       echo(raw);

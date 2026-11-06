@@ -333,22 +333,57 @@
     const done = saved();
     done[id] = true;
     try { localStorage.setItem(KEY, JSON.stringify(done)); } catch (e) { /* storage blocked */ }
+    touch();
     applyRepairs();
   }
+
+  /* ---------- Progress expiry ----------
+     Repairs don't last forever: after IDLE_LIMIT with no repair activity
+     the warp storm damages the ship again. Any repair action (fixing a
+     system, safing a panel, working a puzzle) resets the countdown, so
+     nobody loses progress mid-hunt. */
+  const IDLE_LIMIT = 60 * 60 * 1000;          // 1 hour
+  const TOUCH_KEY = "alexisos-repair-touch";
+  const NOTICE_KEY = "alexisos-storm-notice";
+  function touch() {
+    try { localStorage.setItem(TOUCH_KEY, String(Date.now())); } catch (e) { /* storage blocked */ }
+  }
+  function hasProgress() {
+    try { return !!(localStorage.getItem(KEY) || localStorage.getItem(FLAG_KEY)); } catch (e) { return false; }
+  }
+  /* Called on load and on every screen change. Returns true if it reset. */
+  function checkExpiry() {
+    if (!hasProgress()) { return false; }
+    let last = 0;
+    try { last = parseInt(localStorage.getItem(TOUCH_KEY) || "0", 10); } catch (e) { last = 0; }
+    if (last && Date.now() - last < IDLE_LIMIT) { return false; }
+    if (!last) { touch(); return false; }       // older saves with no timestamp: start the clock now
+    resetRepairs();
+    try { sessionStorage.setItem(NOTICE_KEY, "1"); } catch (e) { /* storage blocked */ }
+    return true;
+  }
+  /* The "storm damage" message is shown once, then cleared. */
+  function consumeStormNotice() {
+    try {
+      if (sessionStorage.getItem(NOTICE_KEY) === "1") { sessionStorage.removeItem(NOTICE_KEY); return true; }
+    } catch (e) { /* storage blocked */ }
+    return false;
+  }
   function isRepaired(id) { return !!saved()[id]; }
-  /* Overall repair progress. Every system listed in REPAIRS counts, so
-     new puzzles (deck 4, cargo, life support) join automatically. */
+  /* Whole-ship progress: how many systems are nominal out of all of
+     them. The ship is only "complete" (ready for a warp jump) when EVERY
+     system is nominal, so areas without a repair puzzle yet (deck 4,
+     cargo, life support) keep it from being ready until they're fixed. */
   function progress() {
-    const ids = Object.keys(REPAIRS);
-    const done = ids.filter(isRepaired).length;
-    return { done: done, total: ids.length, complete: done === ids.length };
+    const done = SHIP_SYSTEMS.filter(function (s) { return s.status === "ok"; }).length;
+    return { done: done, total: SHIP_SYSTEMS.length, complete: done === SHIP_SYSTEMS.length };
   }
   /* Which prerequisites are still missing for a repair (empty = ready). */
   function missingFor(id) {
     return (REQUIRES[id] || []).filter(function (r) { return !isRepaired(r); });
   }
   function resetRepairs() {
-    try { localStorage.removeItem(KEY); localStorage.removeItem(FLAG_KEY); } catch (e) { /* storage blocked */ }
+    try { localStorage.removeItem(KEY); localStorage.removeItem(FLAG_KEY); localStorage.removeItem(TOUCH_KEY); } catch (e) { /* storage blocked */ }
     applyRepairs();
   }
 
@@ -363,11 +398,23 @@
     if (value === undefined) { return !!f[name]; }
     f[name] = !!value;
     try { localStorage.setItem(FLAG_KEY, JSON.stringify(f)); } catch (e) { /* storage blocked */ }
+    touch();
     return f[name];
   }
+  checkExpiry();
   applyRepairs();
+
+  /* Warp jumps completed (just a counter for the MASTER page) */
+  function jumps(add) {
+    let n = 0;
+    try { n = parseInt(localStorage.getItem("alexisos-jumps") || "0", 10) || 0; } catch (e) { n = 0; }
+    if (add) { n += add; try { localStorage.setItem("alexisos-jumps", String(n)); } catch (e) { /* storage blocked */ } }
+    return n;
+  }
 
   window.Ship = { systems: SHIP_SYSTEMS, render: render, hull: hull,
                   repair: repair, isRepaired: isRepaired, resetRepairs: resetRepairs,
-                  missingFor: missingFor, requires: REQUIRES, flag: flag, progress: progress };
+                  missingFor: missingFor, requires: REQUIRES, flag: flag, progress: progress,
+                  touch: touch, checkExpiry: checkExpiry, consumeStormNotice: consumeStormNotice,
+                  jumps: jumps, idleLimit: IDLE_LIMIT };
 })();

@@ -1913,3 +1913,25 @@ body.theme-retrowave:not(.red-alert):not(.green-mode) .emblem { filter: none; }
 .dash.ready .dash-bottom { color: #38ff7a; text-shadow: 0 0 8px rgba(56, 255, 122, 0.6); }
 .dash.ready .dash-rule { background: #38ff7a; box-shadow: 0 0 8px #38ff7a; }
 @media (prefers-reduced-motion: reduce) { .dash-ready { animation: none; } }
+
+/* ---------- Warp jump + storm notice ---------- */
+.warp-btn {
+  display: block; margin: 6px auto 2px; padding: 4px 18px;
+  border: 2px solid #38ff7a; color: #38ff7a; font-weight: 600; letter-spacing: 0.12em;
+  text-shadow: 0 0 8px rgba(56, 255, 122, 0.7);
+}
+.warp-btn:hover, .warp-btn:focus-visible { background: #38ff7a; color: #021a08; text-shadow: none; }
+.warp { position: absolute; inset: 0; z-index: 9; background: #000; display: flex; align-items: center; justify-content: center; }
+.warp-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.warp-text {
+  position: relative; font-family: var(--font-head); font-size: 4em; letter-spacing: 0.18em; text-align: center;
+  color: var(--amber); text-shadow: 0 0 18px var(--amber); padding: 0 20px;
+}
+.warp-text.bad { color: #ff5a3c; text-shadow: 0 0 18px #ff5a3c; animation: blink 0.5s steps(1) infinite; }
+.warp.flash { background: #fff; }
+.warp.storm-shake { animation: alarm-hit 0.5s steps(4) infinite; }
+.storm { text-align: center; padding: 10px 6px; }
+.storm-h { font-family: var(--font-head); font-size: 1.4em; letter-spacing: 0.12em; color: var(--alert); margin-bottom: 10px; animation: blink 0.8s steps(1) 6; }
+.storm-ok { margin-top: 12px; border: 1px solid var(--amber-dim); padding: 3px 14px; }
+@media (max-width: 700px) { .warp-text { font-size: 1.4em; } }
+@media (prefers-reduced-motion: reduce) { .warp.storm-shake, .warp-text.bad, .storm-h { animation: none; } }
