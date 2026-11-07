@@ -307,7 +307,18 @@
     vox:     { status: "ok", pct: 100, note: "LOCK HOLDING. SIGNAL CLEAR" },
     reactor: { status: "ok", pct: 100, note: "CORES STABLE. FULL OUTPUT" },
     geller:  { status: "ok", pct: 100, note: "FIELD STABLE" },
-    engines: { status: "ok", pct: 100, note: "BOTH ENGINES ONLINE. THRUST NOMINAL" }
+    engines: { status: "ok", pct: 100, note: "BOTH ENGINES ONLINE. THRUST NOMINAL" },
+    deck4:   { status: "ok", pct: 100, note: "FIRES OUT. BUNKS B PURGED" },
+    cargo:   { status: "ok", pct: 100, note: "FIRES OUT. QUARANTINE PURGED" },
+    life:    { status: "ok", pct: 100, note: "SCRUBBERS CLEARING SMOKE. PODS ON MAIN POWER" }
+  };
+  /* Systems fixed by bridge damage control instead of a puzzle: they come
+     back once these flags are set (see Repairs.purge / Repairs.suppress).
+     Life support recovers when both decks are purged and the fires are out. */
+  const FROM_FLAGS = {
+    deck4: ["purge_bunksB", "fire_suppressed"],
+    cargo: ["purge_quarantine", "fire_suppressed"],
+    life:  ["purge_bunksB", "purge_quarantine", "fire_suppressed"]
   };
   /* Some repairs depend on others. The Geller field can only be raised
      from the bridge once the vox array and the reactor are online. */
@@ -324,7 +335,9 @@
   function applyRepairs() {
     const done = saved();
     SHIP_SYSTEMS.forEach(function (s) {
-      const src = done[s.id] && REPAIRS[s.id] ? REPAIRS[s.id] : ORIGINAL[s.id];
+      const f = flags();
+      const byFlags = FROM_FLAGS[s.id] && FROM_FLAGS[s.id].every(function (n) { return f[n]; });
+      const src = (done[s.id] || byFlags) && REPAIRS[s.id] ? REPAIRS[s.id] : ORIGINAL[s.id];
       s.status = src.status; s.pct = src.pct; s.note = src.note;
     });
   }
@@ -372,8 +385,9 @@
   function isRepaired(id) { return !!saved()[id]; }
   /* Whole-ship progress: how many systems are nominal out of all of
      them. The ship is only "complete" (ready for a warp jump) when EVERY
-     system is nominal, so areas without a repair puzzle yet (deck 4,
-     cargo, life support) keep it from being ready until they're fixed. */
+     system is nominal: vox, reactor, geller and engines by their puzzles;
+     deck 4, aft cargo and life support by bridge damage control (purge
+     both infested rooms and put out the fires). */
   function progress() {
     const done = SHIP_SYSTEMS.filter(function (s) { return s.status === "ok"; }).length;
     return { done: done, total: SHIP_SYSTEMS.length, complete: done === SHIP_SYSTEMS.length };
@@ -399,6 +413,7 @@
     f[name] = !!value;
     try { localStorage.setItem(FLAG_KEY, JSON.stringify(f)); } catch (e) { /* storage blocked */ }
     touch();
+    applyRepairs();                      // damage control flags can bring systems back
     return f[name];
   }
   checkExpiry();
