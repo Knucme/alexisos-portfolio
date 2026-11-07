@@ -744,14 +744,16 @@
                  progress bar runs, then the purge is confirmed. Saves the
                  flags sealed_<key> and purge_<key>; the room cameras then
                  show the creatures dead (the fires keep burning).
-       suppress  one discharge puts out every fire on both decks. Saves
+       suppress  one discharge puts out every fire on both decks and in
+                 the failed cryo pods in life support. Saves
                  fire_suppressed; the cameras then show smoke, no flames.
      Flags reset with the rest of the repairs (1 hour idle, or a warp jump). */
   const PURGE_ROOMS = [
     { key: "quarantine", deck: "AFT CARGO", name: "QUARANTINE", bios: 3 },
     { key: "bunksB", deck: "DECK 4", name: "BUNKS B", bios: 3 }
   ];
-  const FIRE_ROOMS = [["DECK 4", "BUNKS B"], ["DECK 4", "AIRLOCK 4"], ["AFT CARGO", "HOLD 2"], ["AFT CARGO", "QUARANTINE"]];
+  const FIRE_ROOMS = [["DECK 4", "BUNKS B"], ["DECK 4", "AIRLOCK 4"], ["AFT CARGO", "HOLD 2"], ["AFT CARGO", "QUARANTINE"],
+                      ["LIFE SUPPORT", "CRYO PODS 03, 10"]];
   const ALL_ROOMS = [
     ["DECK 4", ["BUNKS A", "BUNKS B", "SANITATION", "MEDICAE BAY", "OFFICER QTRS", "MAIN CORRIDOR", "LOCKERS", "MESS HALL", "GALLEY", "SHRINE", "AIRLOCK 4"]],
     ["AFT CARGO", ["HOLD 1", "HOLD 2", "QUARANTINE", "MANIFEST OFFICE", "CARGO LIFT", "SERVITOR BAY", "DOCK CLAMP", "FUEL BUNKER"]]

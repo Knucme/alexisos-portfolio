@@ -1435,6 +1435,12 @@
     const bg = sceneImage("assets/life_support/cryo_bay.png");
     const SEALED = { x: 213, y: 80 };
     const FAILED = [{ x: 87, y: 73, n: 3 }, { x: 162, y: 72, n: 10 }];
+    // fire burning inside the failed pods: base of the flame in image
+    // pixels and its size (assets/fx/fire.png, 25x51 frames). Put out by
+    // bridge fire suppression, after which the pods just smoke.
+    const POD_FIRES = [{ x: 88, y: 85, s: 0.48, n: 3 }, { x: 160, y: 82, s: 0.4, n: 10 }];
+    const fireImg = sceneImage("assets/fx/fire.png");
+    let fireOut = false, fireAt = -1, puffs = [];
     let fog = [];
 
     function heartbeat(t) {
@@ -1459,6 +1465,31 @@
         if (Math.sin(t * 8 + P.n) > 0) { glow(P.x, P.y, 14, "rgba(255,50,30,0.45)"); }
       });
       ctx.globalCompositeOperation = "source-over";
+      // fire in the failed pods (smoke once suppression has run)
+      if (t - fireAt > 0.5 || fireAt < 0) { fireAt = t; fireOut = !!(window.Ship && Ship.flag("fire_suppressed")); }
+      POD_FIRES.forEach(function (F) {
+        if (fireOut) {
+          if (Math.random() < 0.2) {
+            puffs.push({ x: F.x + (Math.random() - 0.5) * 3, y: F.y - 4, r: 1.2, vx: (Math.random() - 0.5) * 0.1,
+                         vy: -(0.18 + Math.random() * 0.15), life: 0, max: 80 + Math.random() * 50 });
+          }
+          return;
+        }
+        glow(F.x, F.y - 6, 18, "rgba(255,120,30," + (0.3 + 0.1 * Math.sin(t * 9 + F.n)).toFixed(3) + ")");
+        if (fireImg.complete && fireImg.naturalWidth) {
+          const k = (Math.floor(t * 24) + F.n * 11) % 64;
+          ctx.drawImage(fireImg, (k % 16) * 25, Math.floor(k / 16) * 51, 25, 51,
+                        F.x - 12.5 * F.s, F.y - 49 * F.s, 25 * F.s, 51 * F.s);
+        }
+      });
+      puffs.forEach(function (p) {
+        p.life++; p.x += p.vx + Math.sin(p.life * 0.07) * 0.08; p.y += p.vy; p.r += 0.03;
+        const a = Math.max(0, 1 - p.life / p.max), q = Math.round(p.r);
+        ctx.fillStyle = "rgba(150,155,160," + (0.35 * a).toFixed(3) + ")";
+        ctx.fillRect(Math.round(p.x - q), Math.round(p.y - q / 2), q * 2, q);
+        ctx.fillRect(Math.round(p.x - q / 2), Math.round(p.y - q), q, q * 2);
+      });
+      puffs = puffs.filter(function (p) { return p.life < p.max; });
       // vitals trace over pod 07's side screen
       const sx = 226, sy = 103;
       ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(sx, sy, 14, 7);
