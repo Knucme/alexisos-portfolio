@@ -1027,8 +1027,13 @@
          PORT (top)     stalled: a weak blue glow flickering in the throat
          STBD (bottom)  dead: an ember and smoke pouring out of the bell
          shut down      (safed at its panel) no light at all, just smoke
-         running        both burn, flashing blue, with a long plume */
+         running        both burn, flashing blue, with a long plume and a
+                        blue thrust arrow past each bell (ARROW.dx moves it) */
     const art = sceneImage("assets/engines/engines.png");
+    // blue thrust arrow shown past each bell once the engines are running
+    // (assets/engines/thrust_arrow.png: 30 frames of 55x24 in one row)
+    const arrow = sceneImage("assets/engines/thrust_arrow.png");
+    const ARROW = { w: 55, h: 24, frames: 30, fps: 20, dx: 24 };
     const ENG = [
       { cx: 176, cy: 36, rx: 16, ry: 33, safed: !!(window.Ship && Ship.flag("engine_port_safed")) },   // port
       { cx: 175, cy: 112, rx: 16, ry: 32, safed: !!(window.Ship && Ship.flag("engine_stbd_safed")) }    // starboard
@@ -1120,6 +1125,11 @@
           const f = i ? 0.7 + 0.3 * Math.sin(t * 7 + 1.3) : flash;
           mouthGlow(E, 0.55 + 0.45 * f, "120,190,255");
           plume(E, t, 0.75 + 0.25 * f);
+          if (arrow.complete && arrow.naturalWidth) {
+            const n = (Math.floor(t * ARROW.fps) + i * 7) % ARROW.frames;
+            ctx.drawImage(arrow, n * ARROW.w, 0, ARROW.w, ARROW.h,
+                          E.cx + ARROW.dx, E.cy - ARROW.h / 2, ARROW.w, ARROW.h);
+          }
         });
       } else {
         ENG.forEach(function (E) {
