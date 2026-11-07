@@ -363,10 +363,19 @@
   /* Pre-rendered room images (made from the Kraken Code PSX Sci-Fi
      packs, 256x144), loaded once and reused. */
   const SCENE_IMG = {};
+  const SCENE_V = "1";                 // bump when the rendered images change
   function sceneImage(src) {
     if (!SCENE_IMG[src] && typeof Image === "function") {
-      SCENE_IMG[src] = new Image();
-      SCENE_IMG[src].src = src;
+      const img = new Image();
+      // If the picture fails (say, mid deploy), forget it and retry a few
+      // seconds later instead of showing an empty room for the whole visit.
+      let tries = 0;
+      img.onerror = function () {
+        if (++tries > 5) { return; }
+        setTimeout(function () { img.src = src + "?v=" + SCENE_V + "&r=" + Date.now(); }, 3000);
+      };
+      img.src = src + "?v=" + SCENE_V;
+      SCENE_IMG[src] = img;
     }
     return SCENE_IMG[src] || { complete: false };
   }
