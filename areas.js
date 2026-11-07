@@ -1025,12 +1025,13 @@
        Live effects are drawn over it. MOUTH is each bell's opening in
        image pixels (centre, half width, half height):
          PORT (top)     stalled: a weak blue glow flickering in the throat
-         STBD (bottom)  dead: smoke pouring out of the bell
-         running        both fire a long blue white exhaust plume */
+         STBD (bottom)  dead: an ember and smoke pouring out of the bell
+         shut down      (safed at its panel) no light at all, just smoke
+         running        both burn, flashing blue, with a long plume */
     const art = sceneImage("assets/engines/engines.png");
     const ENG = [
-      { cx: 176, cy: 36, rx: 16, ry: 33, on: true },        // port
-      { cx: 175, cy: 112, rx: 16, ry: 32, on: running }      // starboard
+      { cx: 176, cy: 36, rx: 16, ry: 33, safed: !!(window.Ship && Ship.flag("engine_port_safed")) },   // port
+      { cx: 175, cy: 112, rx: 16, ry: 32, safed: !!(window.Ship && Ship.flag("engine_stbd_safed")) }    // starboard
     ];
     let smoke = [];
 
@@ -1113,17 +1114,29 @@
       if (art.complete && art.naturalWidth) { ctx.drawImage(art, 0, 0, W, H); }
 
       if (running) {
-        ENG.forEach(function (E) { mouthGlow(E, 0.9, "170,215,255"); plume(E, t, 0.95 + 0.05 * Math.sin(t * 9)); });
+        // restarted from the bridge: both burn, flashing blue
+        const flash = 0.7 + 0.3 * Math.sin(t * 7);
+        ENG.forEach(function (E, i) {
+          const f = i ? 0.7 + 0.3 * Math.sin(t * 7 + 1.3) : flash;
+          mouthGlow(E, 0.55 + 0.45 * f, "120,190,255");
+          plume(E, t, 0.75 + 0.25 * f);
+        });
       } else {
-        // port: stalled, a weak flicker with the odd sputter of flame
-        const P = ENG[0];
-        const sputter = Math.sin(t * 23) > 0.94 || rnd() < 0.02;
-        mouthGlow(P, 0.25 + 0.12 * Math.sin(t * 2.4) + (sputter ? 0.4 : 0), "90,170,255");
-        if (sputter) { plume(P, t, 0.3); }
-        // starboard: dead, a faint ember deep in the throat and smoke
-        const S = ENG[1];
-        if (Math.sin(t * 1.3) > 0.6) { mouthGlow(S, 0.18, "255,110,40"); }
-        if (!reduce && frame % 3 === 0) { spawn(S); }
+        ENG.forEach(function (E) {
+          if (E.safed) {
+            // shut off at its panel: dark, no flicker, smoke rolling out
+            if (!reduce && frame % 3 === 0) { spawn(E); }
+          } else if (E === ENG[0]) {
+            // port, still live: stalled, a weak flicker with the odd sputter of flame
+            const sputter = Math.sin(t * 23) > 0.94 || rnd() < 0.02;
+            mouthGlow(E, 0.25 + 0.12 * Math.sin(t * 2.4) + (sputter ? 0.4 : 0), "90,170,255");
+            if (sputter) { plume(E, t, 0.3); }
+          } else {
+            // starboard, still live: dead, a faint ember in the throat and smoke
+            if (Math.sin(t * 1.3) > 0.6) { mouthGlow(E, 0.18, "255,110,40"); }
+            if (!reduce && frame % 3 === 0) { spawn(E); }
+          }
+        });
       }
       drawSmoke();
 
@@ -1132,16 +1145,19 @@
       if (running) {
         ctx.fillStyle = "rgba(120,220,255,0.9)"; ctx.fillText("PORT ONLINE", 6, 12); ctx.fillText("STBD ONLINE", 6, H - 6);
       } else {
-        ctx.fillStyle = "rgba(120,190,255,0.8)"; ctx.fillText("PORT STALLED", 6, 12);
-        ctx.fillStyle = "rgba(255,90,60," + (Math.sin(t * 6) > 0 ? 0.9 : 0.4) + ")"; ctx.fillText("STBD OFFLINE", 6, H - 6);
+        if (ENG[0].safed) { ctx.fillStyle = "rgba(200,200,205,0.8)"; ctx.fillText("PORT SHUT DOWN", 6, 12); }
+        else { ctx.fillStyle = "rgba(120,190,255,0.8)"; ctx.fillText("PORT STALLED", 6, 12); }
+        if (ENG[1].safed) { ctx.fillStyle = "rgba(200,200,205,0.8)"; ctx.fillText("STBD SHUT DOWN", 6, H - 6); }
+        else { ctx.fillStyle = "rgba(255,90,60," + (Math.sin(t * 6) > 0 ? 0.9 : 0.4) + ")"; ctx.fillText("STBD OFFLINE", 6, H - 6); }
       }
       frame++;
       if (!reduce) { raf = requestAnimationFrame(draw); }
     }
     if (!reduce && !running) {
       // pre-fill so the smoke is already trailing away when the page opens
+      const smokers = ENG.filter(function (E, i) { return E.safed || i === 1; });
       for (let i = 0; i < 240; i++) {
-        if (i % 3 === 0) { spawn(ENG[1]); }
+        if (i % 3 === 0) { smokers.forEach(spawn); }
         smoke.forEach(function (p) { p.life++; p.vx *= 0.996; p.x += p.vx; p.y += p.vy; p.r += p.grow; });
         smoke = smoke.filter(function (p) { return p.life < p.max && p.x < W + 12; });
       }
