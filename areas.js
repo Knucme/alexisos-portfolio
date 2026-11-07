@@ -442,7 +442,6 @@
     ["ENGAGE", "RESET"].forEach(function (t) { rail.appendChild(key(t, "fnkey")); });
     panel.appendChild(rail);
 
-    panel.appendChild(el("div", "bp-plate", "COGITATOR MAIN CONSOLE MK IV. DO NOT ANOINT WHILE POWERED"));
     return panel;
   }
 
