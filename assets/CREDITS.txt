@@ -36,3 +36,12 @@ Warp rift (bridge/warp_vortex.png)
 Bridge metal (bridge/tex_plate.jpg, bridge/tex_steel.jpg)
   Metal_21 and Metal_20 from the Tiny Texture Pack 3 by Screaming Brain
   Studios. CC0 / public domain.
+
+Quarantine warp incursion (aft_cargo/q_portal.png, q_ritual.png, mon_*.png)
+  q_portal.png   rendered from a port of the Fire Forcefield shader in the
+                 BinbunVFX fire effects pack.        LICENSE: TO CONFIRM
+  q_ritual.png   circle from "Ritual Circles and Occult Symbols".
+                                                      LICENSE: TO CONFIRM
+  mon_demon.png, mon_blood.png
+                 Demon_A and Blood Monster_A from Tiny RPG Character Asset
+                 Pack 02 (free demo).                 LICENSE: TO CONFIRM

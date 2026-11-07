@@ -448,7 +448,7 @@
   /* Pre-rendered room images (made from the Kraken Code PSX Sci-Fi
      packs, 256x144), loaded once and reused. */
   const SCENE_IMG = {};
-  const SCENE_V = "2";                 // bump when the rendered images change
+  const SCENE_V = "3";                 // bump when the rendered images change
   function sceneImage(src) {
     if (!SCENE_IMG[src] && typeof Image === "function") {
       const img = new Image();
@@ -492,6 +492,129 @@
       else if (kind === "beacon") { a = Math.max(0, Math.cos(t * speed)) * 0.6; }
       else { a = 0.2 + 0.2 * Math.max(0, Math.sin(t * speed)); }
       glowAt(ctx, x, y, r, "rgba(" + rgb + "," + a.toFixed(3) + ")");
+    };
+  }
+
+  /* ---------- QUARANTINE (CAM 23): the warp incursion ----------
+     Drawn over the rendered room, back to front:
+       portal   a burning warp portal on the back wall
+                (assets/aft_cargo/q_portal.png, 24 frames of 56x56)
+       ritual   a blood circle on the floor, already in perspective
+                (assets/aft_cargo/q_ritual.png, same size as the room)
+       spawns   three warp creatures that crawl out of the portal and
+                prowl the room (assets/aft_cargo/mon_demon.png and
+                mon_blood.png: rows idle, walk, attack, death; 48x28 frames)
+     Creatures live in room coordinates (metres, floor plane) and are
+     projected with the same camera the room was rendered with, so they
+     shrink with distance and sort front to back. Tune SPAWNS, BOUNDS and
+     PORTAL below. */
+  const QCAM = { eye: [2.3, 2.5, 0.7], target: [-1.1, 0.8, -3.8], fov: 66, W: 256, H: 144 };
+  function qProject(x, y, z) {
+    const e = QCAM.eye, t = QCAM.target;
+    let f = [t[0] - e[0], t[1] - e[1], t[2] - e[2]];
+    const fl = Math.hypot(f[0], f[1], f[2]); f = [f[0] / fl, f[1] / fl, f[2] / fl];
+    let r = [f[1] * 0 - f[2] * 1, f[2] * 0 - f[0] * 0, f[0] * 1 - f[1] * 0];          // f x up
+    const rl = Math.hypot(r[0], r[1], r[2]); r = [r[0] / rl, r[1] / rl, r[2] / rl];
+    const u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
+    const d = [x - e[0], y - e[1], z - e[2]];
+    const depth = d[0] * f[0] + d[1] * f[1] + d[2] * f[2];
+    const foc = (QCAM.H / 2) / Math.tan(QCAM.fov * Math.PI / 360);
+    return { x: QCAM.W / 2 + foc * (d[0] * r[0] + d[1] * r[1] + d[2] * r[2]) / depth,
+             y: QCAM.H / 2 - foc * (d[0] * u[0] + d[1] * u[1] + d[2] * u[2]) / depth, depth: depth };
+  }
+
+  function quarantineFx() {
+    const C = "assets/aft_cargo/";
+    const portalImg = sceneImage(C + "q_portal.png");
+    const ritualImg = sceneImage(C + "q_ritual.png");
+    const sheets = { demon: sceneImage(C + "mon_demon.png"), blood: sceneImage(C + "mon_blood.png") };
+    const PORTAL = { x: 152, y: 57, w: 30, h: 33, frames: 24, size: 56, fps: 10 };
+    const DOOR = { x: -0.3, z: -4.6 };                        // floor spot under the portal
+    const BOUNDS = { x0: -1.5, x1: 1.3, z0: -4.3, z1: -1.4 };
+    const FW = 48, FH = 28, FEET = 26, CX = 23;               // frame size, feet row, body centre
+    const ROWS = { idle: [0, 6], walk: [1, 8], attack: [2, 7], death: [3, 4] };
+    const HEIGHT = 0.9;                                       // creature height in metres (sets on screen size)
+    const SPAWNS = [
+      { kind: "blood", delay: 0.5 },
+      { kind: "demon", delay: 5 },
+      { kind: "blood", delay: 10 }
+    ].map(function (s, i) {
+      return { kind: s.kind, delay: s.delay, x: DOOR.x, z: DOOR.z, tx: DOOR.x, tz: DOOR.z,
+               state: "wait", until: s.delay, face: 1, seed: i * 17.3, anim: 0 };
+    });
+    let last = 0;
+
+    function pick(m, t) {
+      // new spot on the floor; now and then go and stand in the circle
+      const k = Math.sin(t * 3.1 + m.seed) * 0.5 + 0.5;
+      // each creature has its own spot on the circle's edge, so they gather around it
+      if (k > 0.7) { m.tx = -0.25 + Math.cos(m.seed) * 0.75; m.tz = -2.55 + Math.sin(m.seed) * 0.6; return; }
+      m.tx = BOUNDS.x0 + (BOUNDS.x1 - BOUNDS.x0) * (Math.sin(t * 1.7 + m.seed) * 0.5 + 0.5);
+      m.tz = BOUNDS.z0 + (BOUNDS.z1 - BOUNDS.z0) * (Math.sin(t * 2.3 + m.seed * 1.9) * 0.5 + 0.5);
+    }
+
+    function step(m, t, dt) {
+      if (m.state === "wait") {
+        if (t >= m.until) { m.state = "emerge"; m.until = t + 1.2; }
+        return;
+      }
+      if (m.state === "emerge") { if (t >= m.until) { m.state = "idle"; m.until = t + 0.6; } return; }
+      if (m.state === "idle" || m.state === "attack") {
+        if (t >= m.until) { pick(m, t); m.state = "walk"; }
+        return;
+      }
+      // walking
+      const dx = m.tx - m.x, dz = m.tz - m.z, dist = Math.hypot(dx, dz), sp = 0.55 * dt;
+      if (dist <= sp) {
+        m.x = m.tx; m.z = m.tz;
+        const roll = Math.sin(t * 5.7 + m.seed);
+        m.state = roll > 0.4 ? "attack" : "idle";
+        m.until = t + (m.state === "attack" ? 0.9 : 1 + (roll + 1) * 1.2);
+        return;
+      }
+      m.x += dx / dist * sp; m.z += dz / dist * sp;
+      const a = qProject(m.x, 0, m.z), b = qProject(m.tx, 0, m.tz);
+      if (Math.abs(b.x - a.x) > 0.5) { m.face = b.x > a.x ? 1 : -1; }
+    }
+
+    function drawMon(ctx, m, t) {
+      const img = sheets[m.kind];
+      if (!img.complete || !img.naturalWidth || m.state === "wait") { return; }
+      const foot = qProject(m.x, 0, m.z), head = qProject(m.x, HEIGHT, m.z);
+      const scale = Math.max(0.4, (foot.y - head.y) / 17);    // ~17px of body in each frame
+      const row = ROWS[m.state === "walk" ? "walk" : m.state === "attack" ? "attack" : "idle"];
+      const n = Math.floor(t * (m.state === "walk" ? 10 : 7) + m.seed) % row[1];
+      const w = FW * scale, h = FH * scale;
+      ctx.save();
+      if (m.state === "emerge") { ctx.globalAlpha = Math.max(0, 1 - (m.until - t) / 1.2); }
+      // soft shadow on the floor
+      ctx.fillStyle = "rgba(0,0,0,0.35)";
+      ctx.beginPath(); ctx.ellipse(foot.x, foot.y, 6 * scale, 1.8 * scale, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.translate(Math.round(foot.x), Math.round(foot.y));
+      ctx.scale(m.face, 1);
+      ctx.drawImage(img, n * FW, row[0] * FH, FW, FH, -CX * scale, -FEET * scale, w, h);
+      ctx.restore();
+    }
+
+    return function (ctx, t) {
+      const dt = Math.min(0.1, Math.max(0, t - last)); last = t;
+      // portal on the back wall, with its light spilling into the room
+      glowAt(ctx, PORTAL.x, PORTAL.y + 4, 44, "rgba(255,110,30," + (0.22 + 0.06 * Math.sin(t * 3)).toFixed(3) + ")");
+      if (portalImg.complete && portalImg.naturalWidth) {
+        const n = Math.floor(t * PORTAL.fps) % PORTAL.frames;
+        ctx.drawImage(portalImg, n * PORTAL.size, 0, PORTAL.size, PORTAL.size,
+                      PORTAL.x - PORTAL.w / 2, PORTAL.y - PORTAL.h / 2, PORTAL.w, PORTAL.h);
+      }
+      // blood circle on the floor, pulsing
+      if (ritualImg.complete && ritualImg.naturalWidth) {
+        ctx.save();
+        ctx.globalAlpha = 0.7 + 0.3 * Math.sin(t * 2.2);
+        ctx.drawImage(ritualImg, 0, 0, 256, 144);
+        ctx.restore();
+        glowAt(ctx, 126, 100, 34, "rgba(255,30,20," + (0.12 + 0.08 * Math.sin(t * 2.2)).toFixed(3) + ")");
+      }
+      SPAWNS.forEach(function (m) { step(m, t, dt); });
+      SPAWNS.slice().sort(function (a, b) { return a.z - b.z; }).forEach(function (m) { drawMon(ctx, m, t); });
     };
   }
 
@@ -920,13 +1043,7 @@
     return withCam([
       { room: "HOLD 1", cam: "21", src: C + "c_hold1.png" },
       { room: "HOLD 2", cam: "22", src: C + "cargo_hold.png", fx: pulse(158, 50, 40, "255,150,30", 5, "beacon") },
-      { room: "QUARANTINE", cam: "23", src: C + "c_quarantine.png", fx: function (ctx, t) {
-          // something moves inside the tanks now and then
-          const a = Math.max(0, Math.sin(t * 0.7)) * Math.max(0, Math.sin(t * 2.3));
-          ctx.fillStyle = "rgba(0,20,8," + (0.55 * a).toFixed(3) + ")";
-          ctx.fillRect(119 + Math.round(Math.sin(t) * 2), 52, 8, 18);
-          ctx.fillRect(168, 60 + Math.round(Math.sin(t * 1.3) * 2), 6, 12);
-          glowAt(ctx, 124, 62, 30, "rgba(80,255,120," + (0.12 + 0.06 * Math.sin(t * 2)).toFixed(3) + ")"); } },
+      { room: "QUARANTINE", cam: "23", src: C + "c_quarantine.png", fx: quarantineFx() },
       { room: "MANIFEST OFFICE", cam: "24", src: C + "c_manifest.png", fx: pulse(124, 70, 8, "120,255,160", 4) },
       { room: "CARGO LIFT", cam: "25", src: C + "c_lift.png", fx: pulse(132, 35, 40, "255,150,30", 5, "beacon") },
       { room: "SERVITOR BAY", cam: "26", note: "SERVITOR 3 KAPPA: NO RESPONSE" },
