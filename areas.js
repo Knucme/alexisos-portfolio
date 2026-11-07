@@ -448,7 +448,7 @@
   /* Pre-rendered room images (made from the Kraken Code PSX Sci-Fi
      packs, 256x144), loaded once and reused. */
   const SCENE_IMG = {};
-  const SCENE_V = "3";                 // bump when the rendered images change
+  const SCENE_V = "4";                 // bump when the rendered images change
   function sceneImage(src) {
     if (!SCENE_IMG[src] && typeof Image === "function") {
       const img = new Image();
@@ -495,75 +495,82 @@
     };
   }
 
-  /* ---------- QUARANTINE (CAM 23): the warp incursion ----------
-     Drawn over the rendered room, back to front:
-       portal   a burning warp portal on the back wall
-                (assets/aft_cargo/q_portal.png, 24 frames of 56x56)
-       ritual   a blood circle on the floor, already in perspective
-                (assets/aft_cargo/q_ritual.png, same size as the room)
-       spawns   three warp creatures that crawl out of the portal and
-                prowl the room (assets/aft_cargo/mon_demon.png and
-                mon_blood.png: rows idle, walk, attack, death; 48x28 frames)
-     Creatures live in room coordinates (metres, floor plane) and are
-     projected with the same camera the room was rendered with, so they
-     shrink with distance and sort front to back. Tune SPAWNS, BOUNDS and
-     PORTAL below. */
-  const QCAM = { eye: [2.3, 2.5, 0.7], target: [-1.1, 0.8, -3.8], fov: 66, W: 256, H: 144 };
-  function qProject(x, y, z) {
-    const e = QCAM.eye, t = QCAM.target;
+  /* ---------- WARP INCURSIONS on the damaged room cameras ----------
+     Damaged compartments show fire. Contaminated ones (Quarantine) also
+     get the warp incursion: portal, ritual circle and creatures. Leave
+     portal / ritual / spawns out of a room's settings for fire only.
+     Drawn over the rendered room:
+       fire     flames on the floor (assets/fx/fire.png, 64 frames of
+                25x51, Free Pixel Effects Pack, public domain)
+       portal   a burning warp portal on a wall (assets/aft_cargo/q_portal.png,
+                24 frames of 56x56)
+       ritual   a blood circle on the floor, pre-warped to that camera
+       spawns   warp creatures that crawl out of the portal and prowl
+                (assets/aft_cargo/mon_demon.png, mon_blood.png: rows idle,
+                walk, attack, death; 48x28 frames)
+     Creatures and flames live in room coordinates (metres on the floor)
+     and are projected with the camera the room was rendered with, so
+     they shrink with distance and sort front to back.
+     Each room's settings are in INCURSIONS below. */
+  const CAM_STD = { eye: [2.3, 2.5, 0.7], target: [-1.1, 0.8, -3.8], fov: 66 };
+  const CAM_HOLD = { eye: [4.4, 2.7, 1.8], target: [-1.2, 0.6, -6], fov: 66 };
+  const INCURSIONS = {
+    quarantine: { cam: CAM_STD, ritual: "aft_cargo/q_ritual.png", glow: [126, 100],
+      portal: { x: 152, y: 57.5, w: 29, h: 31 }, door: { x: -0.3, z: -4.6 }, circle: { x: -0.25, z: -2.55, r: 0.75 },
+      bounds: { x0: -1.5, x1: 1.3, z0: -4.3, z1: -1.4 }, spawns: ["blood", "demon", "blood"],
+      fire: [[-1.3, -1.6, 0.7], [1.0, -3.6, 0.6]] },
+    // damaged rooms: fire only, no portal or creatures
+    bunksB: { cam: CAM_STD, fire: [[-1.0, -4.3, 0.8], [1.2, -1.4, 0.6], [-1.3, -1.2, 0.5]] },
+    airlock4: { cam: CAM_STD, fire: [[-1.5, -4.3, 0.7], [1.4, -3.0, 0.6]] },
+    hold2: { cam: CAM_HOLD, fire: [[0.9, -3.3, 0.9], [-0.3, -6.4, 1.0], [3.7, -7.6, 0.7]] }
+  };
+
+  function makeProjector(cam) {
+    const e = cam.eye, t = cam.target, W = 256, H = 144;
     let f = [t[0] - e[0], t[1] - e[1], t[2] - e[2]];
     const fl = Math.hypot(f[0], f[1], f[2]); f = [f[0] / fl, f[1] / fl, f[2] / fl];
-    let r = [f[1] * 0 - f[2] * 1, f[2] * 0 - f[0] * 0, f[0] * 1 - f[1] * 0];          // f x up
+    let r = [-f[2], 0, f[0]];                                  // f x up
     const rl = Math.hypot(r[0], r[1], r[2]); r = [r[0] / rl, r[1] / rl, r[2] / rl];
     const u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
-    const d = [x - e[0], y - e[1], z - e[2]];
-    const depth = d[0] * f[0] + d[1] * f[1] + d[2] * f[2];
-    const foc = (QCAM.H / 2) / Math.tan(QCAM.fov * Math.PI / 360);
-    return { x: QCAM.W / 2 + foc * (d[0] * r[0] + d[1] * r[1] + d[2] * r[2]) / depth,
-             y: QCAM.H / 2 - foc * (d[0] * u[0] + d[1] * u[1] + d[2] * u[2]) / depth, depth: depth };
+    const foc = (H / 2) / Math.tan(cam.fov * Math.PI / 360);
+    return function (x, y, z) {
+      const d = [x - e[0], y - e[1], z - e[2]];
+      const depth = d[0] * f[0] + d[1] * f[1] + d[2] * f[2];
+      return { x: W / 2 + foc * (d[0] * r[0] + d[1] * r[1] + d[2] * r[2]) / depth,
+               y: H / 2 - foc * (d[0] * u[0] + d[1] * u[1] + d[2] * u[2]) / depth, depth: depth };
+    };
   }
 
-  function quarantineFx() {
-    const C = "assets/aft_cargo/";
-    const portalImg = sceneImage(C + "q_portal.png");
-    const ritualImg = sceneImage(C + "q_ritual.png");
-    const sheets = { demon: sceneImage(C + "mon_demon.png"), blood: sceneImage(C + "mon_blood.png") };
-    const PORTAL = { x: 152, y: 57, w: 30, h: 33, frames: 24, size: 56, fps: 10 };
-    const DOOR = { x: -0.3, z: -4.6 };                        // floor spot under the portal
-    const BOUNDS = { x0: -1.5, x1: 1.3, z0: -4.3, z1: -1.4 };
-    const FW = 48, FH = 28, FEET = 26, CX = 23;               // frame size, feet row, body centre
+  function incursionFx(cfg) {
+    const A = "assets/";
+    const proj = makeProjector(cfg.cam);
+    const portalImg = sceneImage(A + "aft_cargo/q_portal.png");
+    const ritualImg = cfg.ritual ? sceneImage(A + cfg.ritual) : null;
+    const fireImg = sceneImage(A + "fx/fire.png");
+    const sheets = { demon: sceneImage(A + "aft_cargo/mon_demon.png"), blood: sceneImage(A + "aft_cargo/mon_blood.png") };
+    const P = cfg.portal, PF = { frames: 24, size: 56, fps: 10 };
+    const FIRE = { w: 25, h: 51, cols: 16, frames: 64, fps: 24, base: 49, cx: 12.5 };
+    const FW = 48, FH = 28, FEET = 26, CX = 23;               // creature frame, feet row, body centre
     const ROWS = { idle: [0, 6], walk: [1, 8], attack: [2, 7], death: [3, 4] };
     const HEIGHT = 0.9;                                       // creature height in metres (sets on screen size)
-    const SPAWNS = [
-      { kind: "blood", delay: 0.5 },
-      { kind: "demon", delay: 5 },
-      { kind: "blood", delay: 10 }
-    ].map(function (s, i) {
-      return { kind: s.kind, delay: s.delay, x: DOOR.x, z: DOOR.z, tx: DOOR.x, tz: DOOR.z,
-               state: "wait", until: s.delay, face: 1, seed: i * 17.3, anim: 0 };
+    const mons = (cfg.spawns || []).map(function (kind, i) {
+      return { kind: kind, x: cfg.door.x, z: cfg.door.z, tx: cfg.door.x, tz: cfg.door.z,
+               state: "wait", until: 0.5 + i * 4.5, face: 1, seed: i * 17.3 + cfg.door.x };
     });
     let last = 0;
 
     function pick(m, t) {
-      // new spot on the floor; now and then go and stand in the circle
-      const k = Math.sin(t * 3.1 + m.seed) * 0.5 + 0.5;
-      // each creature has its own spot on the circle's edge, so they gather around it
-      if (k > 0.7) { m.tx = -0.25 + Math.cos(m.seed) * 0.75; m.tz = -2.55 + Math.sin(m.seed) * 0.6; return; }
-      m.tx = BOUNDS.x0 + (BOUNDS.x1 - BOUNDS.x0) * (Math.sin(t * 1.7 + m.seed) * 0.5 + 0.5);
-      m.tz = BOUNDS.z0 + (BOUNDS.z1 - BOUNDS.z0) * (Math.sin(t * 2.3 + m.seed * 1.9) * 0.5 + 0.5);
+      // now and then go and stand at its own spot on the circle's edge
+      const k = Math.sin(t * 3.1 + m.seed) * 0.5 + 0.5, B = cfg.bounds, c = cfg.circle;
+      if (k > 0.7) { m.tx = c.x + Math.cos(m.seed) * c.r; m.tz = c.z + Math.sin(m.seed) * c.r * 0.8; return; }
+      m.tx = B.x0 + (B.x1 - B.x0) * (Math.sin(t * 1.7 + m.seed) * 0.5 + 0.5);
+      m.tz = B.z0 + (B.z1 - B.z0) * (Math.sin(t * 2.3 + m.seed * 1.9) * 0.5 + 0.5);
     }
 
     function step(m, t, dt) {
-      if (m.state === "wait") {
-        if (t >= m.until) { m.state = "emerge"; m.until = t + 1.2; }
-        return;
-      }
+      if (m.state === "wait") { if (t >= m.until) { m.state = "emerge"; m.until = t + 1.2; } return; }
       if (m.state === "emerge") { if (t >= m.until) { m.state = "idle"; m.until = t + 0.6; } return; }
-      if (m.state === "idle" || m.state === "attack") {
-        if (t >= m.until) { pick(m, t); m.state = "walk"; }
-        return;
-      }
-      // walking
+      if (m.state === "idle" || m.state === "attack") { if (t >= m.until) { pick(m, t); m.state = "walk"; } return; }
       const dx = m.tx - m.x, dz = m.tz - m.z, dist = Math.hypot(dx, dz), sp = 0.55 * dt;
       if (dist <= sp) {
         m.x = m.tx; m.z = m.tz;
@@ -573,49 +580,62 @@
         return;
       }
       m.x += dx / dist * sp; m.z += dz / dist * sp;
-      const a = qProject(m.x, 0, m.z), b = qProject(m.tx, 0, m.tz);
+      const a = proj(m.x, 0, m.z), b = proj(m.tx, 0, m.tz);
       if (Math.abs(b.x - a.x) > 0.5) { m.face = b.x > a.x ? 1 : -1; }
     }
 
     function drawMon(ctx, m, t) {
       const img = sheets[m.kind];
       if (!img.complete || !img.naturalWidth || m.state === "wait") { return; }
-      const foot = qProject(m.x, 0, m.z), head = qProject(m.x, HEIGHT, m.z);
-      const scale = Math.max(0.4, (foot.y - head.y) / 17);    // ~17px of body in each frame
+      const foot = proj(m.x, 0, m.z), head = proj(m.x, HEIGHT, m.z);
+      const scale = Math.max(0.35, (foot.y - head.y) / 17);
       const row = ROWS[m.state === "walk" ? "walk" : m.state === "attack" ? "attack" : "idle"];
       const n = Math.floor(t * (m.state === "walk" ? 10 : 7) + m.seed) % row[1];
-      const w = FW * scale, h = FH * scale;
       ctx.save();
       if (m.state === "emerge") { ctx.globalAlpha = Math.max(0, 1 - (m.until - t) / 1.2); }
-      // soft shadow on the floor
       ctx.fillStyle = "rgba(0,0,0,0.35)";
       ctx.beginPath(); ctx.ellipse(foot.x, foot.y, 6 * scale, 1.8 * scale, 0, 0, Math.PI * 2); ctx.fill();
       ctx.translate(Math.round(foot.x), Math.round(foot.y));
       ctx.scale(m.face, 1);
-      ctx.drawImage(img, n * FW, row[0] * FH, FW, FH, -CX * scale, -FEET * scale, w, h);
+      ctx.drawImage(img, n * FW, row[0] * FH, FW, FH, -CX * scale, -FEET * scale, FW * scale, FH * scale);
       ctx.restore();
+    }
+
+    function drawFire(ctx, f, t) {
+      const foot = proj(f[0], 0, f[1]), top = proj(f[0], f[2], f[1]);
+      const scale = Math.max(0.4, (foot.y - top.y) / 22);     // flame height in metres sets its size
+      glowAt(ctx, foot.x, foot.y - 6 * scale, 22 * scale, "rgba(255,120,30," + (0.35 + 0.1 * Math.sin(t * 9 + f[0])).toFixed(3) + ")");
+      if (!fireImg.complete || !fireImg.naturalWidth) { return; }
+      const n = (Math.floor(t * FIRE.fps) + Math.round(f[0] * 13)) % FIRE.frames;
+      ctx.drawImage(fireImg, (n % FIRE.cols) * FIRE.w, Math.floor(n / FIRE.cols) * FIRE.h, FIRE.w, FIRE.h,
+                    foot.x - FIRE.cx * scale, foot.y - FIRE.base * scale, FIRE.w * scale, FIRE.h * scale);
     }
 
     return function (ctx, t) {
       const dt = Math.min(0.1, Math.max(0, t - last)); last = t;
-      // portal on the back wall, with its light spilling into the room
-      glowAt(ctx, PORTAL.x, PORTAL.y + 4, 44, "rgba(255,110,30," + (0.22 + 0.06 * Math.sin(t * 3)).toFixed(3) + ")");
-      if (portalImg.complete && portalImg.naturalWidth) {
-        const n = Math.floor(t * PORTAL.fps) % PORTAL.frames;
-        ctx.drawImage(portalImg, n * PORTAL.size, 0, PORTAL.size, PORTAL.size,
-                      PORTAL.x - PORTAL.w / 2, PORTAL.y - PORTAL.h / 2, PORTAL.w, PORTAL.h);
+      // the portal and its light
+      if (P) { glowAt(ctx, P.x, P.y + 4, P.h * 1.4, "rgba(255,110,30," + (0.22 + 0.06 * Math.sin(t * 3)).toFixed(3) + ")"); }
+      if (P && portalImg.complete && portalImg.naturalWidth) {
+        const n = Math.floor(t * PF.fps) % PF.frames;
+        ctx.drawImage(portalImg, n * PF.size, 0, PF.size, PF.size, P.x - P.w / 2, P.y - P.h / 2, P.w, P.h);
       }
       // blood circle on the floor, pulsing
-      if (ritualImg.complete && ritualImg.naturalWidth) {
-        ctx.save();
-        ctx.globalAlpha = 0.7 + 0.3 * Math.sin(t * 2.2);
-        ctx.drawImage(ritualImg, 0, 0, 256, 144);
-        ctx.restore();
-        glowAt(ctx, 126, 100, 34, "rgba(255,30,20," + (0.12 + 0.08 * Math.sin(t * 2.2)).toFixed(3) + ")");
+      if (ritualImg && ritualImg.complete && ritualImg.naturalWidth) {
+        ctx.save(); ctx.globalAlpha = 0.7 + 0.3 * Math.sin(t * 2.2); ctx.drawImage(ritualImg, 0, 0, 256, 144); ctx.restore();
+        glowAt(ctx, cfg.glow[0], cfg.glow[1], 34, "rgba(255,30,20," + (0.12 + 0.08 * Math.sin(t * 2.2)).toFixed(3) + ")");
       }
-      SPAWNS.forEach(function (m) { step(m, t, dt); });
-      SPAWNS.slice().sort(function (a, b) { return a.z - b.z; }).forEach(function (m) { drawMon(ctx, m, t); });
+      mons.forEach(function (m) { step(m, t, dt); });
+      // flames and creatures, far to near
+      const items = cfg.fire.map(function (f) { return { z: f[1], draw: function () { drawFire(ctx, f, t); } }; })
+        .concat(mons.map(function (m) { return { z: m.z, draw: function () { drawMon(ctx, m, t); } }; }));
+      items.sort(function (a, b) { return a.z - b.z; }).forEach(function (it) { it.draw(); });
     };
+  }
+
+  // run several fx on one camera
+  function both() {
+    const list = Array.prototype.slice.call(arguments);
+    return function (ctx, t) { list.forEach(function (fx) { fx(ctx, t); }); };
   }
 
   function camFeeds(cams) {
@@ -995,7 +1015,7 @@
     const D = "assets/deck4/";
     return withCam([
       { room: "BUNKS A", cam: "04", src: D + "crew_quarters.png", fx: pulse(204, 70, 36, "255,40,20", 3) },
-      { room: "BUNKS B", cam: "05", src: D + "d4_bunks_b.png", fx: pulse(155, 57, 44, "255,30,15", 6, "blink") },
+      { room: "BUNKS B", cam: "05", src: D + "d4_bunks_b.png", fx: both(pulse(155, 57, 44, "255,30,15", 6, "blink"), incursionFx(INCURSIONS.bunksB)) },
       { room: "SANITATION", cam: "06", src: D + "d4_sanitation.png" },
       { room: "MEDICAE BAY", cam: "07", src: D + "d4_medicae.png", fx: pulse(142, 60, 10, "90,255,140", 9, "blink") },
       { room: "OFFICER QTRS", cam: "08", note: "LOCKED FROM INSIDE" },
@@ -1007,7 +1027,7 @@
       { room: "SHRINE", cam: "13", src: D + "d4_shrine.png", fx: function (ctx, t) {
           const f = 0.22 + 0.08 * Math.sin(t * 11) + 0.06 * Math.sin(t * 23);       // candle flicker
           glowAt(ctx, 157, 60, 30, "rgba(255,170,70," + f.toFixed(3) + ")"); } },
-      { room: "AIRLOCK 4", cam: "14", src: D + "d4_airlock.png", fx: pulse(158, 37, 46, "255,40,20", 5, "beacon") }
+      { room: "AIRLOCK 4", cam: "14", src: D + "d4_airlock.png", fx: both(pulse(158, 37, 46, "255,40,20", 5, "beacon"), incursionFx(INCURSIONS.airlock4)) }
     ], {
       id: "deck4",
       title: "CREW QUARTERS",
@@ -1042,8 +1062,8 @@
     const C = "assets/aft_cargo/";
     return withCam([
       { room: "HOLD 1", cam: "21", src: C + "c_hold1.png" },
-      { room: "HOLD 2", cam: "22", src: C + "cargo_hold.png", fx: pulse(158, 50, 40, "255,150,30", 5, "beacon") },
-      { room: "QUARANTINE", cam: "23", src: C + "c_quarantine.png", fx: quarantineFx() },
+      { room: "HOLD 2", cam: "22", src: C + "cargo_hold.png", fx: both(pulse(158, 50, 40, "255,150,30", 5, "beacon"), incursionFx(INCURSIONS.hold2)) },
+      { room: "QUARANTINE", cam: "23", src: C + "c_quarantine.png", fx: incursionFx(INCURSIONS.quarantine) },
       { room: "MANIFEST OFFICE", cam: "24", src: C + "c_manifest.png", fx: pulse(124, 70, 8, "120,255,160", 4) },
       { room: "CARGO LIFT", cam: "25", src: C + "c_lift.png", fx: pulse(132, 35, 40, "255,150,30", 5, "beacon") },
       { room: "SERVITOR BAY", cam: "26", note: "SERVITOR 3 KAPPA: NO RESPONSE" },
