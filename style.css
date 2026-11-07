@@ -1536,6 +1536,9 @@ body.theme-retrowave:not(.red-alert):not(.green-mode) .emblem { filter: none; }
 .dp { max-width: 1000px; margin: 6px auto 10px; }
 .dp-svg { display: block; width: 100%; height: auto; border: 2px solid var(--amber-dim); background: rgba(0, 0, 0, 0.35); }
 .dp-svg * { vector-effect: non-scaling-stroke; }
+/* security camera feed above a deck plan */
+.dp-cam { max-width: 1000px; margin: 6px auto 10px; }
+.dp-cam > .rx-canvas.cam { max-width: 760px; margin: 0 auto 10px; box-shadow: 0 0 18px rgba(160, 200, 255, 0.12); filter: saturate(0.85) contrast(1.05); }
 .dp-gridline { fill: none; stroke: var(--amber-faint); stroke-width: 0.6; }
 .dp-hull { fill: rgba(0, 0, 0, 0.45); stroke: var(--amber-dim); stroke-width: 3; }
 .dp-hull-inner { fill: none; stroke: var(--amber-faint); stroke-width: 1; stroke-dasharray: 6 4; }
