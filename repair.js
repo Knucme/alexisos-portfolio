@@ -93,14 +93,30 @@
     calBox.appendChild(mon.el);
 
     const ctrls = el("div", "rp-ctrls");
-    // Start well off target. Steps are chosen so the exact match is reachable.
-    const state = { amp: 1.7, freq: 1.75, phase: 105 };
+    // Start off target, but not too far. Steps are chosen so the exact
+    // match is reachable. Each control has its own lock light and a hint
+    // that says which way to slide it (see hint() below), so players
+    // can solve one control at a time instead of guessing.
+    const state = { amp: 1.5, freq: 1.5, phase: 90 };
     const SPEC = [
-      { key: "phase", label: "AZIMUTH",   unit: "°", min: -180, max: 180, step: 15,   fmt: function (v) { return (v > 0 ? "+" : "") + v + "°"; } },
-      { key: "amp",   label: "ELEVATION", unit: "",       min: 0.2,  max: 2.0, step: 0.1,  fmt: function (v) { return v.toFixed(1); } },
-      { key: "freq",  label: "FEED RATE", unit: "",       min: 0.5,  max: 2.0, step: 0.25, fmt: function (v) { return v.toFixed(2); } }
+      { key: "freq",  label: "FEED RATE", what: "how many peaks", target: 1, min: 0.5, max: 2.0, step: 0.25,
+        fmt: function (v) { return v.toFixed(2); }, high: "TOO MANY PEAKS", low: "TOO FEW PEAKS" },
+      { key: "amp",   label: "ELEVATION", what: "how tall the wave is", target: 1, min: 0.2, max: 2.0, step: 0.1,
+        fmt: function (v) { return v.toFixed(1); }, high: "TOO TALL", low: "TOO SHORT" },
+      { key: "phase", label: "AZIMUTH",   what: "slides the wave sideways", target: 0, min: -180, max: 180, step: 15,
+        fmt: function (v) { return (v > 0 ? "+" : "") + v + "°"; }, high: "SLIDE LEFT", low: "SLIDE RIGHT" }
     ];
-    const sliders = [];
+    calBox.insertBefore(el("div", "line dim rp-howto",
+      "Each control has its own light. Turn them all green: FEED RATE sets how many peaks, " +
+      "ELEVATION sets how tall the wave is, AZIMUTH slides it sideways."), mon.el);
+    const sliders = [], hints = [];
+    function onTarget(sp) { return Math.abs(state[sp.key] - sp.target) < sp.step / 2; }
+    function hint(sp, out) {
+      if (onTarget(sp)) { out.textContent = "● LOCKED"; out.className = "rp-ctrl-s ok"; return; }
+      const high = state[sp.key] > sp.target;
+      out.textContent = high ? "◀ " + sp.high : sp.low + " ▶";
+      out.className = "rp-ctrl-s off";
+    }
     SPEC.forEach(function (sp) {
       const row = el("label", "rp-ctrl");
       row.appendChild(el("span", "rp-ctrl-l", sp.label));
@@ -110,6 +126,8 @@
       input.disabled = true;
       input.setAttribute("aria-label", sp.label);
       const val = el("span", "rp-ctrl-v", sp.fmt(state[sp.key]));
+      const st = el("span", "rp-ctrl-s");
+      input.title = sp.label + ": " + sp.what;
       input.addEventListener("input", function () {
         if (window.Ship) { Ship.touch(); }
         state[sp.key] = parseFloat(input.value);
@@ -119,8 +137,10 @@
       input.addEventListener("click", function (e) { e.stopPropagation(); });
       row.appendChild(input);
       row.appendChild(val);
+      row.appendChild(st);
       ctrls.appendChild(row);
       sliders.push(input);
+      hints.push([sp, st]);
     });
     calBox.appendChild(ctrls);
     const calMsg = el("div", "line dim rp-msg", "Match the live signal to the dashed carrier wave.");
@@ -177,8 +197,12 @@
     let locked = false;
     function update() {
       const q = mon.set(state, false, !powered());
+      hints.forEach(function (h) {
+        if (powered()) { hint(h[0], h[1]); } else { h[1].textContent = ""; h[1].className = "rp-ctrl-s"; }
+      });
       if (!powered() || locked) { return; }
-      if (q >= 0.98) {
+      const good = SPEC.filter(onTarget).length;
+      if (good === SPEC.length || q >= 0.98) {
         locked = true;
         sliders.forEach(function (s) { s.disabled = true; });
         calMsg.className = "line rp-ok rp-msg";
@@ -186,10 +210,10 @@
         wrap.classList.add("rp-won");
         if (window.Ship) { Ship.repair("vox"); }
         setTimeout(done, 2600);
-      } else if (q >= 0.8) {
-        calMsg.className = "line rp-msg"; calMsg.textContent = "CLOSE. FINE TUNE THE DISH.";
       } else {
-        calMsg.className = "line dim rp-msg"; calMsg.textContent = "Match the live signal to the dashed carrier wave.";
+        const next = SPEC.find(function (sp) { return !onTarget(sp); });
+        calMsg.className = "line rp-msg" + (good ? "" : " dim");
+        calMsg.textContent = good + " OF 3 CONTROLS LOCKED. NEXT: " + next.label + " (" + next.what + ").";
       }
     }
 

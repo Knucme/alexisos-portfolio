@@ -1737,7 +1737,12 @@ body.theme-retrowave:not(.red-alert):not(.green-mode) .emblem { filter: none; }
 .rp-seg.on { box-shadow: 0 0 6px currentColor; }
 
 .rp-ctrls { display: grid; gap: 6px; }
-.rp-ctrl { display: grid; grid-template-columns: 11ch 1fr 8ch; align-items: center; gap: 1.5ch; }
+.rp-ctrl { display: grid; grid-template-columns: 11ch 1fr 7ch 18ch; align-items: center; gap: 1.5ch; }
+.rp-ctrl-s { font-size: 0.85em; letter-spacing: 0.04em; white-space: nowrap; }
+.rp-ctrl-s.ok { color: #38ff7a; text-shadow: 0 0 6px rgba(56, 255, 122, 0.6); }
+.rp-ctrl-s.off { color: #ffcc33; }
+.rp-howto { margin: 2px 0 8px; }
+@media (max-width: 700px) { .rp-ctrl { grid-template-columns: 10ch 1fr 6ch; } .rp-ctrl-s { grid-column: 1 / -1; } }
 .rp-ctrl-l { color: var(--amber-dim); letter-spacing: 0.08em; }
 .rp-ctrl-v { text-align: right; }
 .rp-ctrl input[type=range] { width: 100%; accent-color: var(--amber); cursor: pointer; }
