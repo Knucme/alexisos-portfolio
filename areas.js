@@ -360,12 +360,25 @@
     return panel;
   }
 
+  /* Pre-rendered reactor room images, loaded once and reused. */
+  const REACTOR_IMG = {};
+  function reactorImage(fixed) {
+    const k = fixed ? "online" : "damaged";
+    if (!REACTOR_IMG[k] && typeof Image === "function") {
+      REACTOR_IMG[k] = new Image();
+      REACTOR_IMG[k].src = "assets/reactor/reactor_" + k + ".png";
+    }
+    return REACTOR_IMG[k] || { complete: false };
+  }
+
   /* ---------- REACTOR ----------
-     Pixel-art reactor hall drawn on a small canvas and scaled up with
-     crisp pixels: three glass containment tanks full of molten core,
-     turning slowly (the ribs sweep around each cylinder), pulsing with
-     heat, and venting pixelated steam from the top. The center tank is
-     the failing one: it flashes red. */
+     The room itself is a pre-rendered PS1 style image made from the
+     Kraken Code PSX Sci-Fi pack (assets/reactor/reactor_damaged.png and
+     reactor_online.png, 256x144). The live effects are drawn on top:
+     pulsing core glow, bubbles inside the glass, steam from the caps,
+     and the red flashing on core B while it is critical.
+     To move an effect, change CORES below: x0/x1 is the glass column in
+     image pixels, y0/y1 its top and bottom. */
   function reactor(sys, all, opts) {
     const wrap = el("div", "rx");
     const W = 256, H = 144;
@@ -373,7 +386,7 @@
     canvas.width = W;
     canvas.height = H;
     canvas.setAttribute("role", "img");
-    canvas.setAttribute("aria-label", "Reactor hall: three glowing containment tanks venting steam");
+    canvas.setAttribute("aria-label", "Reactor hall: three plasma core columns venting steam");
     const isFixed = sys && sys.status === "ok";
     // A wall terminal beside the reactor hall: clicking it opens the
     // control board in its own window (see openWindow in script.js).
@@ -411,105 +424,57 @@
     ctx.imageSmoothingEnabled = false;
     const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    const TANKS = [
-      { x: 62,  hot: "#ffb12a", core: "#ff6a00", crit: false, phase: 0 },
-      { x: 128, hot: "#ffd24a", core: fixed ? "#ff6a00" : "#ff3a10", crit: !fixed, phase: 1.7 },
-      { x: 194, hot: "#ffb12a", core: "#ff6a00", crit: false, phase: 3.1 }
+    const CORES = [
+      { x0: 74,  x1: 85,  crit: false, phase: 0 },
+      { x0: 123, x1: 134, crit: !fixed, phase: 1.7 },
+      { x0: 172, x1: 183, crit: false, phase: 3.1 }
     ];
-    const TW = 40, TOP = 46, BOT = 112;      // tank width, glass top, glass bottom
+    const TOP = 60, BOT = 84, CAP = 55;      // glass top, glass bottom, steam vent height
+    const bg = reactorImage(fixed);
     let smoke = [];
     const rnd = seeded(11);
 
     function px(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); }
 
-    function room(t) {
-      // back wall
-      const g = ctx.createLinearGradient(0, 0, 0, H);
-      g.addColorStop(0, "#120607"); g.addColorStop(0.65, "#2a0d08"); g.addColorStop(1, "#0b0405");
-      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-      for (let x = 0; x < W; x += 32) { px(x, 0, 1, 118, "#1d0a09"); }       // wall panels
-      // overhead pipes
-      px(0, 10, W, 4, "#3a1f1c"); px(0, 10, W, 1, "#6b3a30");
-      px(0, 20, W, 3, "#2b1714"); px(0, 20, W, 1, "#55302a");
-      for (let x = 20; x < W; x += 58) { px(x, 8, 4, 8, "#4a2a24"); }       // pipe clamps
-      // floor and grating
-      px(0, 118, W, H - 118, "#0d0606");
-      for (let x = -40; x < W + 40; x += 16) {                               // perspective lines
-        ctx.strokeStyle = "#1e0d0b"; ctx.beginPath(); ctx.moveTo(x, 118); ctx.lineTo(x + (x - W / 2) * 0.6, H); ctx.stroke();
+    function core(C, t) {
+      const cx = (C.x0 + C.x1) / 2, w = C.x1 - C.x0;
+      const flash = C.crit ? (Math.sin(t * 9) > 0 ? 1 : 0.35) : 0.75 + 0.25 * Math.sin(t * 3 + C.phase);
+      ctx.globalCompositeOperation = "lighter";
+      // glow halo around the column
+      const halo = ctx.createRadialGradient(cx, (TOP + BOT) / 2, 2, cx, (TOP + BOT) / 2, 34);
+      halo.addColorStop(0, C.crit ? "rgba(255,40,20," + 0.45 * flash + ")" : "rgba(60,200,255," + 0.22 * flash + ")");
+      halo.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = halo; ctx.fillRect(cx - 40, TOP - 30, 80, BOT - TOP + 60);
+      // bubbles of plasma rising inside the glass
+      for (let i = 0; i < 4; i++) {
+        const ph = (t * 0.45 + i / 4 + C.phase) % 1;
+        const bx = cx + Math.sin(t * 2 + i * 1.9 + C.phase) * (w / 2 - 2);
+        const by = BOT - 2 - ph * (BOT - TOP - 4);
+        px(bx, by, 1, 1, C.crit ? "rgba(255,200,150," + (0.9 - ph * 0.6) + ")" : "rgba(200,250,255," + (0.8 - ph * 0.5) + ")");
       }
-      px(0, 118, W, 1, "#3b1a12");
-      // warm light spill on the floor, pulsing
-      const glow = 0.35 + 0.15 * Math.sin(t * 2.2);
-      const fg = ctx.createRadialGradient(W / 2, 122, 4, W / 2, 122, 130);
-      fg.addColorStop(0, "rgba(255,120,30," + glow + ")"); fg.addColorStop(1, "rgba(255,80,20,0)");
-      ctx.fillStyle = fg; ctx.fillRect(0, 100, W, 44);
+      // band of light sweeping down the column so it reads as turning
+      const sy = TOP + ((t * 14 + C.phase * 9) % (BOT - TOP));
+      px(C.x0, sy, w, 1, C.crit ? "rgba(255,120,80,0.35)" : "rgba(150,240,255,0.30)");
+      ctx.globalCompositeOperation = "source-over";
+      // critical core: the glass blinks hot red
+      if (C.crit && flash === 1) { px(C.x0, TOP, w, BOT - TOP, "rgba(255,30,10,0.25)"); }
     }
 
-    function tank(T, t) {
-      const x0 = T.x - TW / 2, r = TW / 2;
-      const flash = T.crit ? (Math.sin(t * 9) > 0 ? 1 : 0.45) : 0.75 + 0.25 * Math.sin(t * 3 + T.phase);
-      // pedestal
-      px(x0 - 4, BOT, TW + 8, 8, "#1b1b22"); px(x0 - 4, BOT, TW + 8, 1, "#3d3d4a");
-      px(x0 + 2, BOT + 8, TW - 4, 4, "#121217");
-      // feed pipes from the overhead line
-      px(T.x - 2, 14, 4, TOP - 18, "#3a1f1c"); px(T.x - 2, 14, 1, TOP - 18, "#6b3a30");
-      // glass body: molten core with a heat gradient
-      const level = TOP + 14 + Math.sin(t * 1.3 + T.phase) * 2;
-      const g = ctx.createLinearGradient(0, level, 0, BOT);
-      g.addColorStop(0, T.crit && flash < 1 ? "#ff2a10" : T.hot);
-      g.addColorStop(0.5, T.core);
-      g.addColorStop(1, "#5a0e04");
-      ctx.globalAlpha = flash;
-      ctx.fillStyle = g; ctx.fillRect(x0 + 1, Math.round(level), TW - 2, BOT - Math.round(level));
-      ctx.globalAlpha = 1;
-      // empty glass above the liquid
-      px(x0 + 1, TOP, TW - 2, Math.round(level) - TOP, "rgba(255,170,90,0.10)");
-      // bubbles / swirl blobs rising inside
-      for (let i = 0; i < 6; i++) {
-        const ph = (t * 0.5 + i / 6 + T.phase) % 1;
-        const bx = T.x + Math.sin(t * 2 + i * 1.9 + T.phase) * (r - 6);
-        const by = BOT - 4 - ph * (BOT - level - 6);
-        px(bx, by, 2, 2, "rgba(255,240,170," + (0.9 - ph * 0.6) + ")");
-      }
-      // rotation: ribs sweeping around the cylinder (only the front half shows)
-      for (let k = 0; k < 6; k++) {
-        const a = t * 0.9 + T.phase + k * Math.PI / 3;
-        const z = Math.cos(a);
-        if (z <= 0) { continue; }
-        const rx = T.x + Math.sin(a) * (r - 1);
-        px(rx, TOP, 1, BOT - TOP, "rgba(40,20,20," + (0.35 + z * 0.45) + ")");
-      }
-      // glass edge highlights (fixed, so the turning reads as rotation)
-      px(x0, TOP, 1, BOT - TOP, "#c98a5a"); px(x0 + TW - 1, TOP, 1, BOT - TOP, "#7a4a32");
-      px(x0 + 5, TOP + 3, 2, BOT - TOP - 10, "rgba(255,255,255,0.22)");
-      // metal bands and cap
-      [TOP, TOP + 22, BOT - 2].forEach(function (y) { px(x0 - 1, y, TW + 2, 2, "#2a2a33"); px(x0 - 1, y, TW + 2, 1, "#55556a"); });
-      px(x0 + 4, TOP - 8, TW - 8, 8, "#24242c"); px(x0 + 4, TOP - 8, TW - 8, 1, "#4d4d5e");
-      px(T.x - 3, TOP - 13, 6, 5, "#2e2e38");       // vent stack
-      // heat halo
-      const halo = ctx.createRadialGradient(T.x, (TOP + BOT) / 2, 4, T.x, (TOP + BOT) / 2, 46);
-      halo.addColorStop(0, T.crit ? "rgba(255,40,20," + 0.28 * flash + ")" : "rgba(255,140,40," + 0.18 * flash + ")");
-      halo.addColorStop(1, "rgba(255,80,20,0)");
-      ctx.fillStyle = halo; ctx.fillRect(T.x - 50, TOP - 20, 100, BOT - TOP + 40);
-    }
-
-    function spawnSmoke(T) {
-      smoke.push({ x: T.x + (rnd() - 0.5) * 4, y: TOP - 13, vx: (rnd() - 0.5) * 0.25, vy: -(0.35 + rnd() * 0.3),
-                   r: 2 + rnd() * 2, life: 0, max: 110 + rnd() * 70, crit: T.crit });
+    function spawnSmoke(C) {
+      const cx = (C.x0 + C.x1) / 2;
+      smoke.push({ x: cx + (rnd() - 0.5) * 10, y: CAP, vx: (rnd() - 0.5) * 0.35, vy: -(0.12 + rnd() * 0.15),
+                   r: 1.5 + rnd() * 1.5, life: 0, max: 90 + rnd() * 60, crit: C.crit });
     }
 
     function drawSmoke() {
       smoke.forEach(function (p) {
-        p.life++; p.x += p.vx + Math.sin(p.life * 0.05) * 0.15; p.y += p.vy; p.r += 0.06;
+        p.life++; p.x += p.vx + Math.sin(p.life * 0.05) * 0.15; p.y += p.vy; p.r += 0.05;
         const a = Math.max(0, 1 - p.life / p.max);
-        const shade = p.crit ? [190, 170, 165] : [215, 210, 205];
-        // pixel puff: a few chunky squares instead of a smooth circle
+        const shade = p.crit ? [200, 170, 165] : [190, 215, 225];
         const s = Math.round(p.r);
-        ctx.fillStyle = "rgba(" + shade.join(",") + "," + (0.55 * a) + ")";
+        ctx.fillStyle = "rgba(" + shade.join(",") + "," + (0.4 * a) + ")";
         ctx.fillRect(Math.round(p.x - s), Math.round(p.y - s / 2), s * 2, s);
         ctx.fillRect(Math.round(p.x - s / 2), Math.round(p.y - s), s, s * 2);
-        ctx.fillStyle = "rgba(255,255,255," + (0.35 * a) + ")";
-        ctx.fillRect(Math.round(p.x - s / 2), Math.round(p.y - s / 2), Math.max(1, s - 1), Math.max(1, s - 1));
       });
       smoke = smoke.filter(function (p) { return p.life < p.max && p.y > -10; });
     }
@@ -518,20 +483,22 @@
     function draw() {
       if (!canvas.isConnected && frame > 0) { cancelAnimationFrame(raf); return; }
       const t = frame / 60;
-      room(t);
-      TANKS.forEach(function (T) { tank(T, t); });
+      ctx.fillStyle = "#06050a"; ctx.fillRect(0, 0, W, H);
+      if (bg.complete && bg.naturalWidth) { ctx.drawImage(bg, 0, 0, W, H); }
+      CORES.forEach(function (C) { core(C, t); });
       if (!reduce) {
-        TANKS.forEach(function (T) { if (frame % (T.crit ? 4 : 7) === 0) { spawnSmoke(T); } });
+        CORES.forEach(function (C) { if (frame % (C.crit ? 5 : 12) === 0) { spawnSmoke(C); } });
       }
       drawSmoke();
-      // warning stripe on the critical tank's pedestal
-      if (!fixed && Math.sin(t * 9) > 0) { ctx.fillStyle = "#ff2a10"; ctx.fillRect(TANKS[1].x - 10, BOT + 2, 20, 2); }
+      // warning stripe on the critical core's pedestal
+      if (!fixed && Math.sin(t * 9) > 0) { px(CORES[1].x0 - 3, BOT + 5, CORES[1].x1 - CORES[1].x0 + 6, 1, "#ff2a10"); }
       frame++;
       if (!reduce) { raf = requestAnimationFrame(draw); }
     }
     // Pre-warm the steam so it's already rising when the page opens
-    if (!reduce) { for (let i = 0; i < 160; i++) { TANKS.forEach(function (T) { if (i % 7 === 0) { spawnSmoke(T); } }); smoke.forEach(function (p) { p.life++; p.y += p.vy; p.x += p.vx; }); } }
+    if (!reduce) { for (let i = 0; i < 160; i++) { CORES.forEach(function (C) { if (i % 12 === 0) { spawnSmoke(C); } }); smoke.forEach(function (p) { p.life++; p.y += p.vy; p.x += p.vx; }); } }
     draw();
+    if (reduce && !bg.complete && bg.addEventListener) { bg.addEventListener("load", draw); }
     return wrap;
   }
 

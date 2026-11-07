@@ -3,3 +3,7 @@
 
 # Log / temp files
 *.log
+
+# Paid 3D asset packs: license forbids redistributing the raw files.
+# Keep them local only; publish rendered images instead.
+assets/_packs/
