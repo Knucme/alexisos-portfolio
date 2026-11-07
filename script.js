@@ -1075,13 +1075,15 @@
     if (!window.Ship) { return; }
     try { sessionStorage.setItem("alexisos-briefed", "1"); } catch (e) { /* storage blocked */ }
     const box = el("div", "brief");
-    box.appendChild(el("div", "brief-log", "COGITATOR LOG.  VIGIL OF ASH.  DAY 1207"));
+    box.appendChild(el("div", "brief-log", "SALVAGE LOG.  DERELICT VIGIL OF ASH.  ADRIFT 1207 DAYS"));
     box.appendChild(el("p", "brief-story",
-      "The Vigil was crossing the void when a warp storm tore into her. The Geller field collapsed, " +
-      "the reactor ran hot, the engines died and the vox went dark. Something came through the breach. " +
-      "The crew went into stasis and never woke."));
+      "Your shuttle was destroyed in a ferocious battle. You were the only survivor. Your escape pod " +
+      "drifted for days before it found a ship: the Vigil of Ash, dark and adrift, her crew asleep in " +
+      "stasis pods that never opened. You docked, cut your way in, and woke the cogitator."));
     box.appendChild(el("p", "brief-story",
-      "You are the only one aboard. Bring the ship back online, clear what got in, and jump before the storm returns."));
+      "She is broken. The Geller field is down, the reactor runs hot, the engines are dead and the vox " +
+      "is silent. Something came aboard through the breach. But she is the only ship for light years " +
+      "and your only way out. Bring her back online, clear what got in, and jump before the storm returns."));
     box.appendChild(el("div", "brief-h", "WHAT NEEDS TO HAPPEN"));
     const list = el("div", "brief-steps");
     let nextMarked = false;
