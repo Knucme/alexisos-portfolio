@@ -469,44 +469,124 @@
     return sceneImage("assets/reactor/reactor_" + (fixed ? "online" : "damaged") + ".png");
   }
 
-  /* Security camera feed shown above the deck plans: the rendered room,
-     a REC light, a clock, rolling scan noise, and an optional fx(ctx, t)
-     for room specific effects (a pulsing alarm light, a beacon). */
-  function camFeed(src, label, fx) {
+  /* ---------- SECURITY CAMERAS ----------
+     One feed above each deck plan that can switch between cameras.
+     Each camera: { room, cam, src, fx }
+       room  the compartment name on the deck plan (clicking it there
+             switches to this camera)
+       cam   the camera number shown in the corner
+       src   the rendered room image (256x144); leave it out for a dead
+             feed, which shows static and NO SIGNAL
+       fx    optional fx(ctx, t) for live effects on top of the image
+     Switching plays a short burst of static. */
+  function glowAt(ctx, x, y, r, rgba) {
+    const g = ctx.createRadialGradient(x, y, 1, x, y, r);
+    g.addColorStop(0, rgba); g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.globalCompositeOperation = "lighter"; ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    ctx.globalCompositeOperation = "source-over";
+  }
+  // a light that pulses (sin), blinks (on/off) or sweeps like a beacon (cos)
+  function pulse(x, y, r, rgb, speed, kind) {
+    return function (ctx, t) {
+      let a;
+      if (kind === "blink") { a = Math.sin(t * speed) > 0 ? 0.5 : 0.05; }
+      else if (kind === "beacon") { a = Math.max(0, Math.cos(t * speed)) * 0.6; }
+      else { a = 0.2 + 0.2 * Math.max(0, Math.sin(t * speed)); }
+      glowAt(ctx, x, y, r, "rgba(" + rgb + "," + a.toFixed(3) + ")");
+    };
+  }
+
+  function camFeeds(cams) {
     const W = 256, H = 144;
+    const box = el("div", "cam-box");
     const canvas = el("canvas", "rx-canvas cam");
     canvas.width = W; canvas.height = H;
     canvas.setAttribute("role", "img");
-    canvas.setAttribute("aria-label", label + " security camera");
+    box.appendChild(canvas);
+
+    // controls: prev / next and one button per camera
+    const bar = el("div", "cam-bar");
+    const prev = el("button", "cam-btn cam-step", "< PREV");
+    const next = el("button", "cam-btn cam-step", "NEXT >");
+    prev.type = next.type = "button";
+    const list = el("div", "cam-list");
+    const btns = cams.map(function (c, i) {
+      const b = el("button", "cam-btn" + (c.src ? "" : " dead"), "CAM " + c.cam);
+      b.type = "button";
+      b.title = c.room;
+      b.addEventListener("click", function (e) { e.stopPropagation(); show(i, true); });
+      list.appendChild(b);
+      return b;
+    });
+    prev.addEventListener("click", function (e) { e.stopPropagation(); show((cur + cams.length - 1) % cams.length, true); });
+    next.addEventListener("click", function (e) { e.stopPropagation(); show((cur + 1) % cams.length, true); });
+    bar.appendChild(prev); bar.appendChild(list); bar.appendChild(next);
+    box.appendChild(bar);
+
     const ctx = canvas.getContext && canvas.getContext("2d");
-    if (!ctx) { return canvas; }
-    ctx.imageSmoothingEnabled = false;
     const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const bg = sceneImage(src);
-    let frame = 0, raf = 0;
+    let cur = 0, burst = 0, frame = 0, raf = 0, img = null;
+    const api = { el: box, onChange: null, show: function (room) {
+      const i = cams.findIndex(function (c) { return c.room === room; });
+      if (i >= 0 && i !== cur) { show(i, false); }
+    } };
+
+    function show(i, fromUser) {
+      cur = i;
+      const c = cams[i];
+      img = c.src ? sceneImage(c.src) : null;
+      if (img && reduce && !img.complete && img.addEventListener) { img.addEventListener("load", draw); }
+      burst = reduce ? 0 : 10;
+      btns.forEach(function (b, k) { b.classList.toggle("on", k === i); });
+      canvas.setAttribute("aria-label", "Security camera " + c.cam + ": " + c.room + (c.src ? "" : ", no signal"));
+      if (fromUser && api.onChange) { api.onChange(c.room); }
+      if (reduce) { draw(); }
+    }
+
+    function noise(amount) {
+      for (let i = 0; i < amount; i++) {
+        const v = Math.floor(Math.random() * 200);
+        ctx.fillStyle = "rgb(" + v + "," + v + "," + v + ")";
+        ctx.fillRect(Math.floor(Math.random() * W), Math.floor(Math.random() * H), 2, 1);
+      }
+    }
+
     function draw() {
+      if (!ctx) { return; }
       if (gone(canvas)) { cancelAnimationFrame(raf); return; }
       const t = frame / 60;
+      const c = cams[cur];
       ctx.fillStyle = "#050507"; ctx.fillRect(0, 0, W, H);
-      if (bg.complete && bg.naturalWidth) { ctx.drawImage(bg, 0, 0, W, H); }
-      if (fx) { fx(ctx, t); }
-      // rolling scan band
-      const band = (t * 30) % (H + 20) - 10;
-      ctx.fillStyle = "rgba(255,255,255,0.05)"; ctx.fillRect(0, band, W, 6);
+      ctx.font = "7px \"IBM Plex Mono\", monospace";
+      if (!c.src) {
+        // dead feed: static with a NO SIGNAL card
+        noise(1600);
+        ctx.fillStyle = "rgba(0,0,0,0.75)"; ctx.fillRect(W / 2 - 46, H / 2 - 14, 92, 26);
+        ctx.fillStyle = "#e8eee8"; ctx.font = "10px \"IBM Plex Mono\", monospace";
+        ctx.fillText("NO SIGNAL", W / 2 - 27, H / 2 + 1);
+        ctx.font = "7px \"IBM Plex Mono\", monospace";
+        ctx.fillStyle = "#ffb43a"; ctx.fillText(c.note || "COMPARTMENT SEALED", W / 2 - 38, H / 2 + 9);
+      } else {
+        if (img && img.complete && img.naturalWidth) { ctx.drawImage(img, 0, 0, W, H); }
+        if (c.fx) { c.fx(ctx, t); }
+        const band = (t * 30) % (H + 20) - 10;
+        ctx.fillStyle = "rgba(255,255,255,0.05)"; ctx.fillRect(0, band, W, 6);
+      }
+      if (burst > 0) { noise(900); burst--; }
       // overlay text
       ctx.font = "7px \"IBM Plex Mono\", monospace";
       ctx.fillStyle = "rgba(230,240,230,0.85)";
-      ctx.fillText(label, 6, 11);
+      ctx.fillText("CAM " + c.cam + " " + c.room, 6, 11);
       const secs = Math.floor(t) % 60;
       ctx.fillText("T+1207D 03:4" + Math.floor(t / 60) % 10 + ":" + String(secs).padStart(2, "0"), W - 82, H - 6);
-      if (Math.floor(t * 1.5) % 2 === 0) { ctx.fillStyle = "#ff2a2a"; ctx.fillRect(W - 30, 6, 4, 4); }
-      ctx.fillStyle = "rgba(230,240,230,0.85)"; ctx.fillText("REC", W - 24, 11);
+      if (c.src && Math.floor(t * 1.5) % 2 === 0) { ctx.fillStyle = "#ff2a2a"; ctx.fillRect(W - 30, 6, 4, 4); }
+      ctx.fillStyle = "rgba(230,240,230,0.85)"; ctx.fillText(c.src ? "REC" : "OFF", W - 24, 11);
       frame++;
       if (!reduce) { raf = requestAnimationFrame(draw); }
     }
-    draw();
-    if (reduce && !bg.complete && bg.addEventListener) { bg.addEventListener("load", draw); }
-    return canvas;
+    show(0, false);
+    if (!reduce) { draw(); }
+    return api;
   }
 
   /* ---------- REACTOR ----------
@@ -654,10 +734,16 @@
     return e;
   }
 
-  /* Put a camera feed above a deck plan. */
-  function withCam(cam, plan) {
+  /* Camera feed above a deck plan, linked both ways: click a
+     compartment to see its camera; switch cameras to highlight the
+     compartment. */
+  function withCam(cams, spec) {
+    const feed = camFeeds(cams);
+    spec.onPick = function (r) { feed.show(r.name); };
+    const plan = deckPlan(spec);
+    feed.onChange = function (room) { if (plan.select) { plan.select(room); } };
     const box = el("div", "dp-cam");
-    box.appendChild(cam);
+    box.appendChild(feed.el);
     box.appendChild(plan);
     return box;
   }
@@ -682,7 +768,7 @@
     }
 
     spec.rooms.forEach(function (r, i) {
-      const g = sv("g", { class: "dp-room " + r.status, tabindex: 0 }, svg);
+      const g = sv("g", { class: "dp-room " + r.status, tabindex: 0, "data-room": r.name }, svg);
       g.style.animationDelay = (i * 0.29 % 1.2).toFixed(2) + "s";
       sv("rect", { x: r.x, y: r.y, width: r.w, height: r.h, class: "dp-wall" }, g);
       if (r.furn) { r.furn(g, r); }
@@ -704,8 +790,17 @@
         svg.querySelectorAll(".dp-room").forEach(function (x) { x.classList.remove("pinned"); });
         if (pinned) { g.classList.add("pinned"); }
         report(r);
+        if (spec.onPick) { spec.onPick(r); }
       });
     });
+    // Pin a compartment by name (used when the camera is switched)
+    wrap.select = function (name) {
+      const r = spec.rooms.find(function (x) { return x.name === name; });
+      if (!r) { return; }
+      pinned = r;
+      svg.querySelectorAll(".dp-room").forEach(function (x) { x.classList.toggle("pinned", x.getAttribute("data-room") === name); });
+      report(r);
+    };
 
     // doors: [x, y, "h"|"v"] gaps drawn over walls
     (spec.doors || []).forEach(function (d) {
@@ -775,14 +870,23 @@
 
   /* ---------- DECK 4: crew quarters ---------- */
   function deck4() {
-    return withCam(camFeed("assets/deck4/crew_quarters.png", "CAM 04 BUNKS A", function (ctx, t) {
-      // emergency light by the breached bulkhead
-      const a = 0.18 + 0.18 * Math.max(0, Math.sin(t * 3));
-      const g = ctx.createRadialGradient(204, 70, 1, 204, 70, 36);
-      g.addColorStop(0, "rgba(255,40,20," + a + ")"); g.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.globalCompositeOperation = "lighter"; ctx.fillStyle = g; ctx.fillRect(168, 34, 72, 72);
-      ctx.globalCompositeOperation = "source-over";
-    }), deckPlan({
+    const D = "assets/deck4/";
+    return withCam([
+      { room: "BUNKS A", cam: "04", src: D + "crew_quarters.png", fx: pulse(204, 70, 36, "255,40,20", 3) },
+      { room: "BUNKS B", cam: "05", src: D + "d4_bunks_b.png", fx: pulse(155, 57, 44, "255,30,15", 6, "blink") },
+      { room: "SANITATION", cam: "06", src: D + "d4_sanitation.png" },
+      { room: "MEDICAE BAY", cam: "07", src: D + "d4_medicae.png", fx: pulse(142, 60, 10, "90,255,140", 9, "blink") },
+      { room: "OFFICER QTRS", cam: "08", note: "LOCKED FROM INSIDE" },
+      { room: "MAIN CORRIDOR", cam: "09", src: D + "d4_corridor.png", fx: function (ctx, t) {
+          if (Math.sin(t * 5.3) * Math.sin(t * 1.7) > 0.8) { ctx.fillStyle = "rgba(0,0,0,0.4)"; ctx.fillRect(0, 0, 256, 144); } } },
+      { room: "LOCKERS", cam: "10", src: D + "d4_lockers.png" },
+      { room: "MESS HALL", cam: "11", src: D + "d4_mess.png" },
+      { room: "GALLEY", cam: "12", src: D + "d4_galley.png" },
+      { room: "SHRINE", cam: "13", src: D + "d4_shrine.png", fx: function (ctx, t) {
+          const f = 0.22 + 0.08 * Math.sin(t * 11) + 0.06 * Math.sin(t * 23);       // candle flicker
+          glowAt(ctx, 157, 60, 30, "rgba(255,170,70," + f.toFixed(3) + ")"); } },
+      { room: "AIRLOCK 4", cam: "14", src: D + "d4_airlock.png", fx: pulse(158, 37, 46, "255,40,20", 5, "beacon") }
+    ], {
       id: "deck4",
       title: "CREW QUARTERS",
       hull: "40,60 690,60 770,150 770,270 690,360 40,360 20,330 20,90",
@@ -808,19 +912,28 @@
         sv("path", { d: "M 215 62 L 230 74 L 242 64 L 258 78 L 270 66 L 286 76 L 300 63", class: "dp-breach" }, svg);
         sv("text", { x: 258, y: 52, class: "dp-callout" }, svg).textContent = "SEAL 4 BREACH";
       }
-    }));
+    });
   }
 
   /* ---------- AFT CARGO ---------- */
   function cargoBay() {
-    return withCam(camFeed("assets/aft_cargo/cargo_hold.png", "CAM 11 HOLD 2", function (ctx, t) {
-      // rotating amber beacon on the far bulkhead
-      const a = Math.max(0, Math.cos(t * 5));
-      const g = ctx.createRadialGradient(158, 50, 1, 158, 50, 40);
-      g.addColorStop(0, "rgba(255,150,30," + (0.55 * a) + ")"); g.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.globalCompositeOperation = "lighter"; ctx.fillStyle = g; ctx.fillRect(118, 10, 80, 80);
-      ctx.globalCompositeOperation = "source-over";
-    }), deckPlan({
+    const C = "assets/aft_cargo/";
+    return withCam([
+      { room: "HOLD 1", cam: "21", src: C + "c_hold1.png" },
+      { room: "HOLD 2", cam: "22", src: C + "cargo_hold.png", fx: pulse(158, 50, 40, "255,150,30", 5, "beacon") },
+      { room: "QUARANTINE", cam: "23", src: C + "c_quarantine.png", fx: function (ctx, t) {
+          // something moves inside the tanks now and then
+          const a = Math.max(0, Math.sin(t * 0.7)) * Math.max(0, Math.sin(t * 2.3));
+          ctx.fillStyle = "rgba(0,20,8," + (0.55 * a).toFixed(3) + ")";
+          ctx.fillRect(119 + Math.round(Math.sin(t) * 2), 52, 8, 18);
+          ctx.fillRect(168, 60 + Math.round(Math.sin(t * 1.3) * 2), 6, 12);
+          glowAt(ctx, 124, 62, 30, "rgba(80,255,120," + (0.12 + 0.06 * Math.sin(t * 2)).toFixed(3) + ")"); } },
+      { room: "MANIFEST OFFICE", cam: "24", src: C + "c_manifest.png", fx: pulse(124, 70, 8, "120,255,160", 4) },
+      { room: "CARGO LIFT", cam: "25", src: C + "c_lift.png", fx: pulse(132, 35, 40, "255,150,30", 5, "beacon") },
+      { room: "SERVITOR BAY", cam: "26", note: "SERVITOR 3 KAPPA: NO RESPONSE" },
+      { room: "DOCK CLAMP", cam: "27", src: C + "c_dock.png" },
+      { room: "FUEL BUNKER", cam: "28", src: C + "c_fuel.png", fx: pulse(168, 106, 14, "255,120,40", 2) }
+    ], {
       id: "cargo",
       title: "CARGO HOLDS",
       hull: "60,40 720,40 790,110 790,310 720,380 60,380 30,340 30,80",
@@ -846,7 +959,7 @@
         // scrape marks where C-7 broke loose
         sv("path", { d: "M 440 300 L 470 330 L 490 336 L 505 360", class: "dp-breach" }, svg);
       }
-    }));
+    });
   }
 
   /* ---------- ENGINES ----------
