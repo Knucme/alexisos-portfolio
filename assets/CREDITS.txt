@@ -37,8 +37,8 @@ Bridge metal (bridge/tex_plate.jpg, bridge/tex_steel.jpg)
   Metal_21 and Metal_20 from the Tiny Texture Pack 3 by Screaming Brain
   Studios. CC0 / public domain.
 
-Warp incursion on the Quarantine camera
-  (aft_cargo/q_portal.png, q_ritual.png, mon_*.png)
+Warp incursion on the Quarantine and Bunks B cameras
+  (aft_cargo/q_portal.png, q_ritual.png, deck4/bb_ritual.png, mon_*.png)
   q_portal.png   rendered from a port of the Fire Forcefield shader in the
                  BinbunVFX fire effects pack.        LICENSE: TO CONFIRM
   q_ritual.png   circle from "Ritual Circles and Occult Symbols".

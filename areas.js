@@ -496,8 +496,9 @@
   }
 
   /* ---------- WARP INCURSIONS on the damaged room cameras ----------
-     Damaged compartments show fire. Contaminated ones (Quarantine) also
-     get the warp incursion: portal, ritual circle and creatures. Leave
+     Damaged compartments show fire. Contaminated or breached ones
+     (Quarantine, Bunks B) also get the warp incursion: portal, ritual
+     circle and creatures. Leave
      portal / ritual / spawns out of a room's settings for fire only.
      Drawn over the rendered room:
        fire     flames on the floor (assets/fx/fire.png, 64 frames of
@@ -515,14 +516,18 @@
   const CAM_STD = { eye: [2.3, 2.5, 0.7], target: [-1.1, 0.8, -3.8], fov: 66 };
   const CAM_HOLD = { eye: [4.4, 2.7, 1.8], target: [-1.2, 0.6, -6], fov: 66 };
   const INCURSIONS = {
+    // contaminated or breached: fire plus the warp incursion
     quarantine: { cam: CAM_STD, ritual: "aft_cargo/q_ritual.png", glow: [126, 100],
       portal: { x: 152, y: 57.5, w: 29, h: 31 }, door: { x: -0.3, z: -4.6 }, circle: { x: -0.25, z: -2.55, r: 0.75 },
       bounds: { x0: -1.5, x1: 1.3, z0: -4.3, z1: -1.4 }, spawns: ["blood", "demon", "blood"],
-      fire: [[-1.3, -1.6, 0.7], [1.0, -3.6, 0.6]] },
-    // damaged rooms: fire only, no portal or creatures
-    bunksB: { cam: CAM_STD, fire: [[-1.0, -4.3, 0.8], [1.2, -1.4, 0.6], [-1.3, -1.2, 0.5]] },
-    airlock4: { cam: CAM_STD, fire: [[-1.5, -4.3, 0.7], [1.4, -3.0, 0.6]] },
-    hold2: { cam: CAM_HOLD, fire: [[0.9, -3.3, 0.9], [-0.3, -6.4, 1.0], [3.7, -7.6, 0.7]] }
+      fire: [[-1.3, -1.6, 0.7], [1.0, -3.6, 0.6], [1.2, -1.8, 0.5], [-1.6, -3.0, 0.6], [0.6, -4.5, 0.5]] },
+    bunksB: { cam: CAM_STD, ritual: "deck4/bb_ritual.png", glow: [129, 104],          // hull breach
+      portal: { x: 185, y: 62, w: 34, h: 30 }, door: { x: 1.35, z: -4.6 }, circle: { x: 0, z: -2.4, r: 0.65 },
+      bounds: { x0: -1.0, x1: 1.6, z0: -4.2, z1: -1.0 }, spawns: ["demon", "blood", "blood"],
+      fire: [[-1.0, -4.3, 0.8], [1.2, -1.4, 0.6], [-1.3, -1.2, 0.5], [1.1, -3.6, 0.7], [-1.5, -3.0, 0.6], [0.3, -0.4, 0.5]] },
+    // damaged: fire only
+    airlock4: { cam: CAM_STD, fire: [[-1.5, -4.3, 0.7], [1.4, -3.0, 0.6], [-0.9, -1.0, 0.6], [1.6, -4.4, 0.8], [0.4, -3.6, 0.5], [-1.6, -2.3, 0.6]] },
+    hold2: { cam: CAM_HOLD, fire: [[0.9, -3.3, 0.9], [-0.3, -6.4, 1.0], [3.7, -7.6, 0.7], [2.6, -5.0, 0.8], [1.8, -8.6, 0.7], [-0.8, -8.4, 0.9], [3.9, -4.6, 0.6]] }
   };
 
   function makeProjector(cam) {
