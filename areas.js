@@ -114,6 +114,16 @@
     return turnable(k);
   }
 
+  /* Animation loops stop once their canvas leaves the page. Scenes are
+     printed through the output queue, so a canvas can start drawing a
+     moment before it is attached: only stop after it has been seen on
+     the page at least once (and give up if it never shows up). */
+  function gone(canvas) {
+    if (canvas.isConnected) { canvas._seen = true; return false; }
+    canvas._waits = (canvas._waits || 0) + 1;
+    return canvas._seen || canvas._waits > 1800;
+  }
+
   /* ---------- BRIDGE WINDOW ----------
      A small pixel canvas (320x110) scaled up crisply. fps on PLANET and
      RIFT sets how fast each one turns.
@@ -172,7 +182,7 @@
 
     let n = 0, raf = 0;
     function draw() {
-      if (!canvas.isConnected && n > 0) { cancelAnimationFrame(raf); return; }
+      if (gone(canvas)) { cancelAnimationFrame(raf); return; }
       const t = n / 60;
       ctx.fillStyle = "#03040a"; ctx.fillRect(0, 0, W, H);
       stars.forEach(function (s) {
@@ -475,7 +485,7 @@
     const bg = sceneImage(src);
     let frame = 0, raf = 0;
     function draw() {
-      if (!canvas.isConnected && frame > 0) { cancelAnimationFrame(raf); return; }
+      if (gone(canvas)) { cancelAnimationFrame(raf); return; }
       const t = frame / 60;
       ctx.fillStyle = "#050507"; ctx.fillRect(0, 0, W, H);
       if (bg.complete && bg.naturalWidth) { ctx.drawImage(bg, 0, 0, W, H); }
@@ -609,7 +619,7 @@
 
     let frame = 0, raf = 0;
     function draw() {
-      if (!canvas.isConnected && frame > 0) { cancelAnimationFrame(raf); return; }
+      if (gone(canvas)) { cancelAnimationFrame(raf); return; }
       const t = frame / 60;
       ctx.fillStyle = "#06050a"; ctx.fillRect(0, 0, W, H);
       if (bg.complete && bg.naturalWidth) { ctx.drawImage(bg, 0, 0, W, H); }
@@ -1032,7 +1042,7 @@
 
     let frame = 0, raf = 0;
     function draw() {
-      if (!canvas.isConnected && frame > 0) { cancelAnimationFrame(raf); return; }
+      if (gone(canvas)) { cancelAnimationFrame(raf); return; }
       const t = frame / 60;
       // space
       px(0, 0, W, H, "#04050a");
@@ -1166,7 +1176,7 @@
     let frame = 0, raf = 0;
     for (let i = 0; i < 40; i++) { spawnFog(true); }
     function draw() {
-      if (!canvas.isConnected && frame > 0) { cancelAnimationFrame(raf); return; }
+      if (gone(canvas)) { cancelAnimationFrame(raf); return; }
       const t = frame / 60;
       ctx.fillStyle = "#05080d"; ctx.fillRect(0, 0, W, H);
       if (bg.complete && bg.naturalWidth) { ctx.drawImage(bg, 0, 0, W, H); }
@@ -1177,6 +1187,7 @@
       if (!reduce) { raf = requestAnimationFrame(draw); }
     }
     draw();
+    if (reduce && !bg.complete && bg.addEventListener) { bg.addEventListener("load", draw); }
     return wrap;
   }
 
@@ -1299,7 +1310,7 @@
 
     let frame = 0, raf = 0;
     function draw() {
-      if (!canvas.isConnected && frame > 0) { cancelAnimationFrame(raf); return; }
+      if (gone(canvas)) { cancelAnimationFrame(raf); return; }
       const t = frame / 60;
       sky(t);
 
