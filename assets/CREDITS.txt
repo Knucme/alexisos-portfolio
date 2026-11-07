@@ -32,3 +32,7 @@ Bridge planet (bridge/planet_sheet.png)
 Warp rift (bridge/warp_vortex.png)
   "Vortex" from the Free Pixel Effects Pack by Davit Masia and CodeManu.
   Public domain.
+
+Bridge metal (bridge/tex_plate.jpg, bridge/tex_steel.jpg)
+  Metal_21 and Metal_20 from the Tiny Texture Pack 3 by Screaming Brain
+  Studios. CC0 / public domain.
