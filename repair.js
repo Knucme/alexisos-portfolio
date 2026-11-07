@@ -450,6 +450,24 @@
     trend.width = 600; trend.height = 70;
     trend.setAttribute("aria-label", "Core B temperature trend");
     body.appendChild(trend);
+    // Guide: live checklist of the goals plus one "NEXT" instruction,
+    // with the control it refers to outlined on the board (see guide()).
+    const guideBox = el("div", "rx-guide");
+    const nextLine = el("div", "rx-next-line");
+    guideBox.appendChild(nextLine);
+    const checks = el("div", "rx-checks");
+    const GOALS = [
+      ["b", "CORE B ≤ " + LIMIT_B + " C"],
+      ["p", "PRESSURE ≤ " + LIMIT_P + "%"],
+      ["ac", "CORES A, C ≤ " + LIMIT_AC + " C"],
+      ["hold", "HOLD 10 S"]
+    ].map(function (g) {
+      const c = el("span", "rx-check", "○ " + g[1]);
+      checks.appendChild(c);
+      return { key: g[0], label: g[1], el: c };
+    });
+    guideBox.appendChild(checks);
+    body.appendChild(guideBox);
     const msg = el("div", "line rp-msg dim", "BOARD LIVE. CORE B CRITICAL.");
     body.appendChild(msg);
     const restart = btn("RESTART REACTOR", "rxb-restart", function () {
@@ -494,6 +512,7 @@
       purge.textContent = "PURGE HEADER " + (st.purge ? "OPEN" : "SHUT");
       purge.classList.toggle("on", st.purge);
       drawTrend();
+      guide();
     }
 
     function drawTrend() {
@@ -512,6 +531,33 @@
       ctx.stroke(); ctx.lineWidth = 1;
       ctx.fillStyle = "rgba(255,200,160,0.7)"; ctx.font = "11px \"IBM Plex Mono\", monospace";
       ctx.fillText("CORE B TEMP, 30 S", 6, 12);
+    }
+
+    function guide() {
+      const ok = {
+        b: st.T[1] <= LIMIT_B, p: st.P <= LIMIT_P,
+        ac: st.T[0] <= LIMIT_AC && st.T[2] <= LIMIT_AC, hold: finished
+      };
+      GOALS.forEach(function (g) {
+        g.el.textContent = (ok[g.key] ? "● " : "○ ") + g.label;
+        g.el.className = "rx-check" + (ok[g.key] ? " ok" : "");
+      });
+      // what to do next, in the order that works
+      let text, target = null;
+      if (finished) { text = "ALL GOALS HELD. PRESS RESTART REACTOR."; target = restart; }
+      else if (!st.valve[1]) { text = "OPEN COOLANT B. Core B has no coolant at all."; target = coreEls[1].valve; }
+      else if (!st.valve[0] || !st.valve[2]) { text = "KEEP COOLANT A AND C OPEN. Every core needs its line."; target = !st.valve[0] ? coreEls[0].valve : coreEls[2].valve; }
+      else if (!st.cross) { text = "ENGAGE CROSSFEED. It spreads Core B's heat into A and C."; target = cross; }
+      else if (st.H >= 75 && !st.purge) { text = "VENT HEADER NEARLY FULL. OPEN PURGE HEADER before it bursts."; target = purge; }
+      else if (st.purge && st.H <= 20) { text = "HEADER EMPTY. SHUT PURGE HEADER. While open it weakens the coolant."; target = purge; }
+      else if (st.P > LIMIT_P && !st.vent) { text = "OPEN VENT B to bleed Core B pressure into the header."; target = vent; }
+      else if (st.hold > 0) { text = "IN THE SAFE ZONE. HOLD STEADY: " + (st.hold / 10).toFixed(1) + " OF 10 S."; }
+      else if (st.T[1] > LIMIT_B) { text = "WAIT. CORE B IS COOLING, " + Math.round(st.T[1] - LIMIT_B) + " C TO GO. Keep an eye on the header."; }
+      else { text = "PRESSURE BLEEDING THROUGH VENT B. ALMOST THERE."; }
+      nextLine.textContent = "NEXT: " + text;
+      [coreEls[0].valve, coreEls[1].valve, coreEls[2].valve, cross, vent, purge, restart].forEach(function (b) {
+        b.classList.toggle("rx-next", b === target);
+      });
     }
 
     function step() {

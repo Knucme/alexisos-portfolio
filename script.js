@@ -131,6 +131,12 @@
     setPageTitle(title);
     const page = el("section", "page");
     page.appendChild(el("div", "page-title line h", title));
+    // [ESC] in the top right corner: does exactly what the ESC key does
+    const esc = el("button", "page-esc", "[ESC] BACK");
+    esc.type = "button";
+    esc.setAttribute("aria-label", "Go back (same as the Escape key)");
+    esc.addEventListener("click", function (e) { e.stopPropagation(); escape(); });
+    page.appendChild(esc);
     const body = el("div", "page-body");
     page.appendChild(body);
     enqueue(page);
@@ -360,6 +366,18 @@
         render();
       }
     }, 0);
+  }
+
+  /* What ESC does (the key and the [ESC] BACK button on every page):
+     close a pop up window, else let a game handle it, else go back. */
+  function escape() {
+    if (busy()) { flush(); }
+    if (closeWindow) { closeWindow(); return; }
+    if (inputTrap) {
+      if (inputTrap.esc) { inputTrap.esc(); }
+      return;
+    }
+    back();
   }
 
   function back() {
@@ -996,6 +1014,10 @@
       } else {
         ready.appendChild(el("div", "line dim", "Repair every area to make the Vigil ready for a warp jump."));
       }
+      const brief = el("button", "opt brief-btn", "[ MISSION BRIEFING ]");
+      brief.type = "button";
+      brief.addEventListener("click", function (e) { e.stopPropagation(); openBriefing(); });
+      ready.appendChild(brief);
       enqueue(ready);
       // Clicking a system opens its area (the Geller field is display-only).
       enqueue(Ship.render({ enter: function (sys) { run(function () { go(shipArea, [sys.id]); }); } }));
@@ -1007,6 +1029,10 @@
       });
       blank();
       backOption();
+      // First visit this session: show the briefing once everything is on screen
+      let briefed = false;
+      try { briefed = sessionStorage.getItem("alexisos-briefed") === "1"; } catch (e) { /* storage blocked */ }
+      if (!briefed) { enqueue(function () { openBriefing(); }, 0); }
       return;
     }
     const mins = Math.floor((Date.now() - loadedAt) / 60000);
@@ -1020,6 +1046,79 @@
     line(dots("AUSPEX", 22) + "UNKNOWN BIOSIGNS, AFT CARGO", "alert");
     blank();
     backOption();
+  }
+
+  /* ---------- Mission briefing (pop up on the STATUS screen) ----------
+     Shown the first time STATUS opens in a session, and any time from
+     the [ MISSION BRIEFING ] button or the "briefing" command. A short
+     backstory, then the repair steps in order with live check marks,
+     each with a GO button that takes the player to the right area.
+     Edit BRIEF_STEPS to change the order or the wording. */
+  const BRIEF_STEPS = [
+    { area: "vox",     what: "VOX ARRAY",        how: "Divert power to Dish A, then calibrate it to the carrier wave.",
+      done: function () { return Ship.isRepaired("vox"); } },
+    { area: "reactor", what: "REACTOR",          how: "Use the control terminal to cool Core B and hold it steady.",
+      done: function () { return Ship.isRepaired("reactor"); } },
+    { area: "bridge",  what: "GELLER FIELD",     how: "On the bridge, flip the Geller switch. Needs the vox and reactor online.",
+      done: function () { return Ship.isRepaired("geller"); } },
+    { area: "engines", what: "ENGINES",          how: "Safe the nozzles on both engine panels, then pull the restart lever on the bridge.",
+      done: function () { return Ship.isRepaired("engines"); } },
+    { area: "bridge",  what: "PURGE THE ROOMS",  how: "Bridge Damage Control: seal and decontaminate Quarantine and Bunks B.",
+      done: function () { return Ship.flag("purge_quarantine") && Ship.flag("purge_bunksB"); } },
+    { area: "bridge",  what: "PUT OUT THE FIRES", how: "Bridge Damage Control: discharge fire suppression.",
+      done: function () { return Ship.flag("fire_suppressed"); } },
+    { area: null,      what: "WARP JUMP",        how: "Back on STATUS, initiate the warp jump once every system is nominal.",
+      done: function () { return false; } }
+  ];
+
+  function openBriefing() {
+    if (!window.Ship) { return; }
+    try { sessionStorage.setItem("alexisos-briefed", "1"); } catch (e) { /* storage blocked */ }
+    const box = el("div", "brief");
+    box.appendChild(el("div", "brief-log", "COGITATOR LOG.  VIGIL OF ASH.  DAY 1207"));
+    box.appendChild(el("p", "brief-story",
+      "The Vigil was crossing the void when a warp storm tore into her. The Geller field collapsed, " +
+      "the reactor ran hot, the engines died and the vox went dark. Something came through the breach. " +
+      "The crew went into stasis and never woke."));
+    box.appendChild(el("p", "brief-story",
+      "You are the only one aboard. Bring the ship back online, clear what got in, and jump before the storm returns."));
+    box.appendChild(el("div", "brief-h", "WHAT NEEDS TO HAPPEN"));
+    const list = el("div", "brief-steps");
+    let nextMarked = false;
+    BRIEF_STEPS.forEach(function (s, i) {
+      const isWarp = s.area === null;
+      const ok = isWarp ? false : !!s.done();
+      const ready = isWarp && Ship.progress().complete;
+      const isNext = !ok && !nextMarked;
+      if (isNext) { nextMarked = true; }
+      const row = el("div", "brief-step" + (ok ? " ok" : "") + (isNext ? " next" : ""));
+      row.appendChild(el("span", "brief-mark", ok ? "●" : isNext ? "▶" : "○"));
+      const txt = el("div", "brief-txt");
+      const sys = s.area && Ship.systems.find(function (x) { return x.id === s.area; });
+      txt.appendChild(el("div", "brief-what", (i + 1) + ". " + s.what + (sys && sys.num ? "   [AREA " + sys.num + "]" : "")));
+      txt.appendChild(el("div", "brief-how", s.how));
+      row.appendChild(txt);
+      if (!ok && (s.area || ready)) {
+        const goBtn = el("button", "opt brief-go", isWarp ? "[ JUMP ]" : "[ GO ]");
+        goBtn.type = "button";
+        goBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          if (closeWindow) { closeWindow(); }
+          if (isWarp) { warpJump(); } else { go(shipArea, [s.area]); }
+        });
+        row.appendChild(goBtn);
+      }
+      list.appendChild(row);
+    });
+    box.appendChild(list);
+    box.appendChild(el("div", "brief-tips",
+      "Click a part of the ship or type its number to move there. Every terminal has a guide. " +
+      "ESC goes back. Repairs fade if the ship is left alone for an hour."));
+    const start = el("button", "opt brief-start", "[ BEGIN ]");
+    start.type = "button";
+    start.addEventListener("click", function (e) { e.stopPropagation(); if (closeWindow) { closeWindow(); } });
+    box.appendChild(start);
+    openWindow("MISSION BRIEFING", box);
   }
 
   /* ---------- Pop-up windows (repair terminals) ----------
@@ -1232,6 +1331,7 @@
     ["RESUME",      "service record"],
     ["CONTACT",     "vox channels"],
     ["STATUS",      "vessel status"],
+    ["BRIEFING",    "mission briefing: what happened and what to fix"],
     ["CLEAR",       "purge the screen"],
     ["THEME",       "cycle display colors (THEME LIST for names)"],
     ["REBOOT",      "replay the boot sequence"]
@@ -1404,6 +1504,11 @@
     "contact":  function () { go(vox); },
     "vox":      function () { go(vox); },
     "status":   function () { go(status); },
+    "briefing": function () {
+      if (current.fn === status) { openBriefing(); return; }
+      try { sessionStorage.removeItem("alexisos-briefed"); } catch (e) { /* storage blocked */ }
+      go(status);                          // STATUS opens the briefing once it has drawn
+    },
     "ls":       function () { if (current) { render(); } else { home(); } },
     "dir":      function () { if (current) { render(); } else { home(); } },
     "clear":    function () {
@@ -1583,12 +1688,7 @@
     }
     if (e.key === "Escape") {
       e.preventDefault();
-      if (closeWindow) { closeWindow(); return; }
-      if (inputTrap) {
-        if (inputTrap.esc) { inputTrap.esc(); }
-        return;
-      }
-      back();
+      escape();
       return;
     }
     if (document.activeElement === input) {

@@ -2060,3 +2060,40 @@ body.theme-retrowave:not(.red-alert):not(.green-mode) .emblem { filter: none; }
 .dc-cap { margin-top: 4px; font-size: 0.85em; color: var(--amber); }
 .dc-cap.good { color: #7dff9a; }
 .dc-done { display: block; margin: 14px auto 0; }
+
+/* Reactor board guide (repair.js guide()) */
+.rx-guide { margin: 10px 0 4px; padding: 8px 10px; border: 1px solid var(--amber-faint); background: rgba(0, 0, 0, 0.25); }
+.rx-next-line { color: var(--amber); font-weight: 600; letter-spacing: 0.03em; }
+.rx-checks { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 6px; font-size: 0.9em; }
+.rx-check { color: var(--amber-dim); }
+.rx-check.ok { color: #38ff7a; text-shadow: 0 0 6px rgba(56, 255, 122, 0.5); }
+.rx-next { outline: 2px solid #ffcc33 !important; outline-offset: 3px; animation: rx-next-pulse 0.9s steps(2) infinite; }
+@keyframes rx-next-pulse { 50% { outline-color: transparent; } }
+@media (prefers-reduced-motion: reduce) { .rx-next { animation: none; } }
+
+/* ESC button in the corner of every page panel */
+.page-esc {
+  position: absolute; top: -0.85em; right: 12px; z-index: 2;
+  font: inherit; font-size: 0.85em; letter-spacing: 0.08em; cursor: pointer;
+  padding: 0 8px; background: var(--bg); color: var(--amber-dim);
+  border: 1px solid var(--amber-faint);
+}
+.page-esc:hover, .page-esc:focus-visible { color: var(--amber); border-color: var(--amber-dim); outline: none; }
+
+/* Mission briefing pop up (script.js openBriefing) */
+.brief { max-width: 680px; }
+.brief-log { font-size: 0.8em; letter-spacing: 0.1em; color: var(--amber-dim); margin-bottom: 8px; }
+.brief-story { margin: 0 0 8px; line-height: 1.45; }
+.brief-h { margin: 12px 0 6px; font-family: var(--font-head); letter-spacing: 0.1em; color: var(--amber); border-bottom: 1px solid var(--amber-faint); }
+.brief-steps { display: grid; gap: 4px; }
+.brief-step { display: grid; grid-template-columns: 2ch 1fr auto; gap: 10px; align-items: center; padding: 4px 6px; border-left: 3px solid transparent; }
+.brief-step.ok { opacity: 0.7; }
+.brief-step.ok .brief-mark, .brief-step.ok .brief-what { color: #38ff7a; }
+.brief-step.next { border-left-color: #ffcc33; background: rgba(255, 204, 51, 0.07); }
+.brief-step.next .brief-mark { color: #ffcc33; animation: bp-warn 1s steps(2) infinite; }
+.brief-what { font-weight: 600; letter-spacing: 0.05em; }
+.brief-how { font-size: 0.85em; color: var(--amber-dim); }
+.brief-go { border: 1px solid var(--amber-dim); padding: 1px 8px; white-space: nowrap; }
+.brief-tips { margin-top: 12px; font-size: 0.85em; color: var(--amber-dim); }
+.brief-start { display: block; margin: 12px auto 0; padding: 2px 18px; border: 1px solid var(--amber); }
+.brief-btn { margin-top: 8px; border: 1px solid var(--amber-dim); padding: 1px 10px; }
