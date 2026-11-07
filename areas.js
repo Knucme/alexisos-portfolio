@@ -963,13 +963,10 @@
   }
 
   /* ---------- ENGINES ----------
-     Pixel-art view of the two main engines against the stars. Each
-     engine: a spoked intake ring with a core in the middle, a ribbed
-     body, and three exhaust nozzles.
-       PORT:      stalled. Core glows a weak, flickering blue, the ring
-                  turns slowly, nozzles pulse dim, and it sputters.
-       STARBOARD: dead. No light at all, ring still, pixel smoke leaking
-                  from the nozzles and the core. */
+     The two main engines seen from outside the hull: big bell nozzles
+     with cooling tube bands, stacked one above the other (rendered
+     image, see the notes inside). Two side terminals open the shutdown
+     panels; the bridge lever restarts both. */
   function engines(sys, all, opts) {
     const wrap = el("div", "rx");
     const W = 256, H = 144;
@@ -977,7 +974,7 @@
     canvas.width = W;
     canvas.height = H;
     canvas.setAttribute("role", "img");
-    canvas.setAttribute("aria-label", "Two engines: port stalled with a weak blue glow, starboard dead and smoking");
+    canvas.setAttribute("aria-label", "Two large bell nozzle engines, one above the other: port stalled with a weak blue glow, starboard dead and smoking");
     const running = sys && sys.status === "ok";      // restarted from the bridge
 
     // Two panel screens beside the engines, one per engine
@@ -1023,131 +1020,82 @@
     const stars = [];
     for (let i = 0; i < 90; i++) { stars.push({ x: rnd() * W, y: rnd() * H, b: 0.3 + rnd() * 0.7, s: rnd() < 0.1 ? 2 : 1 }); }
 
-    // y = engine centerline. ring at x 52, body to x 196, nozzles past that.
+    /* The engines are a pre-rendered image (assets/engines/engines.png,
+       256x144 with a transparent background): two big bell nozzles,
+       one above the other, with their plumbing and the thrust plate.
+       Live effects are drawn over it. MOUTH is each bell's opening in
+       image pixels (centre, half width, half height):
+         PORT (top)     stalled: a weak blue glow flickering in the throat
+         STBD (bottom)  dead: smoke pouring out of the bell
+         running        both fire a long blue white exhaust plume */
+    const art = sceneImage("assets/engines/engines.png");
     const ENG = [
-      { y: 44,  on: true,  spin: 0, full: running },
-      { y: 104, on: running, spin: 0.9, full: running }
+      { cx: 176, cy: 36, rx: 16, ry: 33, on: true },        // port
+      { cx: 175, cy: 112, rx: 16, ry: 32, on: running }      // starboard
     ];
     let smoke = [];
 
     function px(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); }
 
-    function ellipse(cx, cy, rx, ry, color, fill) {
+    function mouthGlow(E, strength, rgb) {
+      ctx.save();
+      ctx.beginPath(); ctx.ellipse(E.cx, E.cy, E.rx - 2, E.ry - 3, 0, 0, Math.PI * 2); ctx.clip();
+      const g = ctx.createRadialGradient(E.cx - 6, E.cy, 1, E.cx - 6, E.cy, E.ry);
+      g.addColorStop(0, "rgba(" + rgb + "," + strength.toFixed(3) + ")");
+      g.addColorStop(1, "rgba(" + rgb + ",0)");
+      ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = g; ctx.fillRect(E.cx - E.rx, E.cy - E.ry, E.rx * 2, E.ry * 2);
+      ctx.restore();
+    }
+
+    // exhaust plume: a cone of light leaving the bell, with shock diamonds
+    function plume(E, t, power) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const len = 78 * power, flick = 1 + 0.04 * Math.sin(t * 40 + E.cy);
+      const g = ctx.createLinearGradient(E.cx, 0, E.cx + len, 0);
+      g.addColorStop(0, "rgba(200,235,255," + (0.75 * power) + ")");
+      g.addColorStop(0.4, "rgba(110,170,255," + (0.35 * power) + ")");
+      g.addColorStop(1, "rgba(60,90,255,0)");
+      ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-      if (fill) { ctx.fillStyle = color; ctx.fill(); } else { ctx.strokeStyle = color; ctx.stroke(); }
+      ctx.moveTo(E.cx, E.cy - E.ry * 0.9);
+      ctx.quadraticCurveTo(E.cx + len * 0.5, E.cy - E.ry * 0.75 * flick, E.cx + len, E.cy - 4);
+      ctx.lineTo(E.cx + len, E.cy + 4);
+      ctx.quadraticCurveTo(E.cx + len * 0.5, E.cy + E.ry * 0.75 * flick, E.cx, E.cy + E.ry * 0.9);
+      ctx.closePath(); ctx.fill();
+      for (let k = 0; k < 4; k++) {                                     // shock diamonds
+        const x = E.cx + 12 + k * 14 + ((t * 30) % 2);
+        const r = (9 - k * 1.6) * power;
+        ctx.fillStyle = "rgba(255,255,255," + (0.35 - k * 0.07) * power + ")";
+        ctx.beginPath(); ctx.moveTo(x - r, E.cy); ctx.lineTo(x, E.cy - r * 0.8); ctx.lineTo(x + r, E.cy); ctx.lineTo(x, E.cy + r * 0.8); ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
     }
 
-    function engine(E, t) {
-      const cy = E.y, ringX = 52, rx = 13, ry = 27;
-      // flicker for the stalled engine: mostly dim, with random sputters
-      // A running engine glows steady and bright; a stalled one flickers and sputters
-      const sputter = E.on && !E.full ? (Math.sin(t * 23) > 0.92 || rnd() < 0.03 ? 1 : 0) : 0;
-      const pulse = E.full ? 0.9 + 0.08 * Math.sin(t * 3) : E.on ? 0.35 + 0.15 * Math.sin(t * 2.4) + sputter * 0.45 : 0;
-
-      // body: ribbed cylinder from the ring to the nozzles
-      px(ringX + 6, cy - 15, 138, 30, "#1b1e26");
-      px(ringX + 6, cy - 15, 138, 2, "#3a3f4d");
-      px(ringX + 6, cy + 13, 138, 2, "#0d0f14");
-      for (let x = ringX + 14; x < ringX + 144; x += 9) {
-        px(x, cy - 15, 2, 30, "#2a2e3a");
-        px(x, cy - 15, 1, 30, "#454b5c");
-      }
-      // collar between ring and body
-      px(ringX + 4, cy - 19, 12, 38, "#262a35"); px(ringX + 4, cy - 19, 12, 2, "#4c5266");
-      // a thin heat line along the body when stalled
-      if (E.on) { px(ringX + 16, cy - 1, 124, 1, "rgba(80,170,255," + (0.15 + pulse * 0.35) + ")"); }
-
-      // three exhaust nozzles
-      [-11, 0, 11].forEach(function (o, i) {
-        const ny = cy + o;
-        px(ringX + 144, ny - 4, 16, 8, "#2b2f3b"); px(ringX + 144, ny - 4, 16, 1, "#525a70");
-        px(ringX + 160, ny - 5, 4, 10, "#1a1d25");
-        if (E.on) {
-          const g = 0.25 + pulse * 0.6 + (i === 1 ? 0.1 : 0);
-          px(ringX + 162, ny - 3, 2, 6, "rgba(120,200,255," + g + ")");
-          const flare = ctx.createRadialGradient(ringX + 164, ny, 0, ringX + 164, ny, 10);
-          flare.addColorStop(0, "rgba(90,180,255," + (g * 0.6) + ")"); flare.addColorStop(1, "rgba(90,180,255,0)");
-          ctx.fillStyle = flare; ctx.fillRect(ringX + 154, ny - 10, 20, 20);
-        } else {
-          px(ringX + 162, ny - 3, 2, 6, "#0a0b0e");
-        }
-      });
-
-      // intake ring with spokes (turning slowly on the stalled engine)
-      ctx.lineWidth = 3;
-      ellipse(ringX, cy, rx, ry, "#2f3442");
-      ctx.lineWidth = 1;
-      ellipse(ringX, cy, rx + 1, ry + 1, "#5a6178");
-      const rot = E.on ? t * 0.35 : E.spin;
-      for (let k = 0; k < 10; k++) {
-        const a = rot + k * Math.PI / 5;
-        ctx.strokeStyle = Math.sin(a) > 0 ? "#3d4356" : "#252a36";
-        ctx.beginPath();
-        ctx.moveTo(ringX + Math.cos(a) * 5, cy + Math.sin(a) * 11);
-        ctx.lineTo(ringX + Math.cos(a) * rx, cy + Math.sin(a) * ry);
-        ctx.stroke();
-      }
-
-      // core
-      if (E.on) {
-        const cg = ctx.createRadialGradient(ringX, cy, 1, ringX, cy, 14);
-        cg.addColorStop(0, "rgba(220,240,255," + (0.45 + pulse * 0.5) + ")");
-        cg.addColorStop(0.5, "rgba(70,160,255," + (0.35 + pulse * 0.4) + ")");
-        cg.addColorStop(1, "rgba(20,60,140,0.2)");
-        ellipse(ringX, cy, 6, 13, cg, true);
-        // crackle: little jagged arcs, mostly during a sputter
-        if (sputter || rnd() < 0.25) {
-          ctx.strokeStyle = "rgba(190,230,255," + (0.5 + sputter * 0.5) + ")";
-          ctx.beginPath();
-          let x = ringX + (rnd() - 0.5) * 6, y = cy - 10;
-          ctx.moveTo(x, y);
-          for (let j = 0; j < 5; j++) { x = ringX + (rnd() - 0.5) * 8; y += 4; ctx.lineTo(x, y); }
-          ctx.stroke();
-        }
-        // soft halo around the ring
-        const halo = ctx.createRadialGradient(ringX, cy, 4, ringX, cy, 40);
-        halo.addColorStop(0, "rgba(60,150,255," + (0.12 + pulse * 0.2) + ")"); halo.addColorStop(1, "rgba(60,150,255,0)");
-        ctx.fillStyle = halo; ctx.fillRect(ringX - 40, cy - 40, 80, 80);
-      } else {
-        ellipse(ringX, cy, 6, 13, "#101218", true);
-        ellipse(ringX, cy, 6, 13, "#262a35");
-        // a last ember that never quite goes out
-        if (Math.sin(t * 1.3) > 0.6) { px(ringX - 1, cy + 3, 2, 2, "rgba(255,110,40,0.55)"); }
-      }
-    }
-
-    /* Smoke streams out of each nozzle in turn (and now and then out of
-       the dead core), then drifts away to the right and upward, growing
-       and thinning until it leaves the frame. It never stops. */
-    let nozzle = 0;
-    function spawn(E, fromCore) {
-      const ny = fromCore ? 0 : [-11, 0, 11][nozzle++ % 3];
+    /* Smoke rolls out of the dead bell, then drifts away to the right
+       and upward, growing and thinning until it leaves the frame. */
+    function spawn(E) {
+      const a = rnd() * Math.PI * 2;
       smoke.push({
-        x: fromCore ? 52 + (rnd() - 0.5) * 6 : 52 + 164 + rnd() * 2,
-        y: E.y + ny + (rnd() - 0.5) * 2,
-        vx: fromCore ? -(0.15 + rnd() * 0.2) : 0.45 + rnd() * 0.45,
-        vy: -(0.08 + rnd() * 0.22),
-        r: 1.2 + rnd() * 1.3,
-        grow: 0.035 + rnd() * 0.04,
-        wob: rnd() * 6.28,
-        life: 0,
-        max: 160 + rnd() * 120
+        x: E.cx + Math.cos(a) * E.rx * 0.5, y: E.cy + Math.sin(a) * E.ry * 0.6,
+        vx: 0.35 + rnd() * 0.45, vy: -(0.05 + rnd() * 0.2),
+        r: 2 + rnd() * 2, grow: 0.05 + rnd() * 0.05, wob: rnd() * 6.28, life: 0, max: 150 + rnd() * 120
       });
     }
 
     function drawSmoke() {
       smoke.forEach(function (p) {
         p.life++;
-        p.vx *= 0.997;                                   // slows as it spreads
+        p.vx *= 0.996;
         p.x += p.vx;
         p.y += p.vy + Math.sin(p.life * 0.05 + p.wob) * 0.12;
         p.r += p.grow;
         const a = Math.max(0, 1 - p.life / p.max), s = Math.round(p.r);
-        ctx.fillStyle = "rgba(150,150,158," + (0.5 * a) + ")";
+        ctx.fillStyle = "rgba(140,140,148," + (0.45 * a) + ")";
         ctx.fillRect(Math.round(p.x - s), Math.round(p.y - s / 2), s * 2, s);
         ctx.fillRect(Math.round(p.x - s / 2), Math.round(p.y - s), s, s * 2);
-        ctx.fillStyle = "rgba(200,200,205," + (0.3 * a) + ")";
+        ctx.fillStyle = "rgba(195,195,200," + (0.25 * a) + ")";
         ctx.fillRect(Math.round(p.x - s / 2), Math.round(p.y - s / 2), Math.max(1, s - 1), Math.max(1, s - 1));
       });
       smoke = smoke.filter(function (p) { return p.life < p.max && p.y > -12 && p.x < W + 12 && p.x > -12; });
@@ -1161,42 +1109,46 @@
       px(0, 0, W, H, "#04050a");
       stars.forEach(function (st, i) {
         const tw = 0.6 + 0.4 * Math.sin(t * 1.5 + i);
-        px((st.x - t * 2 * st.b) % W < 0 ? (st.x - t * 2 * st.b) % W + W : (st.x - t * 2 * st.b) % W, st.y, st.s, st.s,
-           "rgba(220,225,255," + (st.b * tw) + ")");
+        px(st.x, st.y, st.s, st.s, "rgba(220,225,255," + (st.b * tw) + ")");
       });
-      // faint dust band
-      const band = ctx.createLinearGradient(0, 60, 0, 90);
-      band.addColorStop(0, "rgba(120,80,60,0)"); band.addColorStop(0.5, "rgba(120,80,60,0.12)"); band.addColorStop(1, "rgba(120,80,60,0)");
-      ctx.fillStyle = band; ctx.fillRect(0, 50, W, 50);
+      if (art.complete && art.naturalWidth) { ctx.drawImage(art, 0, 0, W, H); }
 
-      ENG.forEach(function (E) { engine(E, t); });
-      if (!reduce && !running) {
-        if (frame % 3 === 0) { spawn(ENG[1], false); }   // steady stream from the nozzles
-        if (frame % 11 === 0) { spawn(ENG[1], true); }   // slower leak from the core
+      if (running) {
+        ENG.forEach(function (E) { mouthGlow(E, 0.9, "170,215,255"); plume(E, t, 0.95 + 0.05 * Math.sin(t * 9)); });
+      } else {
+        // port: stalled, a weak flicker with the odd sputter of flame
+        const P = ENG[0];
+        const sputter = Math.sin(t * 23) > 0.94 || rnd() < 0.02;
+        mouthGlow(P, 0.25 + 0.12 * Math.sin(t * 2.4) + (sputter ? 0.4 : 0), "90,170,255");
+        if (sputter) { plume(P, t, 0.3); }
+        // starboard: dead, a faint ember deep in the throat and smoke
+        const S = ENG[1];
+        if (Math.sin(t * 1.3) > 0.6) { mouthGlow(S, 0.18, "255,110,40"); }
+        if (!reduce && frame % 3 === 0) { spawn(S); }
       }
       drawSmoke();
 
       // labels
       ctx.font = "6px \"IBM Plex Mono\", monospace";
       if (running) {
-        ctx.fillStyle = "rgba(120,220,255,0.9)"; ctx.fillText("PORT ONLINE", 70, 20); ctx.fillText("STBD ONLINE", 70, 80);
+        ctx.fillStyle = "rgba(120,220,255,0.9)"; ctx.fillText("PORT ONLINE", 6, 12); ctx.fillText("STBD ONLINE", 6, H - 6);
       } else {
-        ctx.fillStyle = "rgba(120,190,255,0.8)"; ctx.fillText("PORT STALLED", 70, 20);
-        ctx.fillStyle = "rgba(255,90,60," + (Math.sin(t * 6) > 0 ? 0.9 : 0.4) + ")"; ctx.fillText("STBD OFFLINE", 70, 80);
+        ctx.fillStyle = "rgba(120,190,255,0.8)"; ctx.fillText("PORT STALLED", 6, 12);
+        ctx.fillStyle = "rgba(255,90,60," + (Math.sin(t * 6) > 0 ? 0.9 : 0.4) + ")"; ctx.fillText("STBD OFFLINE", 6, H - 6);
       }
       frame++;
       if (!reduce) { raf = requestAnimationFrame(draw); }
     }
     if (!reduce && !running) {
-      // pre-fill so the plume is already trailing away when the page opens
-      for (let i = 0; i < 260; i++) {
-        if (i % 3 === 0) { spawn(ENG[1], false); }
-        if (i % 11 === 0) { spawn(ENG[1], true); }
-        smoke.forEach(function (p) { p.life++; p.vx *= 0.997; p.x += p.vx; p.y += p.vy; p.r += p.grow; });
+      // pre-fill so the smoke is already trailing away when the page opens
+      for (let i = 0; i < 240; i++) {
+        if (i % 3 === 0) { spawn(ENG[1]); }
+        smoke.forEach(function (p) { p.life++; p.vx *= 0.996; p.x += p.vx; p.y += p.vy; p.r += p.grow; });
         smoke = smoke.filter(function (p) { return p.life < p.max && p.x < W + 12; });
       }
     }
     draw();
+    if (reduce && !art.complete && art.addEventListener) { art.addEventListener("load", draw); }
     return wrap;
   }
 
