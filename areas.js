@@ -114,8 +114,94 @@
     return turnable(k);
   }
 
+  /* ---------- BRIDGE WINDOW ----------
+     A small pixel canvas (320x110) scaled up crisply. fps on PLANET and
+     RIFT sets how fast each one turns.
+       stars     drawn here, twinkling
+       planet    an unknown world: violet seas, amber continents.
+                 assets/bridge/planet_sheet.png, 96 frames of 80x80 in a
+                 12 column grid, one full turn (rendered from a port of
+                 Deep-Fold's PixelPlanets, MIT, see assets/CREDITS.txt)
+       warp rift assets/bridge/warp_vortex.png, 61 frames of 64x64 in an
+                 8 column grid (Free Pixel Effects Pack, public domain,
+                 scaled down from 100px)
+       frame     window struts and bolts, drawn last
+     To move the planet or the rift, change PLANET / RIFT below. */
+  function viewport() {
+    const W = 320, H = 110;
+    const canvas = el("canvas", "bp-view");
+    canvas.width = W; canvas.height = H;
+    canvas.setAttribute("role", "img");
+    canvas.setAttribute("aria-label", "Bridge window: an unknown violet and amber planet beside a red warp rift");
+    const ctx = canvas.getContext && canvas.getContext("2d");
+    if (!ctx) { return canvas; }
+    ctx.imageSmoothingEnabled = false;
+    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const planetImg = sceneImage("assets/bridge/planet_sheet.png");
+    const riftImg = sceneImage("assets/bridge/warp_vortex.png");
+    const PLANET = { x: 26, y: 16, size: 80, frames: 96, cols: 12, fps: 3 };
+    const RIFT = { x: 150, y: 23, size: 64, frames: 61, cols: 8, fps: 7 };
+    const rnd = seeded(23);
+    const stars = [];
+    for (let i = 0; i < 90; i++) {
+      stars.push({ x: Math.floor(rnd() * W), y: Math.floor(rnd() * H), b: 0.25 + rnd() * 0.75,
+                   tw: rnd() * 6.28, big: rnd() > 0.93 });
+    }
+
+    function sprite(img, S, n) {
+      if (!img.complete || !img.naturalWidth) { return; }
+      const f = n % S.frames;
+      ctx.drawImage(img, (f % S.cols) * S.size, Math.floor(f / S.cols) * S.size, S.size, S.size,
+                    S.x, S.y, S.size, S.size);
+    }
+
+    function frame() {
+      // window strut: one slanted center mullion and a top rail, with bolts
+      ctx.fillStyle = "#0d1016";
+      ctx.fillRect(0, 0, W, 4);
+      [[252, 244]].forEach(function (m) {
+        ctx.beginPath(); ctx.moveTo(m[0] - 3, 0); ctx.lineTo(m[0] + 3, 0); ctx.lineTo(m[1] + 3, H); ctx.lineTo(m[1] - 3, H); ctx.closePath(); ctx.fill();
+      });
+      ctx.fillStyle = "#2a303b";
+      [[252, 244]].forEach(function (m) {
+        for (let k = 1; k < 5; k++) { const t = k / 5; ctx.fillRect(Math.round(m[0] + (m[1] - m[0]) * t) - 1, Math.round(H * t), 2, 2); }
+      });
+      ctx.fillStyle = "rgba(255,255,255,0.05)";                      // faint glare on the glass
+      ctx.beginPath(); ctx.moveTo(270, 0); ctx.lineTo(282, 0); ctx.lineTo(262, H); ctx.lineTo(255, H); ctx.closePath(); ctx.fill();
+    }
+
+    let n = 0, raf = 0;
+    function draw() {
+      if (!canvas.isConnected && n > 0) { cancelAnimationFrame(raf); return; }
+      const t = n / 60;
+      ctx.fillStyle = "#03040a"; ctx.fillRect(0, 0, W, H);
+      stars.forEach(function (s) {
+        const a = s.b * (0.6 + 0.4 * Math.sin(t * 2 + s.tw));
+        ctx.fillStyle = "rgba(220,230,255," + a.toFixed(2) + ")";
+        ctx.fillRect(s.x, s.y, s.big ? 2 : 1, s.big ? 2 : 1);
+      });
+      // red glow bleeding from the rift
+      const rc = RIFT.size / 2;
+      const g = ctx.createRadialGradient(RIFT.x + rc, RIFT.y + rc, 3, RIFT.x + rc, RIFT.y + rc, 46);
+      g.addColorStop(0, "rgba(255,60,70," + (0.18 + 0.06 * Math.sin(t * 1.7)).toFixed(3) + ")");
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g; ctx.fillRect(RIFT.x + rc - 46, RIFT.y + rc - 46, 92, 92);
+      sprite(planetImg, PLANET, Math.floor(t * PLANET.fps));
+      sprite(riftImg, RIFT, Math.floor(t * RIFT.fps));
+      frame();
+      n++;
+      if (!reduce) { raf = requestAnimationFrame(draw); }
+    }
+    draw();
+    if (reduce) {
+      [planetImg, riftImg].forEach(function (im) { if (!im.complete && im.addEventListener) { im.addEventListener("load", draw); } });
+    }
+    return canvas;
+  }
+
   /* ---------- BRIDGE ----------
-     Top: the auspex screen across the full width, like a windshield.
+     Top: the bridge window, open to space: a planet turning slowly on
+     the left, a warp rift churning on the right.
      Under it: the master caution lights, then the control deck:
      mostly knobs and switches, very few buttons. */
   function bridge(sys, all, opts) {
@@ -124,19 +210,9 @@
     const panel = el("div", "bp");
     panel.setAttribute("aria-label", "Bridge main control console");
 
-    // Windshield auspex screen
+    // Windshield: a window open to space (see viewport() below)
     const shield = el("div", "bp-shield");
-    const radar = el("div", "bp-radar wide");
-    radar.appendChild(el("div", "bp-sweep"));
-    for (let i = 0; i < 7; i++) {
-      const blip = el("div", "bp-blip" + (i === 6 ? " hostile" : ""));
-      blip.style.left = (10 + rand() * 80) + "%";
-      blip.style.top = (15 + rand() * 70) + "%";
-      blip.style.animationDelay = (rand() * 4).toFixed(2) + "s";
-      radar.appendChild(blip);
-    }
-    radar.appendChild(el("div", "bp-crt-label", "1 CONTACT UNIDENTIFIED"));
-    shield.appendChild(radar);
+    shield.appendChild(viewport());
     panel.appendChild(shield);
 
     // Master caution: one light per ship system, in a row under the screen
@@ -363,7 +439,7 @@
   /* Pre-rendered room images (made from the Kraken Code PSX Sci-Fi
      packs, 256x144), loaded once and reused. */
   const SCENE_IMG = {};
-  const SCENE_V = "1";                 // bump when the rendered images change
+  const SCENE_V = "2";                 // bump when the rendered images change
   function sceneImage(src) {
     if (!SCENE_IMG[src] && typeof Image === "function") {
       const img = new Image();
