@@ -666,5 +666,153 @@
   function engineStbd(sys, opts) { return enginePanel("stbd", opts); }
   engineStbd.title = "STARBOARD ENGINE PANEL";
 
-  window.Repairs = { vox: vox, reactor: reactor, engines: true, enginePort: enginePort, engineStbd: engineStbd };
+
+  /* ---------- DAMAGE CONTROL (bridge) ----------
+     Two windows opened from the DAMAGE CONTROL strip on the bridge.
+       purge     every compartment on Deck 4 and Aft Cargo by name. Rooms
+                 with biosigns can be SEALED, then DECONTAMINATED: a
+                 progress bar runs, then the purge is confirmed. Saves the
+                 flags sealed_<key> and purge_<key>; the room cameras then
+                 show the creatures dead (the fires keep burning).
+       suppress  one discharge puts out every fire on both decks. Saves
+                 fire_suppressed; the cameras then show smoke, no flames.
+     Flags reset with the rest of the repairs (1 hour idle, or a warp jump). */
+  const PURGE_ROOMS = [
+    { key: "quarantine", deck: "AFT CARGO", name: "QUARANTINE", bios: 3 },
+    { key: "bunksB", deck: "DECK 4", name: "BUNKS B", bios: 3 }
+  ];
+  const FIRE_ROOMS = [["DECK 4", "BUNKS B"], ["DECK 4", "AIRLOCK 4"], ["AFT CARGO", "HOLD 2"], ["AFT CARGO", "QUARANTINE"]];
+  const ALL_ROOMS = [
+    ["DECK 4", ["BUNKS A", "BUNKS B", "SANITATION", "MEDICAE BAY", "OFFICER QTRS", "MAIN CORRIDOR", "LOCKERS", "MESS HALL", "GALLEY", "SHRINE", "AIRLOCK 4"]],
+    ["AFT CARGO", ["HOLD 1", "HOLD 2", "QUARANTINE", "MANIFEST OFFICE", "CARGO LIFT", "SERVITOR BAY", "DOCK CLAMP", "FUEL BUNKER"]]
+  ];
+  const LOCKED = { "OFFICER QTRS": "LOCKED FROM INSIDE", "SERVITOR BAY": "SEALED, NO RESPONSE" };
+  function flagOn(n) { return !!(window.Ship && Ship.flag(n)); }
+
+  // a stepped progress bar that fills over ms, with changing captions
+  function runBar(bar, cap, steps, ms, then) {
+    const cells = [];
+    bar.innerHTML = "";
+    for (let i = 0; i < 24; i++) { const c = el("span", "dc-cell"); bar.appendChild(c); cells.push(c); }
+    const t0 = Date.now();
+    const timer = setInterval(function () {
+      if (!bar.isConnected) { clearInterval(timer); return; }
+      const p = Math.min(1, (Date.now() - t0) / ms);
+      cells.forEach(function (c, i) { c.classList.toggle("on", i < Math.round(p * 24)); });
+      cap.textContent = steps[Math.min(steps.length - 1, Math.floor(p * steps.length))] + "  " + Math.round(p * 100) + "%";
+      if (p >= 1) { clearInterval(timer); then(); }
+    }, 80);
+  }
+
+  function purge(sys, opts) {
+    const done = (opts && opts.done) || function () {};
+    const wrap = el("section", "dc");
+    wrap.appendChild(el("div", "dc-h", "Seal a compartment, then decontaminate it. Rooms without biosigns need nothing."));
+    const busy = { on: false };
+    ALL_ROOMS.forEach(function (d) {
+      wrap.appendChild(el("div", "dc-deck", d[0]));
+      d[1].forEach(function (name) {
+        const r = PURGE_ROOMS.find(function (p) { return p.name === name && p.deck === d[0]; });
+        const row = el("div", "dc-row");
+        row.appendChild(el("span", "dc-name", name));
+        const state = el("span", "dc-state");
+        row.appendChild(state);
+        const act = el("span", "dc-act");
+        row.appendChild(act);
+        wrap.appendChild(row);
+        if (!r) {
+          state.textContent = LOCKED[name] || "NO BIOSIGNS";
+          state.className = "dc-state " + (LOCKED[name] ? "dim" : "ok");
+          return;
+        }
+        const barRow = el("div", "dc-progress");
+        const bar = el("div", "dc-bar"), cap = el("div", "dc-cap");
+        barRow.appendChild(bar); barRow.appendChild(cap);
+        wrap.appendChild(barRow);
+        function paint() {
+          const sealed = flagOn("sealed_" + r.key), purged = flagOn("purge_" + r.key);
+          act.innerHTML = "";
+          row.className = "dc-row " + (purged ? "ok" : sealed ? "warn" : "crit");
+          if (purged) { state.textContent = "PURGED. 0 BIOSIGNS"; state.className = "dc-state ok"; return; }
+          state.textContent = r.bios + " BIOSIGNS. " + (sealed ? "SEALED" : "OPEN");
+          state.className = "dc-state " + (sealed ? "warn" : "crit");
+          const seal = el("button", "opt dc-btn", sealed ? "[ SEALED ]" : "[ SEAL ]");
+          seal.type = "button"; seal.disabled = sealed || busy.on;
+          seal.addEventListener("click", function (e) {
+            e.stopPropagation();
+            if (window.Ship) { Ship.flag("sealed_" + r.key, true); }
+            paint();
+          });
+          const decon = el("button", "opt dc-btn decon", "[ DECONTAMINATE ]");
+          decon.type = "button"; decon.disabled = !sealed || busy.on;
+          decon.title = sealed ? "" : "Seal the compartment first";
+          decon.addEventListener("click", function (e) {
+            e.stopPropagation();
+            if (busy.on) { return; }
+            busy.on = true; seal.disabled = decon.disabled = true;
+            barRow.classList.add("on");
+            runBar(bar, cap, ["PRESSURE DOORS LOCKED", "FLOODING DECON AGENT", "BURNING ORGANICS", "SCANNING FOR BIOSIGNS", "VENTING TO SPACE"], 4200, function () {
+              if (window.Ship) { Ship.flag("purge_" + r.key, true); }
+              busy.on = false;
+              cap.textContent = "+++ PURGE CONFIRMED. " + r.name + ": 0 BIOSIGNS +++";
+              cap.classList.add("good");
+              paint();
+            });
+          });
+          act.appendChild(seal); act.appendChild(decon);
+        }
+        paint();
+      });
+    });
+    const close = el("button", "opt dc-done", "[ DONE ]");
+    close.type = "button";
+    close.addEventListener("click", function (e) { e.stopPropagation(); done(); });
+    wrap.appendChild(close);
+    return wrap;
+  }
+  purge.title = "COMPARTMENT PURGE";
+
+  function suppress(sys, opts) {
+    const done = (opts && opts.done) || function () {};
+    const wrap = el("section", "dc");
+    const out = flagOn("fire_suppressed");
+    wrap.appendChild(el("div", "dc-h", "Discharge suppressant into every compartment reporting fire."));
+    const states = [];
+    FIRE_ROOMS.forEach(function (f) {
+      const row = el("div", "dc-row " + (out ? "ok" : "crit"));
+      row.appendChild(el("span", "dc-name", f[1]));
+      row.appendChild(el("span", "dc-deckname", f[0]));
+      const st = el("span", "dc-state " + (out ? "ok" : "crit"), out ? "OUT. VENTING SMOKE" : "FIRE");
+      row.appendChild(st);
+      states.push([row, st]);
+      wrap.appendChild(row);
+    });
+    const barRow = el("div", "dc-progress" + (out ? "" : ""));
+    const bar = el("div", "dc-bar"), cap = el("div", "dc-cap");
+    barRow.appendChild(bar); barRow.appendChild(cap);
+    wrap.appendChild(barRow);
+    const go = el("button", "opt dc-btn big", out ? "[ SUPPRESSION SPENT ]" : "[ DISCHARGE SUPPRESSION ]");
+    go.type = "button"; go.disabled = out;
+    go.addEventListener("click", function (e) {
+      e.stopPropagation();
+      go.disabled = true;
+      barRow.classList.add("on");
+      runBar(bar, cap, ["ARMING HALON BANKS", "DISCHARGING", "SMOTHERING FIRES", "CHECKING HEAT SENSORS"], 3600, function () {
+        if (window.Ship) { Ship.flag("fire_suppressed", true); }
+        states.forEach(function (s) { s[0].className = "dc-row ok"; s[1].className = "dc-state ok"; s[1].textContent = "OUT. VENTING SMOKE"; });
+        cap.textContent = "+++ ALL FIRES OUT +++"; cap.classList.add("good");
+        go.textContent = "[ SUPPRESSION SPENT ]";
+      });
+    });
+    wrap.appendChild(go);
+    const close = el("button", "opt dc-done", "[ DONE ]");
+    close.type = "button";
+    close.addEventListener("click", function (e) { e.stopPropagation(); done(); });
+    wrap.appendChild(close);
+    return wrap;
+  }
+  suppress.title = "FIRE SUPPRESSION";
+
+  window.Repairs = { vox: vox, reactor: reactor, engines: true, enginePort: enginePort, engineStbd: engineStbd,
+                     purge: purge, suppress: suppress, PURGE_ROOMS: PURGE_ROOMS, FIRE_ROOMS: FIRE_ROOMS };
 })();

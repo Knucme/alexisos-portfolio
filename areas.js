@@ -431,6 +431,26 @@
 
     panel.appendChild(deck);
 
+    // Damage control: purge infested compartments, put out the fires.
+    // Each opens its own window (Repairs.purge / Repairs.suppress in repair.js).
+    const flagOn = function (n) { return !!(window.Ship && Ship.flag(n)); };
+    const live = (window.Repairs && Repairs.PURGE_ROOMS || []).filter(function (r) { return !flagOn("purge_" + r.key); });
+    const bios = live.reduce(function (n, r) { return n + r.bios; }, 0);
+    const fires = flagOn("fire_suppressed") ? 0 : (window.Repairs && Repairs.FIRE_ROOMS || []).length;
+    const dc = el("div", "bp-dc");
+    dc.appendChild(el("div", "bp-bay-title static", "DAMAGE CONTROL"));
+    [["purge", "COMPARTMENT PURGE", bios ? bios + " BIOSIGNS IN " + live.length + (live.length === 1 ? " ROOM" : " ROOMS") : "NO BIOSIGNS", bios ? "warn" : "ok"],
+     ["suppress", "FIRE SUPPRESSION", fires ? "FIRE IN " + fires + (fires === 1 ? " ROOM" : " ROOMS") : "ALL FIRES OUT", fires ? "crit" : "ok"]].forEach(function (c) {
+      const b = el("button", "bp-dc-btn " + c[0] + " " + c[3]);
+      b.type = "button";
+      b.appendChild(el("span", "bp-dc-cap"));
+      b.appendChild(el("span", "bp-dc-name", c[1]));
+      b.appendChild(el("span", "bp-dc-state", c[2]));
+      b.addEventListener("click", function (e) { e.stopPropagation(); if (opts && opts.open) { opts.open(c[0]); } });
+      dc.appendChild(b);
+    });
+    panel.appendChild(dc);
+
     // A thin bottom rail: readouts and just a few buttons
     const rail = el("div", "bp-rail");
     [["BRG", "271.4"], ["RNG", "0.00"], ["VEL", "0.000"], ["T+", "1207D"]].forEach(function (r) {
@@ -517,11 +537,11 @@
   const CAM_HOLD = { eye: [4.4, 2.7, 1.8], target: [-1.2, 0.6, -6], fov: 66 };
   const INCURSIONS = {
     // contaminated or breached: fire plus the warp incursion
-    quarantine: { cam: CAM_STD, ritual: "aft_cargo/q_ritual.png", glow: [126, 100],
+    quarantine: { key: "quarantine", cam: CAM_STD, ritual: "aft_cargo/q_ritual.png", glow: [126, 100],
       portal: { x: 152, y: 57.5, w: 29, h: 31 }, door: { x: -0.3, z: -4.6 }, circle: { x: -0.25, z: -2.55, r: 0.75 },
       bounds: { x0: -1.5, x1: 1.3, z0: -4.3, z1: -1.4 }, spawns: ["blood", "demon", "blood"],
       fire: [[-1.3, -1.6, 0.7], [1.0, -3.6, 0.6], [1.2, -1.8, 0.5], [-1.6, -3.0, 0.6], [0.6, -4.5, 0.5]] },
-    bunksB: { cam: CAM_STD, ritual: "deck4/bb_ritual.png", glow: [129, 104],          // hull breach
+    bunksB: { key: "bunksB", cam: CAM_STD, ritual: "deck4/bb_ritual.png", glow: [129, 104],          // hull breach
       portal: { x: 185, y: 62, w: 34, h: 30 }, door: { x: 1.35, z: -4.6 }, circle: { x: 0, z: -2.4, r: 0.65 },
       bounds: { x0: -1.0, x1: 1.6, z0: -4.2, z1: -1.0 }, spawns: ["demon", "blood", "blood"],
       fire: [[-1.0, -4.3, 0.8], [1.2, -1.4, 0.6], [-1.3, -1.2, 0.5], [1.1, -3.6, 0.7], [-1.5, -3.0, 0.6], [0.3, -0.4, 0.5]] },
@@ -562,7 +582,15 @@
       return { kind: kind, x: cfg.door.x, z: cfg.door.z, tx: cfg.door.x, tz: cfg.door.z,
                state: "wait", until: 0.5 + i * 4.5, face: 1, seed: i * 17.3 + cfg.door.x };
     });
-    let last = 0;
+    let last = 0, smoke = [];
+    // bridge damage control state, re-read twice a second
+    let st = { sealed: false, purged: false, out: false }, stAt = -1;
+    function readState(t) {
+      if (t - stAt < 0.5 && stAt >= 0) { return; }
+      stAt = t;
+      const f = function (n) { return !!(window.Ship && Ship.flag(n)); };
+      st = { sealed: !!cfg.key && f("sealed_" + cfg.key), purged: !!cfg.key && f("purge_" + cfg.key), out: f("fire_suppressed") };
+    }
 
     function pick(m, t) {
       // now and then go and stand at its own spot on the circle's edge
@@ -573,6 +601,18 @@
     }
 
     function step(m, t, dt) {
+      if (st.purged && m.state !== "dying" && m.state !== "dead") {
+        // killed by the purge: drop where it stands (or, if it never came
+        // through, somewhere on the floor) and play the death animation
+        if (m.state === "wait") {
+          const B = cfg.bounds;
+          m.x = B.x0 + (B.x1 - B.x0) * (Math.sin(m.seed * 3.7) * 0.5 + 0.5);
+          m.z = B.z0 + (B.z1 - B.z0) * (Math.sin(m.seed * 5.1) * 0.5 + 0.5);
+        }
+        m.state = "dying"; m.until = t;
+      }
+      if (m.state === "dying") { if (t - m.until > 0.7) { m.state = "dead"; } return; }
+      if (m.state === "dead") { return; }
       if (m.state === "wait") { if (t >= m.until) { m.state = "emerge"; m.until = t + 1.2; } return; }
       if (m.state === "emerge") { if (t >= m.until) { m.state = "idle"; m.until = t + 0.6; } return; }
       if (m.state === "idle" || m.state === "attack") { if (t >= m.until) { pick(m, t); m.state = "walk"; } return; }
@@ -594,8 +634,10 @@
       if (!img.complete || !img.naturalWidth || m.state === "wait") { return; }
       const foot = proj(m.x, 0, m.z), head = proj(m.x, HEIGHT, m.z);
       const scale = Math.max(0.35, (foot.y - head.y) / 17);
-      const row = ROWS[m.state === "walk" ? "walk" : m.state === "attack" ? "attack" : "idle"];
-      const n = Math.floor(t * (m.state === "walk" ? 10 : 7) + m.seed) % row[1];
+      let row = ROWS[m.state === "walk" ? "walk" : m.state === "attack" ? "attack" : "idle"];
+      let n = Math.floor(t * (m.state === "walk" ? 10 : 7) + m.seed) % row[1];
+      if (m.state === "dying") { row = ROWS.death; n = Math.min(row[1] - 1, Math.floor((t - m.until) * 6)); }
+      if (m.state === "dead") { row = ROWS.death; n = row[1] - 1; }
       ctx.save();
       if (m.state === "emerge") { ctx.globalAlpha = Math.max(0, 1 - (m.until - t) / 1.2); }
       ctx.fillStyle = "rgba(0,0,0,0.35)";
@@ -606,7 +648,29 @@
       ctx.restore();
     }
 
+    // after fire suppression: grey smoke rising from where each fire was
+    function drawSmoke(ctx, f, t) {
+      const foot = proj(f[0], 0, f[1]), top = proj(f[0], f[2], f[1]);
+      const scale = Math.max(0.4, (foot.y - top.y) / 22);
+      if (Math.random() < 0.25) {
+        smoke.push({ x: foot.x + (Math.random() - 0.5) * 6 * scale, y: foot.y - 2 * scale, r: 1.5 * scale,
+                     vx: (Math.random() - 0.3) * 0.15, vy: -(0.25 + Math.random() * 0.25) * scale, life: 0, max: 90 + Math.random() * 60 });
+      }
+      if (Math.sin(t * 2 + f[0] * 7) > 0.85) { glowAt(ctx, foot.x, foot.y - 1, 5 * scale, "rgba(255,90,30,0.35)"); }   // dying ember
+    }
+    function drawPuffs(ctx) {
+      smoke.forEach(function (p) {
+        p.life++; p.x += p.vx + Math.sin(p.life * 0.06) * 0.1; p.y += p.vy; p.r += 0.04;
+        const a = Math.max(0, 1 - p.life / p.max), s = Math.round(p.r);
+        ctx.fillStyle = "rgba(150,150,155," + (0.35 * a).toFixed(3) + ")";
+        ctx.fillRect(Math.round(p.x - s), Math.round(p.y - s / 2), s * 2, s);
+        ctx.fillRect(Math.round(p.x - s / 2), Math.round(p.y - s), s, s * 2);
+      });
+      smoke = smoke.filter(function (p) { return p.life < p.max && p.y > -10; });
+    }
+
     function drawFire(ctx, f, t) {
+      if (st.out) { drawSmoke(ctx, f, t); return; }
       const foot = proj(f[0], 0, f[1]), top = proj(f[0], f[2], f[1]);
       const scale = Math.max(0.4, (foot.y - top.y) / 22);     // flame height in metres sets its size
       glowAt(ctx, foot.x, foot.y - 6 * scale, 22 * scale, "rgba(255,120,30," + (0.35 + 0.1 * Math.sin(t * 9 + f[0])).toFixed(3) + ")");
@@ -618,22 +682,31 @@
 
     return function (ctx, t) {
       const dt = Math.min(0.1, Math.max(0, t - last)); last = t;
-      // the portal and its light
-      if (P) { glowAt(ctx, P.x, P.y + 4, P.h * 1.4, "rgba(255,110,30," + (0.22 + 0.06 * Math.sin(t * 3)).toFixed(3) + ")"); }
-      if (P && portalImg.complete && portalImg.naturalWidth) {
+      readState(t);
+      // the portal and its light (gone once the room is purged)
+      if (P && !st.purged) { glowAt(ctx, P.x, P.y + 4, P.h * 1.4, "rgba(255,110,30," + (0.22 + 0.06 * Math.sin(t * 3)).toFixed(3) + ")"); }
+      if (P && !st.purged && portalImg.complete && portalImg.naturalWidth) {
         const n = Math.floor(t * PF.fps) % PF.frames;
         ctx.drawImage(portalImg, n * PF.size, 0, PF.size, PF.size, P.x - P.w / 2, P.y - P.h / 2, P.w, P.h);
       }
       // blood circle on the floor, pulsing
       if (ritualImg && ritualImg.complete && ritualImg.naturalWidth) {
-        ctx.save(); ctx.globalAlpha = 0.7 + 0.3 * Math.sin(t * 2.2); ctx.drawImage(ritualImg, 0, 0, 256, 144); ctx.restore();
-        glowAt(ctx, cfg.glow[0], cfg.glow[1], 34, "rgba(255,30,20," + (0.12 + 0.08 * Math.sin(t * 2.2)).toFixed(3) + ")");
+        ctx.save(); ctx.globalAlpha = st.purged ? 0.3 : 0.7 + 0.3 * Math.sin(t * 2.2); ctx.drawImage(ritualImg, 0, 0, 256, 144); ctx.restore();
+        if (!st.purged) { glowAt(ctx, cfg.glow[0], cfg.glow[1], 34, "rgba(255,30,20," + (0.12 + 0.08 * Math.sin(t * 2.2)).toFixed(3) + ")"); }
       }
       mons.forEach(function (m) { step(m, t, dt); });
       // flames and creatures, far to near
       const items = cfg.fire.map(function (f) { return { z: f[1], draw: function () { drawFire(ctx, f, t); } }; })
         .concat(mons.map(function (m) { return { z: m.z, draw: function () { drawMon(ctx, m, t); } }; }));
       items.sort(function (a, b) { return a.z - b.z; }).forEach(function (it) { it.draw(); });
+      drawPuffs(ctx);
+      // status tag from the bridge
+      if (st.sealed || st.purged) {
+        ctx.font = "7px \"IBM Plex Mono\", monospace";
+        ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(4, 126, 98, 10);
+        ctx.fillStyle = st.purged ? "#7dff9a" : "#ffb43a";
+        ctx.fillText(st.purged ? "PURGED. 0 BIOSIGNS" : "SEALED. BIOSIGNS ACTIVE", 6, 133);
+      }
     };
   }
 
@@ -1018,6 +1091,7 @@
   /* ---------- DECK 4: crew quarters ---------- */
   function deck4() {
     const D = "assets/deck4/";
+    const purgedB = !!(window.Ship && Ship.flag("purge_bunksB"));
     return withCam([
       { room: "BUNKS A", cam: "04", src: D + "crew_quarters.png", fx: pulse(204, 70, 36, "255,40,20", 3) },
       { room: "BUNKS B", cam: "05", src: D + "d4_bunks_b.png", fx: both(pulse(155, 57, 44, "255,30,15", 6, "blink"), incursionFx(INCURSIONS.bunksB)) },
@@ -1039,7 +1113,8 @@
       hull: "40,60 690,60 770,150 770,270 690,360 40,360 20,330 20,90",
       rooms: [
         { name: "BUNKS A", x: 50, y: 70, w: 150, h: 120, status: "ok", note: "12 RACKS. ALL EMPTY.", furn: bunks(4) },
-        { name: "BUNKS B", x: 200, y: 70, w: 140, h: 120, status: "dmg", note: "PRESSURE SEAL FAILING. HULL BREACH ALONG OUTER WALL.", furn: bunks(3) },
+        { name: "BUNKS B", x: 200, y: 70, w: 140, h: 120, status: "dmg", furn: bunks(3),
+          note: "PRESSURE SEAL FAILING. HULL BREACH ALONG OUTER WALL." + (purgedB ? " PURGED: 0 BIOSIGNS." : " BIOSIGNS INSIDE.") },
         { name: "SANITATION", x: 340, y: 70, w: 90, h: 120, status: "ok", note: "WATER RECLAIM OFFLINE." },
         { name: "MEDICAE BAY", x: 430, y: 70, w: 140, h: 120, status: "ok", note: "2 SURGICAL SLABS. SUPPLIES 9%.",
           furn: function (g, r) { [0, 1].forEach(function (i) { sv("rect", { x: r.x + 20 + i * 60, y: r.y + 14, width: 40, height: 22, class: "dp-furn" }, g); }); } },
@@ -1065,6 +1140,7 @@
   /* ---------- AFT CARGO ---------- */
   function cargoBay() {
     const C = "assets/aft_cargo/";
+    const purgedQ = !!(window.Ship && Ship.flag("purge_quarantine"));
     return withCam([
       { room: "HOLD 1", cam: "21", src: C + "c_hold1.png" },
       { room: "HOLD 2", cam: "22", src: C + "cargo_hold.png", fx: both(pulse(158, 50, 40, "255,150,30", 5, "beacon"), incursionFx(INCURSIONS.hold2)) },
@@ -1081,7 +1157,8 @@
       rooms: [
         { name: "HOLD 1", x: 50, y: 50, w: 250, h: 320, status: "ok", note: "24 CONTAINERS. MANIFEST MATCHES.", furn: crates(4, 4), labelY: 20 },
         { name: "HOLD 2", x: 300, y: 50, w: 220, h: 320, status: "dmg", note: "CONTAINER C7 TORN FROM ITS CLAMPS. MISSING.", furn: crates(3, 4, 6), labelY: 20 },
-        { name: "QUARANTINE", x: 520, y: 50, w: 130, h: 130, status: "dmg", note: "UNKNOWN BIOSIGNS. 3 CONTACTS. MOVING." },
+        { name: "QUARANTINE", x: 520, y: 50, w: 130, h: 130, status: "dmg",
+          note: purgedQ ? "PURGED FROM THE BRIDGE. 0 BIOSIGNS. 3 BODIES." : "UNKNOWN BIOSIGNS. 3 CONTACTS. MOVING." },
         { name: "MANIFEST OFFICE", x: 520, y: 180, w: 130, h: 70, status: "ok", note: "LAST ENTRY 1,207 DAYS AGO." },
         { name: "CARGO LIFT", x: 520, y: 250, w: 130, h: 120, status: "ok", note: "STUCK BETWEEN DECKS 3 AND 4.",
           furn: function (g, r) { sv("rect", { x: r.x + 30, y: r.y + 30, width: 70, height: 60, class: "dp-furn" }, g); sv("line", { x1: r.x + 30, y1: r.y + 30, x2: r.x + 100, y2: r.y + 90, class: "dp-furn" }, g); sv("line", { x1: r.x + 100, y1: r.y + 30, x2: r.x + 30, y2: r.y + 90, class: "dp-furn" }, g); } },
@@ -1091,12 +1168,12 @@
       ],
       doors: [[300, 120, "v"], [300, 300, "v"], [520, 215, "v"], [520, 310, "v"], [585, 180, "h"], [585, 250, "h"], [650, 210, "v"], [700, 170, "h"], [700, 250, "h"]],
       extra: function (svg) {
-        // unknown biosigns drifting inside quarantine
-        [[560, 95, 0], [610, 140, 1.3], [585, 120, 2.4]].forEach(function (b) {
+        // unknown biosigns drifting inside quarantine (gone once it is purged)
+        (purgedQ ? [] : [[560, 95, 0], [610, 140, 1.3], [585, 120, 2.4]]).forEach(function (b) {
           const c = sv("circle", { cx: b[0], cy: b[1], r: 4, class: "dp-bio" }, svg);
           c.style.animationDelay = b[2] + "s";
         });
-        sv("text", { x: 585, y: 34, class: "dp-callout" }, svg).textContent = "3 UNKNOWN BIOSIGNS";
+        sv("text", { x: 585, y: 34, class: "dp-callout" }, svg).textContent = purgedQ ? "QUARANTINE PURGED" : "3 UNKNOWN BIOSIGNS";
         // scrape marks where C-7 broke loose
         sv("path", { d: "M 440 300 L 470 330 L 490 336 L 505 360", class: "dp-breach" }, svg);
       }

@@ -1993,3 +1993,65 @@ body.theme-retrowave:not(.red-alert):not(.green-mode) .emblem { filter: none; }
 .readiness-fill { height: 100%; background: var(--amber); box-shadow: 0 0 8px var(--amber); }
 .readiness.ready .readiness-fill { background: #38ff7a; box-shadow: 0 0 8px #38ff7a; }
 .readiness.ready .readiness-l { color: #38ff7a; }
+
+/* ---------- Bridge: damage control strip ---------- */
+.bp-dc {
+  position: relative;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  margin-top: 12px; padding: 20px 12px 12px;
+  background:
+    linear-gradient(180deg, rgba(10, 12, 16, 0.80), rgba(6, 7, 10, 0.90)),
+    url("assets/bridge/tex_steel.jpg") 0 0 / 256px 256px, var(--panel);
+  border: 1px solid #000;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 0 18px rgba(0, 0, 0, 0.75), 0 1px 0 rgba(255, 255, 255, 0.10);
+}
+.bp-dc .bp-bay-title { position: absolute; top: 3px; left: 12px; font-size: 13px; letter-spacing: 0.1em; }
+.bp-dc-btn {
+  position: relative; font: inherit; cursor: pointer; text-align: left;
+  display: grid; grid-template-columns: 26px 1fr; grid-template-rows: auto auto; column-gap: 10px;
+  padding: 8px 12px; color: #e8e2c8;
+  background: linear-gradient(180deg, #2a2f38, #15181e);
+  border: 1px solid #000; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 2px 0 #05070a;
+}
+.bp-dc-btn:hover { filter: brightness(1.2); }
+.bp-dc-btn:active { transform: translateY(1px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08); }
+.bp-dc-cap { grid-row: 1 / span 2; align-self: center; width: 22px; height: 22px; border-radius: 50%; border: 2px solid #000;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.35), 0 0 10px currentColor; }
+.bp-dc-btn.purge .bp-dc-cap { background: #e7a53a; color: rgba(231, 165, 58, 0.55); }
+.bp-dc-btn.suppress .bp-dc-cap { background: #d8352a; color: rgba(216, 53, 42, 0.55); }
+.bp-dc-btn.ok .bp-dc-cap { background: #3a7a4a; color: rgba(60, 200, 110, 0.35); }
+.bp-dc-name { font-weight: 600; letter-spacing: 0.08em; }
+.bp-dc-state { font-size: 0.8em; letter-spacing: 0.06em; color: #9aa3ad; }
+.bp-dc-btn.warn .bp-dc-state { color: #ffb43a; }
+.bp-dc-btn.crit .bp-dc-state { color: #ff5a3c; animation: bp-warn 1s steps(2) infinite; }
+.bp-dc-btn.ok .bp-dc-state { color: #7dff9a; }
+@media (max-width: 700px) { .bp-dc { grid-template-columns: 1fr; } }
+
+/* ---------- Damage control windows (purge, suppression) ---------- */
+.dc { min-width: min(640px, 86vw); }
+.dc-h { margin-bottom: 10px; color: var(--amber-dim); }
+.dc-deck { margin: 10px 0 4px; font-family: var(--font-head); letter-spacing: 0.1em; color: var(--amber); border-bottom: 1px solid var(--amber-faint); }
+.dc-row { display: grid; grid-template-columns: 16ch 1fr auto; gap: 10px; align-items: center; padding: 3px 6px; border-left: 3px solid transparent; }
+.dc-row.crit { border-left-color: #ff5a3c; background: rgba(255, 90, 60, 0.06); }
+.dc-row.warn { border-left-color: #ffb43a; background: rgba(255, 180, 58, 0.06); }
+.dc-row.ok { border-left-color: #3a7a4a; }
+.dc-deckname { font-size: 0.8em; color: var(--amber-dim); }
+.dc-name { letter-spacing: 0.05em; }
+.dc-state { font-size: 0.85em; }
+.dc-state.ok { color: #7dff9a; }
+.dc-state.warn { color: #ffb43a; }
+.dc-state.crit { color: #ff5a3c; }
+.dc-state.dim { color: var(--amber-dim); }
+.dc-act { display: flex; gap: 6px; }
+.dc-btn { border: 1px solid var(--amber-dim); padding: 1px 8px; }
+.dc-btn:disabled { opacity: 0.35; cursor: default; }
+.dc-btn:disabled:hover { background: none; color: inherit; }
+.dc-btn.big { display: block; margin: 12px auto 0; padding: 4px 16px; border-color: #ff5a3c; color: #ff5a3c; }
+.dc-progress { display: none; margin: 4px 0 8px 16px; }
+.dc-progress.on { display: block; }
+.dc-bar { display: grid; grid-template-columns: repeat(24, 1fr); gap: 3px; height: 12px; }
+.dc-cell { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--amber-faint); }
+.dc-cell.on { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+.dc-cap { margin-top: 4px; font-size: 0.85em; color: var(--amber); }
+.dc-cap.good { color: #7dff9a; }
+.dc-done { display: block; margin: 14px auto 0; }
